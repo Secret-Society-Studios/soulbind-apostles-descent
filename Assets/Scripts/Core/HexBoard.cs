@@ -6,6 +6,7 @@ namespace SoulBind.Core
     /// <summary>
     /// A board made of an arbitrary set of hex tiles. Pure rules data: no Unity types.
     /// Tile order is the order given, so every machine can build an identical board.
+    /// Neighbor lists are built once at creation, so lookups never allocate.
     /// </summary>
     public sealed class HexBoard
     {
@@ -13,6 +14,8 @@ namespace SoulBind.Core
         private readonly HashSet<HexCoord> _edgeSet = new HashSet<HexCoord>();
         private readonly List<HexCoord> _tiles = new List<HexCoord>();
         private readonly List<HexCoord> _edgeTiles = new List<HexCoord>();
+        private readonly Dictionary<HexCoord, IReadOnlyList<HexCoord>> _neighbors =
+            new Dictionary<HexCoord, IReadOnlyList<HexCoord>>();
 
         public int TileCount => _tiles.Count;
         public IReadOnlyList<HexCoord> Tiles => _tiles;
@@ -35,16 +38,23 @@ namespace SoulBind.Core
             if (_tiles.Count == 0)
                 throw new ArgumentException("A board needs at least one tile.", nameof(tiles));
 
+            var found = new List<HexCoord>(HexCoord.DirectionCount);
             foreach (HexCoord tile in _tiles)
             {
+                found.Clear();
                 for (int d = 0; d < HexCoord.DirectionCount; d++)
                 {
-                    if (!_tileSet.Contains(tile.Neighbor(d)))
-                    {
-                        _edgeSet.Add(tile);
-                        _edgeTiles.Add(tile);
-                        break;
-                    }
+                    HexCoord neighbor = tile.Neighbor(d);
+                    if (_tileSet.Contains(neighbor))
+                        found.Add(neighbor);
+                }
+
+                _neighbors.Add(tile, Array.AsReadOnly(found.ToArray()));
+
+                if (found.Count < HexCoord.DirectionCount)
+                {
+                    _edgeSet.Add(tile);
+                    _edgeTiles.Add(tile);
                 }
             }
         }
@@ -82,20 +92,13 @@ namespace SoulBind.Core
 
         public bool IsEdge(HexCoord tile) => _edgeSet.Contains(tile);
 
-        /// <summary>Neighbors of a tile that are on the board (0 to 6 tiles).</summary>
-        public List<HexCoord> GetNeighborsOnBoard(HexCoord tile)
+        /// <summary>Neighbors of a tile that are on the board (0 to 6 tiles). Does not allocate.</summary>
+        public IReadOnlyList<HexCoord> GetNeighborsOnBoard(HexCoord tile)
         {
-            if (!Contains(tile))
+            if (!_neighbors.TryGetValue(tile, out IReadOnlyList<HexCoord> neighbors))
                 throw new ArgumentException($"Tile {tile} is not on the board.", nameof(tile));
 
-            var result = new List<HexCoord>(HexCoord.DirectionCount);
-            for (int d = 0; d < HexCoord.DirectionCount; d++)
-            {
-                HexCoord neighbor = tile.Neighbor(d);
-                if (Contains(neighbor))
-                    result.Add(neighbor);
-            }
-            return result;
+            return neighbors;
         }
 
         /// <summary>True if every tile can be reached from every other by stepping between neighbors.</summary>
@@ -108,10 +111,9 @@ namespace SoulBind.Core
             while (queue.Count > 0)
             {
                 HexCoord current = queue.Dequeue();
-                for (int d = 0; d < HexCoord.DirectionCount; d++)
+                foreach (HexCoord next in _neighbors[current])
                 {
-                    HexCoord next = current.Neighbor(d);
-                    if (_tileSet.Contains(next) && seen.Add(next))
+                    if (seen.Add(next))
                         queue.Enqueue(next);
                 }
             }
