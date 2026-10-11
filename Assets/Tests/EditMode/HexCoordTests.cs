@@ -85,5 +85,69 @@ namespace SoulBind.Tests.EditMode
             Assert.IsTrue(a.Equals((object)b));
             Assert.IsTrue(new HashSet<HexCoord> { a }.Contains(b));
         }
+
+        [Test]
+        public void ToPlane_OriginIsAtZero()
+        {
+            new HexCoord(0, 0).ToPlane(0.5f, out float x, out float y);
+            Assert.AreEqual(0f, x, 0.0001f);
+            Assert.AreEqual(0f, y, 0.0001f);
+        }
+
+        [Test]
+        public void ToPlane_AdjacentTilesAreSqrt3TimesSizeApart()
+        {
+            const float size = 0.5f;
+            var origin = new HexCoord(2, -1);
+            origin.ToPlane(size, out float ox, out float oy);
+
+            foreach (HexCoord neighbor in origin.GetNeighbors())
+            {
+                neighbor.ToPlane(size, out float nx, out float ny);
+                float distance = (float)Math.Sqrt((nx - ox) * (nx - ox) + (ny - oy) * (ny - oy));
+                Assert.AreEqual(size * 1.7320508f, distance, 0.0001f);
+            }
+        }
+
+        [Test]
+        public void ToPlane_HigherRowsAreLowerOnScreen()
+        {
+            new HexCoord(0, 0).ToPlane(0.5f, out _, out float top);
+            new HexCoord(0, 1).ToPlane(0.5f, out _, out float below);
+            Assert.Less(below, top);
+        }
+
+        [Test]
+        public void FromPlane_OriginIsTileZeroZero()
+        {
+            Assert.AreEqual(new HexCoord(0, 0), HexCoord.FromPlane(0f, 0f, 0.5f));
+        }
+
+        [Test]
+        public void FromPlane_RoundTripsEveryTileCenter()
+        {
+            const float size = 0.5f;
+            foreach (HexCoord tile in StandardBoard.Create().Tiles)
+            {
+                tile.ToPlane(size, out float x, out float y);
+                Assert.AreEqual(tile, HexCoord.FromPlane(x, y, size), $"Tile {tile} did not round-trip");
+            }
+        }
+
+        [Test]
+        public void FromPlane_PointsNearACenterMapToThatTile()
+        {
+            const float size = 0.5f;
+            var tile = new HexCoord(3, 4);
+            tile.ToPlane(size, out float cx, out float cy);
+
+            for (int i = 0; i < 6; i++)
+            {
+                double angle = i * Math.PI / 3.0;
+                float x = cx + (float)Math.Cos(angle) * size * 0.45f;
+                float y = cy + (float)Math.Sin(angle) * size * 0.45f;
+                Assert.AreEqual(tile, HexCoord.FromPlane(x, y, size), $"Offset {i} left the tile");
+            }
+        }
     }
 }
