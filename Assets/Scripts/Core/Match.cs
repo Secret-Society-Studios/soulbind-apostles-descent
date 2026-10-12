@@ -10,8 +10,14 @@ namespace SoulBind.Core
     /// </summary>
     public sealed class Match
     {
+        // Kept for decisions made during play (such as Ascension tile tie-breaks).
+        private readonly Random _random;
+
         public Battlefield Battlefield { get; }
         public TurnTracker Turns { get; }
+
+        /// <summary>Who is Awakened and where the Ascension tile is.</summary>
+        public AscensionTracker Ascension { get; }
 
         /// <summary>The Apostle whose turn it is. Null while a Phase is waiting to start, or after the match ends.</summary>
         public ApostleState CurrentApostle { get; private set; }
@@ -24,12 +30,17 @@ namespace SoulBind.Core
         /// <summary>Id of the winner, or 0 if the match ended with no living Apostle.</summary>
         public int WinnerId { get; private set; }
 
+        /// <summary>Why the match ended. None while it is still running.</summary>
+        public MatchEndReason EndReason { get; private set; }
+
         public bool IsAwaitingPhaseStart => Turns.IsAwaitingPhaseStart;
 
-        private Match(Battlefield battlefield, TurnTracker turns)
+        private Match(Battlefield battlefield, TurnTracker turns, Random random)
         {
             Battlefield = battlefield;
             Turns = turns;
+            _random = random;
+            Ascension = new AscensionTracker();
         }
 
         /// <summary>
@@ -60,16 +71,22 @@ namespace SoulBind.Core
                 battlefield.AddApostle(new ApostleState(i + 1, spawnTiles[i], startingSouls));
 
             var turns = new TurnTracker(seatOrder);
-            var match = new Match(battlefield, turns);
+            var match = new Match(battlefield, turns, random);
             match.StartTurn();
             return match;
         }
 
-        /// <summary>Moves the current Apostle one tile. See MoveResult for the possible outcomes.</summary>
+        /// <summary>
+        /// Moves the current Apostle one tile. See MoveResult for the possible outcomes.
+        /// A successful move can Awaken an Apostle or win the match: check IsOver afterwards.
+        /// </summary>
         public MoveResult Move(HexCoord destination)
         {
             RequireActiveTurn();
-            return Battlefield.TryMove(CurrentApostle, destination, CurrentCapacity);
+            MoveResult result = Battlefield.TryMove(CurrentApostle, destination, CurrentCapacity);
+            if (result == MoveResult.Success)
+                UpdateGameOver();
+            return result;
         }
 
         /// <summary>
@@ -110,8 +127,8 @@ namespace SoulBind.Core
         }
 
         /// <summary>
-        /// Checks whether the match has ended. Call this after anything that can eliminate
-        /// an Apostle (such as combat). Returns true if the match is over.
+        /// Re-checks Awakening, Ascension and eliminations. Call this after anything that can
+        /// change Souls or eliminate an Apostle (such as combat). Returns true if the match is over.
         /// </summary>
         public bool RefreshGameState() => UpdateGameOver();
 
@@ -154,10 +171,13 @@ namespace SoulBind.Core
                 throw new InvalidOperationException("The phase has ended; call BeginNextPhase first.");
         }
 
+        // Updates Awakening, then checks both win conditions. Returns true if the match is over.
         private bool UpdateGameOver()
         {
             if (IsOver)
                 return true;
+
+            Ascension.Update(Battlefield, CurrentApostle, _random);
 
             IReadOnlyList<ApostleState> apostles = Battlefield.Apostles;
             int living = 0;
@@ -171,14 +191,31 @@ namespace SoulBind.Core
                 }
             }
 
-            if (living > 1)
-                return false;
+            if (living <= 1)
+            {
+                if (living == 1)
+                    EndMatch(lastLivingId, MatchEndReason.LastApostleStanding);
+                else
+                    EndMatch(0, MatchEndReason.NoSurvivors);
+                return true;
+            }
 
+            if (Ascension.HasAscended(Battlefield))
+            {
+                EndMatch(Ascension.AwakenedId, MatchEndReason.Ascension);
+                return true;
+            }
+
+            return false;
+        }
+
+        private void EndMatch(int winnerId, MatchEndReason reason)
+        {
             IsOver = true;
-            WinnerId = living == 1 ? lastLivingId : 0;
+            WinnerId = winnerId;
+            EndReason = reason;
             CurrentApostle = null;
             CurrentCapacity = null;
-            return true;
         }
 
         private ApostleState FindApostle(int id)

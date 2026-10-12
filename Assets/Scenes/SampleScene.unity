@@ -543,6 +543,9 @@ MonoBehaviour:
   tileColor: {r: 0.62, g: 0.54, b: 0.47, a: 1}
   edgeTileColor: {r: 0.8, g: 0.7, b: 0.56, a: 1}
   highlightColor: {r: 0.45, g: 0.85, b: 0.5, a: 1}
+  healTileColor: {r: 0.9, g: 0.4, b: 0.45, a: 1}
+  purifyTileColor: {r: 0.5, g: 0.75, b: 0.95, a: 1}
+  soulTileColor: {r: 0.68, g: 0.45, b: 0.9, a: 1}
   fitCameraToBoard: 1
   cameraMargin: 1
 --- !u!1 &1066798566
@@ -578,7 +581,7 @@ MonoBehaviour:
   apostlePrefab: {fileID: 2518714460669325445, guid: fa75c4a0ccf4c624fbf30d671313b655, type: 3}
   hud: {fileID: 1090074782}
   playerCount: 4
-  seed: 0
+  seed: 7
   apostleDiameter: 0.6
 --- !u!4 &1066798568
 Transform:
