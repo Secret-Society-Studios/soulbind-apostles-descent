@@ -12,11 +12,16 @@ namespace SoulBind.Core
         private readonly List<ApostleState> _apostles = new List<ApostleState>(GameConstants.MaxPlayers);
 
         public HexBoard Board { get; }
+
+        /// <summary>The special tiles still waiting to be used.</summary>
+        public SpecialTiles Specials { get; }
+
         public IReadOnlyList<ApostleState> Apostles => _apostles;
 
-        public Battlefield(HexBoard board)
+        public Battlefield(HexBoard board, SpecialTiles specialTiles = null)
         {
             Board = board ?? throw new ArgumentNullException(nameof(board));
+            Specials = specialTiles ?? new SpecialTiles();
         }
 
         /// <summary>The living Apostle on this tile, or null. Eliminated Apostles do not count.</summary>
@@ -59,7 +64,8 @@ namespace SoulBind.Core
 
         /// <summary>
         /// Moves an Apostle one tile and spends Capacity, or explains why it cannot.
-        /// Nothing changes unless the result is Success.
+        /// Nothing changes unless the result is Success. A successful move onto a
+        /// special tile triggers it.
         /// </summary>
         public MoveResult TryMove(ApostleState apostle, HexCoord destination, TurnCapacity capacity)
         {
@@ -80,6 +86,7 @@ namespace SoulBind.Core
 
             capacity.Spend(GameConstants.MoveCapacityCost);
             apostle.MoveTo(destination);
+            Specials.TryTrigger(apostle);
             return MoveResult.Success;
         }
 

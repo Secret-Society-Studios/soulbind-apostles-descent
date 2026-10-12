@@ -49,12 +49,17 @@ namespace SoulBind.Core
             if (spawnTiles.Count != playerCount)
                 throw new ArgumentException("There must be exactly one spawn tile per player.", nameof(spawnTiles));
 
-            var battlefield = new Battlefield(board);
+            // The seat order must be the first use of the random source,
+            // so the same seed always gives the same starting player.
+            int[] seatOrder = TurnTracker.CreateRandomSeatOrder(playerCount, random);
+            SpecialTiles specialTiles = SpecialTiles.CreateRandom(board, random);
+
+            var battlefield = new Battlefield(board, specialTiles);
             int startingSouls = GameConstants.GetStartingSouls(playerCount);
             for (int i = 0; i < playerCount; i++)
                 battlefield.AddApostle(new ApostleState(i + 1, spawnTiles[i], startingSouls));
 
-            var turns = new TurnTracker(TurnTracker.CreateRandomSeatOrder(playerCount, random));
+            var turns = new TurnTracker(seatOrder);
             var match = new Match(battlefield, turns);
             match.StartTurn();
             return match;

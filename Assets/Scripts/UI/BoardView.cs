@@ -17,10 +17,14 @@ namespace SoulBind.UI
         [SerializeField] private Color tileColor = new Color(0.62f, 0.54f, 0.47f);
         [SerializeField] private Color edgeTileColor = new Color(0.80f, 0.70f, 0.56f);
         [SerializeField] private Color highlightColor = new Color(0.45f, 0.85f, 0.50f);
+        [SerializeField] private Color healTileColor = new Color(0.90f, 0.40f, 0.45f);
+        [SerializeField] private Color purifyTileColor = new Color(0.50f, 0.75f, 0.95f);
+        [SerializeField] private Color soulTileColor = new Color(0.68f, 0.45f, 0.90f);
         [SerializeField] private bool fitCameraToBoard = true;
         [SerializeField] private float cameraMargin = 1f;
 
         private readonly Dictionary<HexCoord, SpriteRenderer> _tiles = new Dictionary<HexCoord, SpriteRenderer>();
+        private readonly Dictionary<HexCoord, SpecialTileType> _specialTypes = new Dictionary<HexCoord, SpecialTileType>();
         private readonly List<HexCoord> _highlighted = new List<HexCoord>(6);
         private float _centerX;
         private float _centerY;
@@ -51,6 +55,26 @@ namespace SoulBind.UI
             return Board.Contains(tile);
         }
 
+        /// <summary>
+        /// Colors exactly these tiles as special tiles. Call it again after any change, and
+        /// call SetHighlights after it so highlights stay on top.
+        /// </summary>
+        public void ShowSpecialTiles(IReadOnlyDictionary<HexCoord, SpecialTileType> active)
+        {
+            foreach (HexCoord tile in _specialTypes.Keys)
+                _tiles[tile].color = PlainColor(tile);
+            _specialTypes.Clear();
+
+            foreach (KeyValuePair<HexCoord, SpecialTileType> pair in active)
+            {
+                if (_tiles.TryGetValue(pair.Key, out SpriteRenderer spriteRenderer))
+                {
+                    _specialTypes[pair.Key] = pair.Value;
+                    spriteRenderer.color = SpecialColor(pair.Value);
+                }
+            }
+        }
+
         /// <summary>Highlights exactly these tiles, clearing any earlier highlights.</summary>
         public void SetHighlights(IReadOnlyList<HexCoord> tiles)
         {
@@ -72,7 +96,20 @@ namespace SoulBind.UI
             _highlighted.Clear();
         }
 
-        private Color BaseColor(HexCoord tile) => Board.IsEdge(tile) ? edgeTileColor : tileColor;
+        private Color PlainColor(HexCoord tile) => Board.IsEdge(tile) ? edgeTileColor : tileColor;
+
+        private Color BaseColor(HexCoord tile) =>
+            _specialTypes.TryGetValue(tile, out SpecialTileType type) ? SpecialColor(type) : PlainColor(tile);
+
+        private Color SpecialColor(SpecialTileType type)
+        {
+            switch (type)
+            {
+                case SpecialTileType.Heal: return healTileColor;
+                case SpecialTileType.Purify: return purifyTileColor;
+                default: return soulTileColor;
+            }
+        }
 
         private void Build()
         {

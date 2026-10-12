@@ -136,6 +136,7 @@ namespace SoulBind.Managers
         private void AfterStateChange()
         {
             SyncViews();
+            boardView.ShowSpecialTiles(CurrentMatch.Battlefield.Specials.Active);
             RefreshHighlights();
             StateChanged?.Invoke();
         }

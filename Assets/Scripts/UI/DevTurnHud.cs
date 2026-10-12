@@ -17,7 +17,7 @@ namespace SoulBind.UI
         [SerializeField] private MatchController matchController;
 
         private readonly StringBuilder _text = new StringBuilder(512);
-        private Rect _panel = new Rect(10f, 10f, 320f, 340f);
+        private Rect _panel = new Rect(10f, 10f, 400f, 380f);
         private string _summary = string.Empty;
         private bool _endTurnPressed;
         private bool _directionPressed;
@@ -140,6 +140,12 @@ namespace SoulBind.UI
                     _text.Append("  (out)");
                 _text.Append('\n');
             }
+
+            SpecialTiles specials = match.Battlefield.Specials;
+            _text.Append("Tiles left: Heal ").Append(specials.CountOf(SpecialTileType.Heal))
+                 .Append(" (red), Purify ").Append(specials.CountOf(SpecialTileType.Purify))
+                 .Append(" (blue), Soul ").Append(specials.CountOf(SpecialTileType.Soul))
+                 .Append(" (purple)\n");
 
             _summary = _text.ToString();
         }

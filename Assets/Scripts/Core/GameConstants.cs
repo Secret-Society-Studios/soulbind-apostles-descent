@@ -26,6 +26,11 @@ namespace SoulBind.Core
         public const int ZeroSoulCorruption = 5;         // gained the moment Souls reach 0
         public const int ZeroSoulDamageMultiplier = 2;   // Corruption damage multiplier while at 0 Souls
 
+        public const int SpecialTilesPerType = 3;
+        public const int HealTileAmount = 5;
+        public const int PurifyTileAmount = 1;
+        public const int SoulTileAmount = 3;
+
         public static int GetStartingSouls(int playerCount)
         {
             switch (playerCount)
