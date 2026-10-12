@@ -31,6 +31,9 @@ namespace SoulBind.Core
         public const int PurifyTileAmount = 1;
         public const int SoulTileAmount = 3;
 
+        public const int SoulsStolenPerAttack = 1;
+        public const int AttackCorruption = 1;
+
         public static int GetStartingSouls(int playerCount)
         {
             switch (playerCount)

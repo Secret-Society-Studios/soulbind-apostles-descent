@@ -331,5 +331,86 @@ namespace SoulBind.Tests.EditMode
             Assert.AreEqual(apostles[2].Id, match.WinnerId);
             Assert.AreEqual(MatchEndReason.LastApostleStanding, match.EndReason);
         }
+
+        private static ApostleState AnyOtherApostle(Match match)
+        {
+            IReadOnlyList<ApostleState> apostles = match.Battlefield.Apostles;
+            for (int i = 0; i < apostles.Count; i++)
+            {
+                if (apostles[i] != match.CurrentApostle)
+                    return apostles[i];
+            }
+            throw new InvalidOperationException("No other Apostle.");
+        }
+
+        [Test]
+        public void Match_OtherApostle_CannotMoveOntoAscensionTile()
+        {
+            Match match = FourPlayerMatch();
+            ApostleState other = AnyOtherApostle(match);
+            other.AddSouls(GameConstants.SoulsToAwaken - other.Souls);
+            match.RefreshGameState();
+            Assert.AreEqual(other.Id, match.Ascension.AwakenedId);
+
+            ApostleState current = match.CurrentApostle;
+            HexCoord tile = match.Ascension.Tile;
+            HexCoord start = FreeNeighbor(match.Battlefield, tile);
+            current.MoveTo(start);
+
+            Assert.AreEqual(MoveResult.AscensionTileReserved, match.Move(tile));
+            Assert.AreEqual(start, current.Position);
+            Assert.AreEqual(GameConstants.Phase1Capacity, match.CurrentCapacity.Remaining);
+        }
+
+        [Test]
+        public void Match_LegalDestinations_ExcludeAscensionTileForOthers()
+        {
+            Match match = FourPlayerMatch();
+            ApostleState other = AnyOtherApostle(match);
+            other.AddSouls(GameConstants.SoulsToAwaken - other.Souls);
+            match.RefreshGameState();
+
+            HexCoord tile = match.Ascension.Tile;
+            match.CurrentApostle.MoveTo(FreeNeighbor(match.Battlefield, tile));
+
+            var results = new List<HexCoord>();
+            match.GetLegalDestinations(results);
+
+            Assert.IsFalse(results.Contains(tile));
+            Assert.Greater(results.Count, 0);
+        }
+
+        [Test]
+        public void Match_LegalDestinations_IncludeAscensionTileForAwakened()
+        {
+            Match match = FourPlayerMatch();
+            ApostleState current = match.CurrentApostle;
+            current.AddSouls(GameConstants.SoulsToAwaken - current.Souls);
+            match.RefreshGameState();
+
+            HexCoord tile = match.Ascension.Tile;
+            current.MoveTo(FreeNeighbor(match.Battlefield, tile));
+
+            var results = new List<HexCoord>();
+            match.GetLegalDestinations(results);
+
+            Assert.IsTrue(results.Contains(tile));
+        }
+
+        [Test]
+        public void Match_LegalDestinations_AfterMatchOver_IsEmpty()
+        {
+            HexBoard board = StandardBoard.Create();
+            Match match = Match.Create(3, board, SpawnPlanner.PickSpread(board, 3), new Random(1));
+            IReadOnlyList<ApostleState> apostles = match.Battlefield.Apostles;
+            apostles[0].TakeDamage(GameConstants.StartingVessel);
+            apostles[1].TakeDamage(GameConstants.StartingVessel);
+            match.RefreshGameState();
+
+            var results = new List<HexCoord> { new HexCoord(0, 0) };
+            match.GetLegalDestinations(results);
+
+            Assert.AreEqual(0, results.Count);
+        }
     }
 }

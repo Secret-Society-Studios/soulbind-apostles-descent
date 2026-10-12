@@ -121,5 +121,27 @@ namespace SoulBind.Core
             if (!_apostles.Contains(apostle))
                 throw new ArgumentException("That Apostle has not been added to this battlefield.", nameof(apostle));
         }
+        
+        /// <summary>
+        /// Fills results with the living Apostles on the 6 tiles next to the attacker.
+        /// The caller supplies the list so it can be reused without allocating.
+        /// </summary>
+        public void GetAttackTargets(ApostleState attacker, List<ApostleState> results)
+        {
+            RequireRegistered(attacker);
+            if (results == null)
+                throw new ArgumentNullException(nameof(results));
+
+            results.Clear();
+            if (attacker.IsEliminated)
+                return;
+
+            for (int i = 0; i < _apostles.Count; i++)
+            {
+                ApostleState other = _apostles[i];
+                if (other != attacker && !other.IsEliminated && HexCoord.AreAdjacent(attacker.Position, other.Position))
+                    results.Add(other);
+            }
+        }
     }
 }

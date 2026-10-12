@@ -20,12 +20,18 @@ namespace SoulBind.UI
         [SerializeField] private Color healTileColor = new Color(0.90f, 0.40f, 0.45f);
         [SerializeField] private Color purifyTileColor = new Color(0.50f, 0.75f, 0.95f);
         [SerializeField] private Color soulTileColor = new Color(0.68f, 0.45f, 0.90f);
+        [SerializeField] private Color ascensionTileColor = new Color(1.00f, 0.80f, 0.20f);
+        [SerializeField] private Color ascensionHighlightColor = new Color(1.00f, 0.95f, 0.60f);
+        [SerializeField] private Color attackTargetColor = new Color(0.45f, 0.08f, 0.10f);
         [SerializeField] private bool fitCameraToBoard = true;
         [SerializeField] private float cameraMargin = 1f;
 
         private readonly Dictionary<HexCoord, SpriteRenderer> _tiles = new Dictionary<HexCoord, SpriteRenderer>();
         private readonly Dictionary<HexCoord, SpecialTileType> _specialTypes = new Dictionary<HexCoord, SpecialTileType>();
         private readonly List<HexCoord> _highlighted = new List<HexCoord>(6);
+        private readonly List<HexCoord> _attackMarks = new List<HexCoord>(6);
+        private bool _hasAscensionTile;
+        private HexCoord _ascensionTile;
         private float _centerX;
         private float _centerY;
 
@@ -70,8 +76,28 @@ namespace SoulBind.UI
                 if (_tiles.TryGetValue(pair.Key, out SpriteRenderer spriteRenderer))
                 {
                     _specialTypes[pair.Key] = pair.Value;
-                    spriteRenderer.color = SpecialColor(pair.Value);
+                    spriteRenderer.color = BaseColor(pair.Key);
                 }
+            }
+        }
+
+        /// <summary>
+        /// Shows the Ascension tile in gold, or hides it when visible is false.
+        /// Call SetHighlights after it so highlights stay on top.
+        /// </summary>
+        public void ShowAscensionTile(bool visible, HexCoord tile)
+        {
+            if (_hasAscensionTile)
+            {
+                _hasAscensionTile = false;
+                _tiles[_ascensionTile].color = BaseColor(_ascensionTile);
+            }
+
+            if (visible && _tiles.TryGetValue(tile, out SpriteRenderer spriteRenderer))
+            {
+                _hasAscensionTile = true;
+                _ascensionTile = tile;
+                spriteRenderer.color = ascensionTileColor;
             }
         }
 
@@ -83,7 +109,7 @@ namespace SoulBind.UI
             {
                 if (_tiles.TryGetValue(tiles[i], out SpriteRenderer spriteRenderer))
                 {
-                    spriteRenderer.color = highlightColor;
+                    spriteRenderer.color = IsAscensionTile(tiles[i]) ? ascensionHighlightColor : highlightColor;
                     _highlighted.Add(tiles[i]);
                 }
             }
@@ -96,10 +122,45 @@ namespace SoulBind.UI
             _highlighted.Clear();
         }
 
+        
+        /// <summary>
+        /// Marks the tiles under attackable Apostles, clearing any earlier marks.
+        /// Call it last, after ShowSpecialTiles, ShowAscensionTile and SetHighlights.
+        /// </summary>
+        public void SetAttackMarks(IReadOnlyList<HexCoord> tiles)
+        {
+            ClearAttackMarks();
+            for (int i = 0; i < tiles.Count; i++)
+            {
+                if (_tiles.TryGetValue(tiles[i], out SpriteRenderer spriteRenderer))
+                {
+                    spriteRenderer.color = attackTargetColor;
+                    _attackMarks.Add(tiles[i]);
+                }
+            }
+        }
+
+        /// <summary>Removes the attack marks. Call it first, before the other board updates.</summary>
+        public void ClearAttackMarks()
+        {
+            for (int i = 0; i < _attackMarks.Count; i++)
+                _tiles[_attackMarks[i]].color = BaseColor(_attackMarks[i]);
+            _attackMarks.Clear();
+        }
+
+        private bool IsAscensionTile(HexCoord tile) => _hasAscensionTile && _ascensionTile == tile;
+
         private Color PlainColor(HexCoord tile) => Board.IsEdge(tile) ? edgeTileColor : tileColor;
 
-        private Color BaseColor(HexCoord tile) =>
-            _specialTypes.TryGetValue(tile, out SpecialTileType type) ? SpecialColor(type) : PlainColor(tile);
+        // The color a tile has when it is not highlighted.
+        private Color BaseColor(HexCoord tile)
+        {
+            if (IsAscensionTile(tile))
+                return ascensionTileColor;
+            if (_specialTypes.TryGetValue(tile, out SpecialTileType type))
+                return SpecialColor(type);
+            return PlainColor(tile);
+        }
 
         private Color SpecialColor(SpecialTileType type)
         {

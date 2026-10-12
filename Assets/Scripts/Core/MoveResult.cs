@@ -11,6 +11,7 @@ namespace SoulBind.Core
         OffBoard,
         NotAdjacent,
         TileOccupied,
-        NotEnoughCapacity
+        NotEnoughCapacity,
+        AscensionTileReserved
     }
 }

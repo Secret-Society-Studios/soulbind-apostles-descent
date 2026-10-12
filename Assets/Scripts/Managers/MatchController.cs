@@ -35,11 +35,16 @@ namespace SoulBind.Managers
 
         private readonly List<ApostleView> _views = new List<ApostleView>(GameConstants.MaxPlayers);
         private readonly List<HexCoord> _legalDestinations = new List<HexCoord>(6);
+        private readonly List<ApostleState> _attackTargets = new List<ApostleState>(6);
+        private readonly List<HexCoord> _attackTiles = new List<HexCoord>(6);
 
         /// <summary>Raised after anything that changes what the player should see.</summary>
         public event System.Action StateChanged;
 
         public Match CurrentMatch { get; private set; }
+
+        // True while someone's turn is active and the match is still running.
+        private bool CanAct => CurrentMatch != null && !CurrentMatch.IsOver && CurrentMatch.CurrentApostle != null;
 
         private void Start()
         {
@@ -83,7 +88,7 @@ namespace SoulBind.Managers
 
         private void Update()
         {
-            if (CurrentMatch == null || CurrentMatch.IsOver || CurrentMatch.CurrentApostle == null)
+            if (!CanAct)
                 return;
 
             Mouse mouse = Mouse.current;
@@ -105,14 +110,18 @@ namespace SoulBind.Managers
 
         public void TryMove(HexCoord destination)
         {
-            if (CurrentMatch == null || CurrentMatch.IsOver || CurrentMatch.CurrentApostle == null)
+            if (!CanAct)
                 return;
 
             MoveResult result = CurrentMatch.Move(destination);
-            if (result == MoveResult.Success)
-                AfterStateChange();
-            else
+            if (result != MoveResult.Success)
+            {
                 Debug.Log($"MatchController: move to {destination} rejected ({result}).");
+                return;
+            }
+
+            LogIfOver();
+            AfterStateChange();
         }
 
         public void EndTurn()
@@ -133,16 +142,94 @@ namespace SoulBind.Managers
             AfterStateChange();
         }
 
+#if UNITY_EDITOR
+        // DEV ONLY. These bypass the rule that the UI never changes Apostle numbers, so they only
+        // exist in the Editor and development builds, and they will be removed together with DevTurnHud.
+
+        /// <summary>DEV ONLY: changes the current Apostle's Souls to test Awakening.</summary>
+        public void DevChangeCurrentSouls(int delta)
+        {
+            if (!CanAct)
+                return;
+
+            ApostleState apostle = CurrentMatch.CurrentApostle;
+            if (delta > 0)
+                apostle.AddSouls(delta);
+            else if (delta < 0)
+                apostle.LoseSouls(-delta);
+
+            CurrentMatch.RefreshGameState();
+            AfterStateChange();
+        }
+
+        /// <summary>DEV ONLY: gives the current Apostle a shield, standing in for a card's DEF.</summary>
+        public void DevAddShieldToCurrent(int amount)
+        {
+            if (!CanAct)
+                return;
+
+            CurrentMatch.CurrentApostle.AddShield(amount);
+            AfterStateChange();
+        }
+
+        /// <summary>
+        /// DEV ONLY: the current Apostle attacks its adjacent target with the lowest Id,
+        /// standing in for an attack card. Engage-once is not enforced yet.
+        /// </summary>
+        public void DevAttackFirstTarget(int totalAttack)
+        {
+            if (!CanAct)
+                return;
+
+            CurrentMatch.GetAttackTargets(_attackTargets);
+            if (_attackTargets.Count == 0)
+            {
+                Debug.Log("MatchController: no Apostle is adjacent, so there is nothing to attack.");
+                return;
+            }
+
+            int attackerId = CurrentMatch.CurrentApostle.Id;
+            int targetId = _attackTargets[0].Id;
+            AttackResult result = CurrentMatch.Attack(targetId, totalAttack, out AttackOutcome outcome);
+            if (result != AttackResult.Resolved)
+            {
+                Debug.Log($"MatchController: attack on Apostle {targetId} rejected ({result}).");
+                return;
+            }
+
+            if (outcome.BrokeDefense)
+                Debug.Log($"MatchController: Apostle {attackerId} hit Apostle {targetId} for {outcome.Damage} " +
+                          $"(stole {outcome.SoulsStolen} Soul, +{outcome.CorruptionGained} Corruption).");
+            else
+                Debug.Log($"MatchController: Apostle {attackerId} failed to break Apostle {targetId}'s DEF.");
+
+            LogIfOver();
+            AfterStateChange();
+        }
+#endif
+
+        private void LogIfOver()
+        {
+            if (CurrentMatch.IsOver)
+                Debug.Log($"MatchController: match over. Winner {CurrentMatch.WinnerId} ({CurrentMatch.EndReason}).");
+        }
+
+        // The order matters: clear the attack marks first and set them last,
+        // so no board layer paints over another.
         private void AfterStateChange()
         {
+            boardView.ClearAttackMarks();
             SyncViews();
             boardView.ShowSpecialTiles(CurrentMatch.Battlefield.Specials.Active);
+            boardView.ShowAscensionTile(CurrentMatch.Ascension.HasAwakened, CurrentMatch.Ascension.Tile);
             RefreshHighlights();
+            RefreshAttackMarks();
             StateChanged?.Invoke();
         }
 
         private void SyncViews()
         {
+            AscensionTracker ascension = CurrentMatch.Ascension;
             IReadOnlyList<ApostleState> apostles = CurrentMatch.Battlefield.Apostles;
             for (int i = 0; i < apostles.Count; i++)
             {
@@ -152,20 +239,26 @@ namespace SoulBind.Managers
                 view.gameObject.SetActive(!apostle.IsEliminated);
                 view.transform.position = boardView.GetWorldPosition(apostle.Position);
                 view.SetActiveTurn(apostle == CurrentMatch.CurrentApostle);
+                view.SetAwakened(ascension.HasAwakened && apostle.Id == ascension.AwakenedId);
             }
         }
 
         private void RefreshHighlights()
         {
-            if (CurrentMatch.CurrentApostle == null)
-            {
+            CurrentMatch.GetLegalDestinations(_legalDestinations);
+            if (_legalDestinations.Count == 0)
                 boardView.ClearHighlights();
-                return;
-            }
+            else
+                boardView.SetHighlights(_legalDestinations);
+        }
 
-            CurrentMatch.Battlefield.GetLegalDestinations(
-                CurrentMatch.CurrentApostle, CurrentMatch.CurrentCapacity, _legalDestinations);
-            boardView.SetHighlights(_legalDestinations);
+        private void RefreshAttackMarks()
+        {
+            CurrentMatch.GetAttackTargets(_attackTargets);
+            _attackTiles.Clear();
+            for (int i = 0; i < _attackTargets.Count; i++)
+                _attackTiles.Add(_attackTargets[i].Position);
+            boardView.SetAttackMarks(_attackTiles);
         }
     }
 }

@@ -78,15 +78,89 @@ namespace SoulBind.Core
 
         /// <summary>
         /// Moves the current Apostle one tile. See MoveResult for the possible outcomes.
+        /// Only the Awakened Apostle may step onto the Ascension tile.
         /// A successful move can Awaken an Apostle or win the match: check IsOver afterwards.
         /// </summary>
         public MoveResult Move(HexCoord destination)
         {
             RequireActiveTurn();
+
+            if (IsAscensionTileClosedTo(CurrentApostle, destination)
+                && HexCoord.AreAdjacent(CurrentApostle.Position, destination))
+                return MoveResult.AscensionTileReserved;
+
             MoveResult result = Battlefield.TryMove(CurrentApostle, destination, CurrentCapacity);
             if (result == MoveResult.Success)
                 UpdateGameOver();
             return result;
+        }
+
+        /// <summary>
+        /// Fills results with the tiles the current Apostle can move to right now, leaving out
+        /// the Ascension tile for anyone but the Awakened Apostle. Empty when nobody's turn is active.
+        /// The caller supplies the list so it can be reused without allocating.
+        /// </summary>
+        public void GetLegalDestinations(List<HexCoord> results)
+        {
+            if (results == null)
+                throw new ArgumentNullException(nameof(results));
+            if (CurrentApostle == null)
+            {
+                results.Clear();
+                return;
+            }
+
+            Battlefield.GetLegalDestinations(CurrentApostle, CurrentCapacity, results);
+            for (int i = results.Count - 1; i >= 0; i--)
+            {
+                if (IsAscensionTileClosedTo(CurrentApostle, results[i]))
+                    results.RemoveAt(i);
+            }
+        }
+
+        
+        /// <summary>
+        /// The current Apostle attacks another Apostle with this total ATK.
+        /// Only adjacent, living Apostles can be targeted. Capacity and the engage-once rule
+        /// are handled by card play, not here. An attack can Awaken someone, eliminate someone
+        /// or end the match: check IsOver afterwards.
+        /// </summary>
+        public AttackResult Attack(int targetId, int totalAttack, out AttackOutcome outcome)
+        {
+            RequireActiveTurn();
+            if (totalAttack < 1)
+                throw new ArgumentOutOfRangeException(nameof(totalAttack), "An attack needs ATK above 0.");
+
+            outcome = default;
+            ApostleState target = TryFindApostle(targetId);
+            if (target == null)
+                return AttackResult.TargetNotFound;
+            if (target == CurrentApostle)
+                return AttackResult.TargetIsSelf;
+            if (target.IsEliminated)
+                return AttackResult.TargetEliminated;
+            if (!HexCoord.AreAdjacent(CurrentApostle.Position, target.Position))
+                return AttackResult.OutOfRange;
+
+            outcome = Combat.Resolve(CurrentApostle, target, totalAttack);
+            UpdateGameOver();
+            return AttackResult.Resolved;
+        }
+
+        /// <summary>
+        /// Fills results with the Apostles the current Apostle can attack right now.
+        /// Empty when nobody's turn is active. The caller supplies the list to avoid allocating.
+        /// </summary>
+        public void GetAttackTargets(List<ApostleState> results)
+        {
+            if (results == null)
+                throw new ArgumentNullException(nameof(results));
+            if (CurrentApostle == null)
+            {
+                results.Clear();
+                return;
+            }
+            Battlefield.GetAttackTargets(CurrentApostle, results);
         }
 
         /// <summary>
@@ -142,6 +216,7 @@ namespace SoulBind.Core
                     return;
 
                 ApostleState apostle = FindApostle(Turns.CurrentApostleId);
+                apostle.ClearShield();
                 apostle.ApplyCorruptionDamage();
 
                 if (!apostle.IsEliminated)
@@ -209,6 +284,10 @@ namespace SoulBind.Core
             return false;
         }
 
+        // True if this tile is the Ascension tile and the Apostle is not the Awakened one.
+        private bool IsAscensionTileClosedTo(ApostleState apostle, HexCoord tile) =>
+            Ascension.HasAwakened && Ascension.Tile == tile && apostle.Id != Ascension.AwakenedId;
+
         private void EndMatch(int winnerId, MatchEndReason reason)
         {
             IsOver = true;
@@ -217,7 +296,19 @@ namespace SoulBind.Core
             CurrentApostle = null;
             CurrentCapacity = null;
         }
-
+        
+        // Like FindApostle, but returns null instead of throwing (for ids that come from player input).
+        private ApostleState TryFindApostle(int id)
+        {
+            IReadOnlyList<ApostleState> apostles = Battlefield.Apostles;
+            for (int i = 0; i < apostles.Count; i++)
+            {
+                if (apostles[i].Id == id)
+                    return apostles[i];
+            }
+            return null;
+        }
+        
         private ApostleState FindApostle(int id)
         {
             IReadOnlyList<ApostleState> apostles = Battlefield.Apostles;

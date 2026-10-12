@@ -15,6 +15,13 @@ namespace SoulBind.Core
         public int Souls { get; private set; }
         public int Corruption { get; private set; }
 
+        
+        /// <summary>
+        /// DEF shield. Each attack's damage is reduced by it, and hits do not use it up.
+        /// Shields stack, and the whole shield clears at the start of this Apostle's next turn.
+        /// </summary>
+        public int Shield { get; private set; }
+
         public bool IsEliminated => Vessel <= 0;
         public bool IsCorrupted => Corruption >= GameConstants.CorruptionThreshold;
 
@@ -94,6 +101,17 @@ namespace SoulBind.Core
             RequireNonNegative(amount, nameof(amount));
             Corruption = Math.Max(0, Corruption - amount);
         }
+
+        
+        /// <summary>Adds DEF to the shield. Shields stack.</summary>
+        public void AddShield(int amount)
+        {
+            RequireNonNegative(amount, nameof(amount));
+            Shield += amount;
+        }
+
+        /// <summary>Removes the whole shield. Called at the start of this Apostle's turn.</summary>
+        public void ClearShield() => Shield = 0;
 
         /// <summary>Vessel damage this Apostle takes from Corruption at the start of its turn.</summary>
         public int GetCorruptionDamage()
