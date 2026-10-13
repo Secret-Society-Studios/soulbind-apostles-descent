@@ -54,6 +54,18 @@ namespace SoulBind.Core
         /// </summary>
         public void ArmExecute(int vesselBelow) => _match.ArmExecute(vesselBelow);
 
+        /// <summary>Temperance only: ends the player's turn as soon as the card has been played.</summary>
+        public void EndTurnAfterThisCard() => _match.RequestEndTurn();
+
+        /// <summary>The World only: when the player's turn ends, the rest of the current round is skipped.</summary>
+        public void SkipRestOfRound() => _match.SkipRestOfRound();
+
+        /// <summary>
+        /// Swaps one random card from the player's hand with one random card from the other Apostle's
+        /// hand. Returns false (and swaps nothing) if either hand is empty.
+        /// </summary>
+        public bool SwapRandomCardWith(ApostleState other) => _match.SwapRandomCardWith(other);
+
         /// <summary>Raises this turn's maximum Capacity (and what is left of it) by this amount.</summary>
         public void AddCapacityThisTurn(int amount) => _match.IncreaseCurrentCapacity(amount);
 

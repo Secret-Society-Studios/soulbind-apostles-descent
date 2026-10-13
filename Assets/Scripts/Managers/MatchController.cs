@@ -4,6 +4,7 @@ using SoulBind.Entities;
 using SoulBind.UI;
 using SoulBind.Utility;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 
 namespace SoulBind.Managers
@@ -14,21 +15,11 @@ namespace SoulBind.Managers
     /// </summary>
     public sealed class MatchController : MonoBehaviour
     {
-        private static readonly Color[] PlayerColors =
-        {
-            new Color(0.85f, 0.25f, 0.25f),
-            new Color(0.25f, 0.50f, 0.95f),
-            new Color(0.30f, 0.80f, 0.40f),
-            new Color(0.95f, 0.80f, 0.20f),
-            new Color(0.70f, 0.40f, 0.90f),
-            new Color(0.95f, 0.55f, 0.20f)
-        };
-
         [SerializeField] private BoardView boardView;
         [SerializeField] private GameObject apostlePrefab;
         [Tooltip("Optional. Clicks on this panel are not treated as board clicks.")]
         [SerializeField] private DevTurnHud hud;
-        [SerializeField, Range(2, 6)] private int playerCount = 0;
+        [SerializeField, Range(2, 6)] private int playerCount = 4;
         [Tooltip("0 means a different random match every time.")]
         [SerializeField] private int seed;
         [SerializeField] private float apostleDiameter = 0.6f;
@@ -42,6 +33,8 @@ namespace SoulBind.Managers
         public event System.Action StateChanged;
 
         public Match CurrentMatch { get; private set; }
+
+        public BoardView BoardView => boardView;
 
         // True while someone's turn is active and the match is still running.
         private bool CanAct => CurrentMatch != null && !CurrentMatch.IsOver && CurrentMatch.CurrentApostle != null;
@@ -77,7 +70,7 @@ namespace SoulBind.Managers
                 if (view == null)
                     view = instance.AddComponent<ApostleView>();
 
-                view.Initialize(apostle.Id, disc, PlayerColors[(apostle.Id - 1) % PlayerColors.Length]);
+                view.Initialize(apostle.Id, disc, ApostleColors.Get(apostle.Id));
                 _views.Add(view);
             }
 
@@ -99,12 +92,11 @@ namespace SoulBind.Managers
             if (hud != null && hud.ContainsScreenPoint(screenPoint))
                 return;
 
-            Camera cam = Camera.main;
-            if (cam == null)
+            // Clicks on UI that can be clicked (cards, buttons) are not board clicks.
+            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
                 return;
 
-            Vector3 worldPoint = cam.ScreenToWorldPoint(new Vector3(screenPoint.x, screenPoint.y, 0f));
-            if (boardView.TryGetTileAt(worldPoint, out HexCoord tile))
+            if (boardView.TryGetTileAtScreen(screenPoint, out HexCoord tile))
                 TryMove(tile);
         }
 
@@ -127,9 +119,10 @@ namespace SoulBind.Managers
         /// <summary>
         /// Plays a card from the current Apostle's hand. If attack is true and the card has ATK,
         /// it attacks: the engaged target while Engaged, otherwise the adjacent Apostle with the
-        /// lowest Id. Temporary targeting until the real UI lets the player pick a target.
+        /// lowest Id. comboTargetId is who the Nocturne combo hits if this card triggers it (0 = no pick).
+        /// Temporary targeting until the real UI lets the player pick targets.
         /// </summary>
-        public void PlayCard(ArcanaId card, bool attack)
+        public void PlayCard(ArcanaId card, bool attack, int comboTargetId)
         {
             if (!CanAct)
                 return;
@@ -142,15 +135,18 @@ namespace SoulBind.Managers
                     targetId = _attackTargets[0].Id;
             }
 
-            CardPlayResult result = CurrentMatch.PlayCard(card, targetId);
+            // Read before playing: some cards (Temperance) end the turn, so CurrentApostle changes.
+            int playerId = CurrentMatch.CurrentApostle.Id;
+            CardPlayResult result = CurrentMatch.PlayCard(card, targetId, comboTargetId);
             if (result != CardPlayResult.Success)
             {
                 Debug.Log($"MatchController: {CardCatalog.Get(card).Name} rejected ({result}).");
                 return;
             }
 
-            Debug.Log($"MatchController: Apostle {CurrentMatch.CurrentApostle.Id} played {CardCatalog.Get(card).Name}. " +
+            Debug.Log($"MatchController: Apostle {playerId} played {CardCatalog.Get(card).Name}. " +
                       $"State {CurrentMatch.Engagement}, pending ATK {CurrentMatch.PendingAttack}.");
+            LogIfOver();
             AfterStateChange();
         }
 

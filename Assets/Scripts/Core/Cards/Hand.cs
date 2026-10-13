@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace SoulBind.Core
@@ -22,6 +23,17 @@ namespace SoulBind.Core
 
         /// <summary>Removes one copy of the card. Returns false if the hand does not hold it.</summary>
         public bool Remove(ArcanaId card) => _cards.Remove(card);
+
+        /// <summary>Replaces the card at this position (for Wheel of Fortune) and returns the old one.</summary>
+        public ArcanaId ReplaceAt(int index, ArcanaId card)
+        {
+            if (index < 0 || index >= _cards.Count)
+                throw new ArgumentOutOfRangeException(nameof(index));
+
+            ArcanaId old = _cards[index];
+            _cards[index] = card;
+            return old;
+        }
 
         /// <summary>Moves every card in the hand to the deck's discard pile.</summary>
         public void DiscardAllTo(Deck deck)

@@ -34,6 +34,18 @@ namespace SoulBind.Core
         // Set by The Emperor: the attack doubles at Strike if the target is more Corrupted than the player.
         private bool _emperorArmed;
 
+        // Set by Temperance: the turn ends as soon as the card has been played.
+        private bool _endTurnRequested;
+
+        // Set by The World: when this turn ends, the rest of the round is skipped.
+        private bool _skipRestOfRound;
+
+        // Element combos: cards of each element played this turn (indexed by Element).
+        private readonly int[] _elementsPlayedThisTurn = new int[ElementCombo.ElementCount];
+
+        // Who receives the Nocturne combo's Corruption for the card being played (0 = none).
+        private int _nocturneVictimId;
+
         public Battlefield Battlefield { get; }
         public TurnTracker Turns { get; }
 
@@ -185,9 +197,11 @@ namespace SoulBind.Core
         /// Pass 0 to play it without attacking (its ATK is lost).
         /// While Engaged: the card's ATK adds to the attack; targetId must be 0 or the engaged target.
         /// While Disengaged: no more cards can be played this turn.
+        /// comboTargetId picks who the Nocturne combo hits, if this card triggers it: any living
+        /// opponent. Without a pick it hits the attack target; when not attacking, a pick is required.
         /// Nothing changes unless the result is Success.
         /// </summary>
-        public CardPlayResult PlayCard(ArcanaId card, int targetId)
+        public CardPlayResult PlayCard(ArcanaId card, int targetId, int comboTargetId = 0)
         {
             RequireActiveTurn();
 
@@ -225,7 +239,35 @@ namespace SoulBind.Core
                 }
             }
 
+            // Nocturne combo: if this card is the turn's 2nd Nocturne, work out who it hits now,
+            // so an invalid or missing pick changes nothing.
+            int nocturneVictimId = 0;
+            if (definition.Element == Element.Nocturne
+                && _elementsPlayedThisTurn[(int)Element.Nocturne] == ElementCombo.CardsNeeded - 1)
+            {
+                if (comboTargetId != 0)
+                {
+                    ApostleState picked = TryFindApostle(comboTargetId);
+                    if (picked == null || picked == CurrentApostle || picked.IsEliminated)
+                        return CardPlayResult.InvalidComboTarget;
+                    nocturneVictimId = comboTargetId;
+                }
+                else if (Engagement == EngagementState.Engaged)
+                {
+                    nocturneVictimId = EngagedTargetId;
+                }
+                else if (engagesNow)
+                {
+                    nocturneVictimId = targetId;
+                }
+                else
+                {
+                    return CardPlayResult.ComboTargetRequired;
+                }
+            }
+
             // Every check passed: apply the card.
+            _nocturneVictimId = nocturneVictimId;
             if (definition.Cap > 0)
                 CurrentCapacity.Spend(definition.Cap);
             hand.Remove(card);
@@ -270,8 +312,54 @@ namespace SoulBind.Core
             if (Engagement == EngagementState.Engaged)
                 _attackCards.Add(card);
 
+            // Element combo: the 2nd card of an element this turn triggers its bonus (once per turn).
+            int element = (int)definition.Element;
+            _elementsPlayedThisTurn[element]++;
+            if (_elementsPlayedThisTurn[element] == ElementCombo.CardsNeeded && !IsOver)
+            {
+                ApplyCombo(definition.Element);
+                UpdateGameOver();
+            }
+
+            // Temperance: the turn ends now, exactly as if End Turn had been pressed.
+            if (_endTurnRequested)
+            {
+                _endTurnRequested = false;
+                if (!IsOver)
+                    EndTurn();
+            }
+
             return CardPlayResult.Success;
         }
+
+        /// <summary>True if this element's combo has already triggered this turn.</summary>
+        public bool IsComboTriggered(Element element) =>
+            _elementsPlayedThisTurn[(int)element] >= ElementCombo.CardsNeeded;
+
+        private void ApplyCombo(Element element)
+        {
+            switch (element)
+            {
+                case Element.Radiance:
+                    CurrentApostle.AddShield(ElementCombo.RadianceShield);
+                    break;
+                case Element.Celeste:
+                    CurrentApostle.ReduceCorruption(ElementCombo.CelesteCorruptionReduction);
+                    break;
+                case Element.Crimson:
+                    // [Assumed] Only counts toward an attack in progress; otherwise it is lost.
+                    if (Engagement == EngagementState.Engaged)
+                        PendingAttack += ElementCombo.CrimsonAttack;
+                    break;
+                case Element.Nocturne:
+                    // The opponent chosen when the card was played (see PlayCard).
+                    ApostleState victim = TryFindApostle(_nocturneVictimId);
+                    if (victim != null && !victim.IsEliminated)
+                        victim.AddCorruption(ElementCombo.NocturneCorruption);
+                    break;
+            }
+        }
+
 
         // ---- Called by card effects through CardPlayContext ----
 
@@ -307,6 +395,28 @@ namespace SoulBind.Core
             if (spent > 0)
                 raised.Spend(spent);
             CurrentCapacity = raised;
+        }
+
+        internal void RequestEndTurn() => _endTurnRequested = true;
+
+        internal void SkipRestOfRound() => _skipRestOfRound = true;
+
+        // Swaps one random card from the current Apostle's hand with one random card from the
+        // other's hand, using the match's seeded random source. Returns false if either hand is empty.
+        internal bool SwapRandomCardWith(ApostleState other)
+        {
+            Hand mine = _hands[IndexOf(CurrentApostle.Id)];
+            Hand theirs = _hands[IndexOf(other.Id)];
+            if (mine.Count == 0 || theirs.Count == 0)
+                return false;
+
+            int myIndex = _random.Next(mine.Count);
+            int theirIndex = _random.Next(theirs.Count);
+            ArcanaId given = mine.Cards[myIndex];
+            ArcanaId received = theirs.Cards[theirIndex];
+            mine.ReplaceAt(myIndex, received);
+            theirs.ReplaceAt(theirIndex, given);
+            return true;
         }
 
         internal void ArmEmperor()
@@ -454,6 +564,16 @@ namespace SoulBind.Core
             FinishTurn(CurrentApostle);
 
             TurnEvent turnEvent = Turns.EndTurn(Battlefield.Apostles);
+
+            // The World: everyone still waiting in this round is passed over without taking a turn
+            // (no start-of-turn effects, no draw), and the next round (or the Phase end) comes next.
+            if (_skipRestOfRound)
+            {
+                _skipRestOfRound = false;
+                while (turnEvent == TurnEvent.NextTurn)
+                    turnEvent = Turns.EndTurn(Battlefield.Apostles);
+            }
+
             if (turnEvent == TurnEvent.PhaseEnded)
             {
                 CurrentApostle = null;
@@ -523,6 +643,9 @@ namespace SoulBind.Core
             ResetEngagement();
             _corruptionReducersThisTurn = 0;
             _strengthAwaitingPartner = false;
+            _endTurnRequested = false;
+            _skipRestOfRound = false;
+            Array.Clear(_elementsPlayedThisTurn, 0, _elementsPlayedThisTurn.Length);
             while (true)
             {
                 if (UpdateGameOver())

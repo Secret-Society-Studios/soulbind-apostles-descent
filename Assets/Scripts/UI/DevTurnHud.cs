@@ -32,7 +32,7 @@ namespace SoulBind.UI
         private readonly List<string> _cardLabels = new List<string>(12);
 
         private Rect _panel;
-        private readonly Rect _showButton = new Rect(Margin, Margin, 150f, 28f);
+        private Rect _showButton = new Rect(Margin, Margin, 150f, 28f);
         private Vector2 _scroll;
         private bool _hidden;
         private bool _togglePressed;
@@ -46,6 +46,12 @@ namespace SoulBind.UI
         private string _strikeLabel = string.Empty;
         private bool _showStrike;
         private bool _attackMode = true;
+
+        // Who the Nocturne combo hits. The button cycles through the living opponents.
+        private readonly List<int> _opponentIds = new List<int>(GameConstants.MaxPlayers);
+        private int _nocturneTargetId;
+        private string _nocturneLabel = string.Empty;
+        private bool _nocturneCyclePressed;
 
         private bool _endTurnPressed;
         private bool _directionPressed;
@@ -78,8 +84,8 @@ namespace SoulBind.UI
 
         private void Start()
         {
-            if (boardView == null)
-                boardView = FindFirstObjectByType<BoardView>();
+            if (boardView == null && matchController != null)
+                boardView = matchController.BoardView;
         }
 
         /// <summary>True if a screen position (origin bottom-left) is over this panel (or its Show button).</summary>
@@ -103,8 +109,12 @@ namespace SoulBind.UI
             if (matchController == null)
                 return;
 
+            if (_nocturneCyclePressed)
+                CycleNocturneTarget();
+            _nocturneCyclePressed = false;
+
             if (_cardPressed)
-                matchController.PlayCard(_pressedCard, _attackMode);
+                matchController.PlayCard(_pressedCard, _attackMode, _nocturneTargetId);
             if (_strikePressed)
                 matchController.Strike();
             if (_endTurnPressed)
@@ -201,8 +211,17 @@ namespace SoulBind.UI
         // The panel runs down the left edge at a fixed width and fills the screen's height.
         private void UpdatePanelRect()
         {
-            float height = Screen.height / UiScale - 2f * Margin;
-            _panel = new Rect(Margin, Margin, PanelWidth, height);
+            // Fit between the HUD's top and bottom strips, if there are any.
+            float top = Margin;
+            float bottom = Margin;
+            if (boardView != null)
+            {
+                top += boardView.ReservedTopFraction * Screen.height / UiScale;
+                bottom += boardView.ReservedBottomFraction * Screen.height / UiScale;
+            }
+            float height = Screen.height / UiScale - top - bottom;
+            _panel = new Rect(Margin, top, PanelWidth, height);
+            _showButton = new Rect(Margin, top, 150f, 28f);
         }
 
         // Moves the camera so the board sits in the space to the right of the panel.
@@ -220,15 +239,47 @@ namespace SoulBind.UI
             if (!screenChanged && Mathf.Approximately(fraction, _appliedFraction))
                 return;
 
-            boardView.FitCamera(fraction);
+            boardView.SetReservedLeft(fraction);
             _appliedFraction = fraction;
             _lastScreenWidth = Screen.width;
             _lastScreenHeight = Screen.height;
         }
 
+        // Keeps the Nocturne pick on a living opponent of the current Apostle.
+        private void RefreshNocturneTarget(Match match)
+        {
+            _opponentIds.Clear();
+            if (match.CurrentApostle != null)
+            {
+                foreach (ApostleState apostle in match.Battlefield.Apostles)
+                {
+                    if (apostle != match.CurrentApostle && !apostle.IsEliminated)
+                        _opponentIds.Add(apostle.Id);
+                }
+            }
+
+            if (_opponentIds.Count == 0)
+                _nocturneTargetId = 0;
+            else if (!_opponentIds.Contains(_nocturneTargetId))
+                _nocturneTargetId = _opponentIds[0];
+
+            _nocturneLabel = $"Nocturne combo target: A{_nocturneTargetId}  (click to change)";
+        }
+
+        private void CycleNocturneTarget()
+        {
+            if (_opponentIds.Count == 0)
+                return;
+            int index = _opponentIds.IndexOf(_nocturneTargetId);
+            _nocturneTargetId = _opponentIds[(index + 1) % _opponentIds.Count];
+            _nocturneLabel = $"Nocturne combo target: A{_nocturneTargetId}  (click to change)";
+        }
+
         private void DrawHandButtons()
         {
             _attackMode = GUILayout.Toggle(_attackMode, " Attack with ATK cards (lowest-Id adjacent target)");
+            if (_opponentIds.Count > 0 && GUILayout.Button(_nocturneLabel))
+                _nocturneCyclePressed = true;
 
             for (int i = 0; i < _cardIds.Count; i += CardButtonsPerRow)
             {
@@ -304,6 +355,23 @@ namespace SoulBind.UI
                         _text.Append("Play: Disengaged (no more cards this turn)\n");
                         break;
                 }
+            }
+
+            RefreshNocturneTarget(match);
+
+            if (match.CurrentApostle != null)
+            {
+                _text.Append("Combos this turn:");
+                bool anyCombo = false;
+                for (int e = 0; e < ElementCombo.ElementCount; e++)
+                {
+                    if (match.IsComboTriggered((SoulBind.Core.Element)e))
+                    {
+                        _text.Append(' ').Append(((SoulBind.Core.Element)e).ToString());
+                        anyCombo = true;
+                    }
+                }
+                _text.Append(anyCombo ? "\n" : " none\n");
             }
 
             AscensionTracker ascension = match.Ascension;

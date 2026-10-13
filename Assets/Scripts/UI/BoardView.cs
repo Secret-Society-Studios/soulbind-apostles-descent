@@ -26,6 +26,16 @@ namespace SoulBind.UI
         [SerializeField] private bool fitCameraToBoard = true;
         [SerializeField] private float cameraMargin = 1f;
 
+        [Header("Table view")]
+        [Tooltip("How far the camera tilts away from straight down, in degrees.")]
+        [SerializeField, Range(0f, 60f)] private float cameraTilt = 35f;
+        [SerializeField, Range(20f, 70f)] private float fieldOfView = 35f;
+        [Tooltip("Placeholder table color until table art exists.")]
+        [SerializeField] private Color tableColor = new Color(0.32f, 0.21f, 0.13f);
+        [Tooltip("Placeholder play-mat color under the board.")]
+        [SerializeField] private Color matColor = new Color(0.16f, 0.14f, 0.20f);
+        [SerializeField] private float matPadding = 0.6f;
+
         private readonly Dictionary<HexCoord, SpriteRenderer> _tiles = new Dictionary<HexCoord, SpriteRenderer>();
         private readonly Dictionary<HexCoord, SpecialTileType> _specialTypes = new Dictionary<HexCoord, SpecialTileType>();
         private readonly List<HexCoord> _highlighted = new List<HexCoord>(6);
@@ -36,6 +46,9 @@ namespace SoulBind.UI
         private float _centerY;
         private float _boardWidth;
         private float _boardHeight;
+        private float _reservedLeft;
+        private float _reservedTop;
+        private float _reservedBottom;
 
         public HexBoard Board { get; private set; }
 
@@ -149,33 +162,154 @@ namespace SoulBind.UI
             _attackMarks.Clear();
         }
 
+        /// <summary>The share of the screen height kept clear at the top (for the HUD strip).</summary>
+        public float ReservedTopFraction => _reservedTop;
+
+        /// <summary>Keeps this share of the screen width clear on the left (0 to 0.8) and re-fits the camera.</summary>
+        public void SetReservedLeft(float fraction)
+        {
+            _reservedLeft = Mathf.Clamp(fraction, 0f, 0.8f);
+            FitCamera();
+        }
+
+        /// <summary>The share of the screen height kept clear at the bottom (for the player's strip and hand).</summary>
+        public float ReservedBottomFraction => _reservedBottom;
+
         /// <summary>
-        /// Fits the orthographic camera to the board, keeping the left part of the screen free
-        /// (for a panel). reservedLeftFraction is the share of the screen width to keep clear: 0 to 0.8.
+        /// Keeps these shares of the screen height clear at the top and bottom (0 to 0.4 each)
+        /// and re-fits the camera.
         /// </summary>
-        public void FitCamera(float reservedLeftFraction)
+        public void SetReservedTopAndBottom(float top, float bottom)
+        {
+            _reservedTop = Mathf.Clamp(top, 0f, 0.4f);
+            _reservedBottom = Mathf.Clamp(bottom, 0f, 0.4f);
+            FitCamera();
+        }
+
+        /// <summary>
+        /// Finds the board tile under a screen position (for example the mouse), by casting a ray
+        /// from the camera onto the board's plane. Works with the tilted perspective camera.
+        /// </summary>
+        public bool TryGetTileAtScreen(Vector2 screenPoint, out HexCoord tile)
+        {
+            tile = default;
+            Camera cam = Camera.main;
+            if (cam == null || Board == null)
+                return false;
+
+            Ray ray = cam.ScreenPointToRay(screenPoint);
+            var boardPlane = new Plane(Vector3.back, transform.position);
+            if (!boardPlane.Raycast(ray, out float distance))
+                return false;
+
+            return TryGetTileAt(ray.GetPoint(distance), out tile);
+        }
+
+        // Points the tilted perspective camera at the board so the whole mat fits inside the part
+        // of the screen the panels leave free, centered in it.
+        private void FitCamera()
         {
             if (!fitCameraToBoard || Board == null)
                 return;
 
             Camera cam = Camera.main;
-            if (cam == null || !cam.orthographic)
+            if (cam == null)
                 return;
 
-            float reserved = Mathf.Clamp(reservedLeftFraction, 0f, 0.8f);
-            float usable = 1f - reserved;
+            cam.orthographic = false;
+            cam.fieldOfView = fieldOfView;
+            cam.nearClipPlane = 0.1f;
+            cam.farClipPlane = 1000f;
+            // The board lies in the XY plane facing -Z. Tilting up looks at it from the player's side.
+            cam.transform.rotation = Quaternion.Euler(-cameraTilt, 0f, 0f);
 
-            float halfHeight = _boardHeight / 2f + cameraMargin;
-            float halfWidth = _boardWidth / 2f + cameraMargin;
-            float size = Mathf.Max(halfHeight, halfWidth / (cam.aspect * usable));
-            cam.orthographicSize = size;
+            // The free part of the screen, in viewport units (0 to 1).
+            float freeMinX = _reservedLeft;
+            float freeMaxX = 1f;
+            float freeMinY = _reservedBottom;
+            float freeMaxY = 1f - _reservedTop;
+            var freeCenter = new Vector2((freeMinX + freeMaxX) / 2f, (freeMinY + freeMaxY) / 2f);
+            float freeWidth = freeMaxX - freeMinX;
+            float freeHeight = freeMaxY - freeMinY;
 
-            // Move the camera left so the board is centered in the free part of the screen.
-            float visibleWidth = 2f * size * cam.aspect;
-            float shift = reserved * visibleWidth / 2f;
+            Vector3 boardCenter = transform.position;
+            Vector3 forward = cam.transform.forward;
 
-            Vector3 cameraPosition = cam.transform.position;
-            cam.transform.position = new Vector3(transform.position.x - shift, transform.position.y, cameraPosition.z);
+            // 1. Move back until the whole mat fits in the free area.
+            float near = 1f;
+            float far = 500f;
+            for (int i = 0; i < 30; i++)
+            {
+                float middle = (near + far) / 2f;
+                cam.transform.position = boardCenter - forward * middle;
+                GetViewportBounds(cam, out Vector2 min, out Vector2 max);
+                if (max.x - min.x <= freeWidth && max.y - min.y <= freeHeight)
+                    far = middle;
+                else
+                    near = middle;
+            }
+            cam.transform.position = boardCenter - forward * far;
+
+            // 2. Slide sideways and up/down so the mat is centered in the free area.
+            float frustumHeight = 2f * far * Mathf.Tan(fieldOfView * 0.5f * Mathf.Deg2Rad);
+            float frustumWidth = frustumHeight * cam.aspect;
+            for (int i = 0; i < 4; i++)
+            {
+                GetViewportBounds(cam, out Vector2 min, out Vector2 max);
+                Vector2 offset = (min + max) / 2f - freeCenter;
+                cam.transform.position += cam.transform.right * (offset.x * frustumWidth)
+                                        + cam.transform.up * (offset.y * frustumHeight);
+            }
+        }
+
+        // The screen-space box (viewport units) around the four corners of the mat plus margin.
+        private void GetViewportBounds(Camera cam, out Vector2 min, out Vector2 max)
+        {
+            float halfWidth = _boardWidth / 2f + matPadding + cameraMargin;
+            float halfHeight = _boardHeight / 2f + matPadding + cameraMargin;
+            min = new Vector2(float.MaxValue, float.MaxValue);
+            max = new Vector2(float.MinValue, float.MinValue);
+
+            for (int corner = 0; corner < 4; corner++)
+            {
+                float x = (corner & 1) == 0 ? -halfWidth : halfWidth;
+                float y = (corner & 2) == 0 ? -halfHeight : halfHeight;
+                Vector3 viewport = cam.WorldToViewportPoint(transform.position + new Vector3(x, y, 0f));
+                if (viewport.z <= 0f)
+                {
+                    // A corner behind the camera: treat the mat as far too big to fit.
+                    min = new Vector2(-1000f, -1000f);
+                    max = new Vector2(1000f, 1000f);
+                    return;
+                }
+                min = Vector2.Min(min, viewport);
+                max = Vector2.Max(max, viewport);
+            }
+        }
+
+        // A plain table under everything and a play mat under the board (placeholders for art).
+        private void CreateTableAndMat()
+        {
+            var texture = new Texture2D(1, 1) { filterMode = FilterMode.Point };
+            texture.SetPixel(0, 0, Color.white);
+            texture.Apply();
+            Sprite square = Sprite.Create(texture, new Rect(0f, 0f, 1f, 1f), new Vector2(0.5f, 0.5f), 1f);
+
+            CreateFlat("Table", square, tableColor, -20,
+                new Vector3(_boardWidth * 6f, _boardHeight * 6f, 1f));
+            CreateFlat("Mat", square, matColor, -10,
+                new Vector3(_boardWidth + 2f * matPadding, _boardHeight + 2f * matPadding, 1f));
+        }
+
+        private void CreateFlat(string objectName, Sprite sprite, Color color, int sortingOrder, Vector3 scale)
+        {
+            var flat = new GameObject(objectName);
+            flat.transform.SetParent(transform, false);
+            flat.transform.localScale = scale;
+            var spriteRenderer = flat.AddComponent<SpriteRenderer>();
+            spriteRenderer.sprite = sprite;
+            spriteRenderer.color = color;
+            spriteRenderer.sortingOrder = sortingOrder;
         }
 
         private bool IsAscensionTile(HexCoord tile) => _hasAscensionTile && _ascensionTile == tile;
@@ -257,7 +391,9 @@ namespace SoulBind.UI
             Board = board;
             Debug.Log($"BoardView: built {_tiles.Count} tiles ({board.EdgeTiles.Count} edge).");
 
-            FitCamera(0f);
+            CreateTableAndMat();
+
+            FitCamera();
         }
     }
 }
