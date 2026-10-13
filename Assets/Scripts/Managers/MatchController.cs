@@ -28,7 +28,7 @@ namespace SoulBind.Managers
         [SerializeField] private GameObject apostlePrefab;
         [Tooltip("Optional. Clicks on this panel are not treated as board clicks.")]
         [SerializeField] private DevTurnHud hud;
-        [SerializeField, Range(2, 6)] private int playerCount = 4;
+        [SerializeField, Range(2, 6)] private int playerCount = 0;
         [Tooltip("0 means a different random match every time.")]
         [SerializeField] private int seed;
         [SerializeField] private float apostleDiameter = 0.6f;
@@ -124,12 +124,67 @@ namespace SoulBind.Managers
             AfterStateChange();
         }
 
+        /// <summary>
+        /// Plays a card from the current Apostle's hand. If attack is true and the card has ATK,
+        /// it attacks: the engaged target while Engaged, otherwise the adjacent Apostle with the
+        /// lowest Id. Temporary targeting until the real UI lets the player pick a target.
+        /// </summary>
+        public void PlayCard(ArcanaId card, bool attack)
+        {
+            if (!CanAct)
+                return;
+
+            int targetId = 0;
+            if (attack && CardCatalog.Get(card).Attack > 0)
+            {
+                CurrentMatch.GetAttackTargets(_attackTargets);
+                if (_attackTargets.Count > 0)
+                    targetId = _attackTargets[0].Id;
+            }
+
+            CardPlayResult result = CurrentMatch.PlayCard(card, targetId);
+            if (result != CardPlayResult.Success)
+            {
+                Debug.Log($"MatchController: {CardCatalog.Get(card).Name} rejected ({result}).");
+                return;
+            }
+
+            Debug.Log($"MatchController: Apostle {CurrentMatch.CurrentApostle.Id} played {CardCatalog.Get(card).Name}. " +
+                      $"State {CurrentMatch.Engagement}, pending ATK {CurrentMatch.PendingAttack}.");
+            AfterStateChange();
+        }
+
+        /// <summary>Resolves the built-up attack and disengages.</summary>
+        public void Strike()
+        {
+            if (!CanAct)
+                return;
+
+            int attackerId = CurrentMatch.CurrentApostle.Id;
+            int targetId = CurrentMatch.EngagedTargetId;
+            if (!CurrentMatch.Strike(out AttackOutcome outcome))
+            {
+                Debug.Log("MatchController: not engaged, so there is nothing to strike.");
+                return;
+            }
+
+            if (outcome.BrokeDefense)
+                Debug.Log($"MatchController: Apostle {attackerId} hit Apostle {targetId} for {outcome.Damage} " +
+                          $"(stole {outcome.SoulsStolen} Soul, +{outcome.CorruptionGained} Corruption).");
+            else
+                Debug.Log($"MatchController: Apostle {attackerId} failed to break Apostle {targetId}'s DEF.");
+
+            LogIfOver();
+            AfterStateChange();
+        }
+
         public void EndTurn()
         {
             if (CurrentMatch == null || CurrentMatch.IsOver || CurrentMatch.IsAwaitingPhaseStart)
                 return;
 
             CurrentMatch.EndTurn();
+            LogIfOver();
             AfterStateChange();
         }
 
@@ -144,7 +199,7 @@ namespace SoulBind.Managers
 
 #if UNITY_EDITOR
         // DEV ONLY. These bypass the rule that the UI never changes Apostle numbers, so they only
-        // exist in the Editor and development builds, and they will be removed together with DevTurnHud.
+        // exist in the Editor, and they will be removed together with DevTurnHud.
 
         /// <summary>DEV ONLY: changes the current Apostle's Souls to test Awakening.</summary>
         public void DevChangeCurrentSouls(int delta)
@@ -162,48 +217,13 @@ namespace SoulBind.Managers
             AfterStateChange();
         }
 
-        /// <summary>DEV ONLY: gives the current Apostle a shield, standing in for a card's DEF.</summary>
+        /// <summary>DEV ONLY: gives the current Apostle extra shield.</summary>
         public void DevAddShieldToCurrent(int amount)
         {
             if (!CanAct)
                 return;
 
             CurrentMatch.CurrentApostle.AddShield(amount);
-            AfterStateChange();
-        }
-
-        /// <summary>
-        /// DEV ONLY: the current Apostle attacks its adjacent target with the lowest Id,
-        /// standing in for an attack card. Engage-once is not enforced yet.
-        /// </summary>
-        public void DevAttackFirstTarget(int totalAttack)
-        {
-            if (!CanAct)
-                return;
-
-            CurrentMatch.GetAttackTargets(_attackTargets);
-            if (_attackTargets.Count == 0)
-            {
-                Debug.Log("MatchController: no Apostle is adjacent, so there is nothing to attack.");
-                return;
-            }
-
-            int attackerId = CurrentMatch.CurrentApostle.Id;
-            int targetId = _attackTargets[0].Id;
-            AttackResult result = CurrentMatch.Attack(targetId, totalAttack, out AttackOutcome outcome);
-            if (result != AttackResult.Resolved)
-            {
-                Debug.Log($"MatchController: attack on Apostle {targetId} rejected ({result}).");
-                return;
-            }
-
-            if (outcome.BrokeDefense)
-                Debug.Log($"MatchController: Apostle {attackerId} hit Apostle {targetId} for {outcome.Damage} " +
-                          $"(stole {outcome.SoulsStolen} Soul, +{outcome.CorruptionGained} Corruption).");
-            else
-                Debug.Log($"MatchController: Apostle {attackerId} failed to break Apostle {targetId}'s DEF.");
-
-            LogIfOver();
             AfterStateChange();
         }
 #endif

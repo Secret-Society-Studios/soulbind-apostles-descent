@@ -14,27 +14,36 @@ namespace SoulBind.UI
     public sealed class DevTurnHud : MonoBehaviour
     {
         private const float DesignHeight = 720f;
+        private const int CardButtonsPerRow = 2;
 
         [SerializeField] private MatchController matchController;
 
-        private readonly StringBuilder _text = new StringBuilder(768);
+        private readonly StringBuilder _text = new StringBuilder(1024);
         private readonly List<ApostleState> _targets = new List<ApostleState>(6);
-        private Rect _panel = new Rect(10f, 10f, 470f, 470f);
+
+        // The current hand as buttons. Rebuilt only when the state changes, not every frame.
+        private readonly List<ArcanaId> _cardIds = new List<ArcanaId>(12);
+        private readonly List<string> _cardLabels = new List<string>(12);
+
+        private Rect _panel = new Rect(10f, 10f, 560f, 700f);
         private string _summary = string.Empty;
+        private string _strikeLabel = string.Empty;
+        private bool _showStrike;
+        private bool _attackMode = true;
+
         private bool _endTurnPressed;
         private bool _directionPressed;
         private TurnDirection _pressedDirection;
+        private bool _cardPressed;
+        private ArcanaId _pressedCard;
+        private bool _strikePressed;
 #if UNITY_EDITOR
         private const int DevSoulStep = 5;
         private const int DevShieldStep = 4;
-        private const int DevAttackPower = 5;
         private const string DevShieldLabel = "+4 Shield (dev)";
         private bool _devSoulsPressed;
         private int _devSoulsDelta;
         private bool _devShieldPressed;
-        private bool _devAttackPressed;
-        private bool _devHasTarget;
-        private string _devAttackLabel = "Attack (no target)";
 #endif
 
         private static float UiScale => Mathf.Max(1f, Screen.height / DesignHeight);
@@ -64,6 +73,10 @@ namespace SoulBind.UI
             if (matchController == null)
                 return;
 
+            if (_cardPressed)
+                matchController.PlayCard(_pressedCard, _attackMode);
+            if (_strikePressed)
+                matchController.Strike();
             if (_endTurnPressed)
                 matchController.EndTurn();
             if (_directionPressed)
@@ -73,13 +86,12 @@ namespace SoulBind.UI
                 matchController.DevChangeCurrentSouls(_devSoulsDelta);
             if (_devShieldPressed)
                 matchController.DevAddShieldToCurrent(DevShieldStep);
-            if (_devAttackPressed)
-                matchController.DevAttackFirstTarget(DevAttackPower);
             _devSoulsPressed = false;
             _devShieldPressed = false;
-            _devAttackPressed = false;
 #endif
 
+            _cardPressed = false;
+            _strikePressed = false;
             _endTurnPressed = false;
             _directionPressed = false;
         }
@@ -114,9 +126,13 @@ namespace SoulBind.UI
                 }
                 else
                 {
+                    DrawHandButtons();
+
+                    if (_showStrike && GUILayout.Button(_strikeLabel))
+                        _strikePressed = true;
                     if (GUILayout.Button("End Turn"))
                         _endTurnPressed = true;
-#if UNITY_EDITOR 
+#if UNITY_EDITOR
                     GUILayout.BeginHorizontal();
                     if (GUILayout.Button($"+{DevSoulStep} Souls (dev)"))
                     {
@@ -128,17 +144,8 @@ namespace SoulBind.UI
                         _devSoulsPressed = true;
                         _devSoulsDelta = -DevSoulStep;
                     }
-                    GUILayout.EndHorizontal();
-
-                    GUILayout.BeginHorizontal();
                     if (GUILayout.Button(DevShieldLabel))
                         _devShieldPressed = true;
-
-                    bool wasEnabled = GUI.enabled;
-                    GUI.enabled = _devHasTarget;
-                    if (GUILayout.Button(_devAttackLabel))
-                        _devAttackPressed = true;
-                    GUI.enabled = wasEnabled;
                     GUILayout.EndHorizontal();
 #endif
                 }
@@ -146,10 +153,32 @@ namespace SoulBind.UI
             GUILayout.EndArea();
         }
 
+        private void DrawHandButtons()
+        {
+            _attackMode = GUILayout.Toggle(_attackMode, " Attack with ATK cards (targets the lowest-Id adjacent Apostle)");
+
+            for (int i = 0; i < _cardIds.Count; i += CardButtonsPerRow)
+            {
+                GUILayout.BeginHorizontal();
+                for (int j = i; j < i + CardButtonsPerRow && j < _cardIds.Count; j++)
+                {
+                    if (GUILayout.Button(_cardLabels[j]))
+                    {
+                        _cardPressed = true;
+                        _pressedCard = _cardIds[j];
+                    }
+                }
+                GUILayout.EndHorizontal();
+            }
+        }
+
         private void Rebuild()
         {
             Match match = matchController.CurrentMatch;
             _text.Clear();
+            _cardIds.Clear();
+            _cardLabels.Clear();
+            _showStrike = false;
 
             if (match == null)
             {
@@ -186,6 +215,22 @@ namespace SoulBind.UI
                 _text.Append("Apostle ").Append(match.CurrentApostle.Id).Append("'s turn   Capacity ")
                      .Append(match.CurrentCapacity.Remaining).Append('/').Append(match.CurrentCapacity.Maximum)
                      .Append('\n');
+
+                switch (match.Engagement)
+                {
+                    case EngagementState.Free:
+                        _text.Append("Play: Free (move or play cards)\n");
+                        break;
+                    case EngagementState.Engaged:
+                        _text.Append("Play: Engaged with A").Append(match.EngagedTargetId)
+                             .Append(", ATK ").Append(match.PendingAttack).Append(" (no moving; Strike to attack)\n");
+                        _showStrike = true;
+                        _strikeLabel = $"Strike A{match.EngagedTargetId} (ATK {match.PendingAttack})";
+                        break;
+                    default:
+                        _text.Append("Play: Disengaged (no more cards this turn)\n");
+                        break;
+                }
             }
 
             AscensionTracker ascension = match.Ascension;
@@ -208,7 +253,8 @@ namespace SoulBind.UI
                      .Append("  Vessel ").Append(apostle.Vessel)
                      .Append("  Souls ").Append(apostle.Souls)
                      .Append("  Corr ").Append(apostle.Corruption)
-                     .Append("  Shield ").Append(apostle.Shield);
+                     .Append("  Shield ").Append(apostle.Shield)
+                     .Append("  Hand ").Append(match.GetHand(apostle.Id).Count);
                 if (apostle.IsEliminated)
                     _text.Append("  (out)");
                 if (ascension.HasAwakened && apostle.Id == ascension.AwakenedId)
@@ -223,7 +269,7 @@ namespace SoulBind.UI
                 _text.Append("Can attack: ");
                 if (_targets.Count == 0)
                 {
-                    _text.Append("nobody adjacent");
+                    _text.Append("nobody");
                 }
                 else
                 {
@@ -243,14 +289,28 @@ namespace SoulBind.UI
                  .Append(" (blue), Soul ").Append(specials.CountOf(SpecialTileType.Soul))
                  .Append(" (purple)\n");
 
-            _summary = _text.ToString();
+            _text.Append("Deck ").Append(match.Deck.DrawCount)
+                 .Append("   Discard ").Append(match.Deck.DiscardCount);
 
-#if UNITY_EDITOR
-            _devHasTarget = _targets.Count > 0;
-            _devAttackLabel = _devHasTarget
-                ? $"Attack A{_targets[0].Id} (ATK {DevAttackPower}, dev)"
-                : "Attack (no target)";
-#endif
+            // The hand header comes last, so the card buttons appear right under it.
+            if (match.CurrentApostle != null)
+            {
+                IReadOnlyList<ArcanaId> hand = match.GetHand(match.CurrentApostle.Id);
+                _text.Append("\nA").Append(match.CurrentApostle.Id).Append(" hand (").Append(hand.Count).Append(')');
+                if (hand.Count > GameConstants.MaxHandSize)
+                    _text.Append("  over 7!");
+                _text.Append(':');
+
+                // One button per card: name, ATK, DEF and CAP.
+                for (int i = 0; i < hand.Count; i++)
+                {
+                    CardDefinition card = CardCatalog.Get(hand[i]);
+                    _cardIds.Add(card.Id);
+                    _cardLabels.Add($"{card.Name}  A{card.Attack} D{card.Defense} C{card.Cap}");
+                }
+            }
+
+            _summary = _text.ToString();
         }
     }
 }

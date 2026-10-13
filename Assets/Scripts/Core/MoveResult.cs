@@ -12,6 +12,7 @@ namespace SoulBind.Core
         NotAdjacent,
         TileOccupied,
         NotEnoughCapacity,
-        AscensionTileReserved
+        AscensionTileReserved,
+        EngagedInCombat
     }
 }

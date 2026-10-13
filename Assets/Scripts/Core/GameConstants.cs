@@ -34,6 +34,9 @@ namespace SoulBind.Core
         public const int SoulsStolenPerAttack = 1;
         public const int AttackCorruption = 1;
 
+        public const int CardsDrawnPerTurn = 1;
+        public const int HandOverLimitCorruption = 1;
+
         public static int GetStartingSouls(int playerCount)
         {
             switch (playerCount)
