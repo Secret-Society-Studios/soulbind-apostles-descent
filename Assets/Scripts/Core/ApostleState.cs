@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace SoulBind.Core
 {
@@ -9,18 +10,28 @@ namespace SoulBind.Core
     /// </summary>
     public sealed class ApostleState
     {
+        private readonly List<TimedEffect> _timedEffects = new List<TimedEffect>(4);
+
         public int Id { get; }
         public HexCoord Position { get; private set; }
         public int Vessel { get; private set; }
         public int Souls { get; private set; }
         public int Corruption { get; private set; }
 
-        
         /// <summary>
-        /// DEF shield. Each attack's damage is reduced by it, and hits do not use it up.
+        /// DEF shield from played cards. Each attack's damage is reduced by it, and hits do not use it up.
         /// Shields stack, and the whole shield clears at the start of this Apostle's next turn.
         /// </summary>
         public int Shield { get; private set; }
+
+        /// <summary>How many of its own turns this Apostle has started. Timed effects count these.</summary>
+        public int TurnsStarted { get; private set; }
+
+        /// <summary>Effects that last for a number of this Apostle's turns.</summary>
+        public IReadOnlyList<TimedEffect> TimedEffects => _timedEffects;
+
+        /// <summary>The DEF an attack has to beat: the shield plus any timed DEF bonus.</summary>
+        public int Defense => Shield + GetTimedTotal(TimedEffectKind.Defense);
 
         public bool IsEliminated => Vessel <= 0;
         public bool IsCorrupted => Corruption >= GameConstants.CorruptionThreshold;
@@ -102,7 +113,6 @@ namespace SoulBind.Core
             Corruption = Math.Max(0, Corruption - amount);
         }
 
-        
         /// <summary>Adds DEF to the shield. Shields stack.</summary>
         public void AddShield(int amount)
         {
@@ -110,8 +120,55 @@ namespace SoulBind.Core
             Shield += amount;
         }
 
-        /// <summary>Removes the whole shield. Called at the start of this Apostle's turn.</summary>
+        /// <summary>Removes the whole shield.</summary>
         public void ClearShield() => Shield = 0;
+
+        /// <summary>Lowers the shield, never below 0. Timed DEF is not touched.</summary>
+        public void ReduceShield(int amount)
+        {
+            RequireNonNegative(amount, nameof(amount));
+            Shield = Math.Max(0, Shield - amount);
+        }
+
+        /// <summary>
+        /// Adds an effect that lasts for this many of this Apostle's turns: it is active for the
+        /// rest of this turn and the next (ownTurns - 1) turns, and ends at the start of the one after.
+        /// </summary>
+        public void AddTimedEffect(TimedEffectKind kind, int amount, int ownTurns)
+        {
+            RequireNonNegative(amount, nameof(amount));
+            if (ownTurns < 1)
+                throw new ArgumentOutOfRangeException(nameof(ownTurns), "An effect lasts at least 1 turn.");
+
+            _timedEffects.Add(new TimedEffect(kind, amount, TurnsStarted + ownTurns));
+        }
+
+        /// <summary>The total amount of every active timed effect of this kind.</summary>
+        public int GetTimedTotal(TimedEffectKind kind)
+        {
+            int total = 0;
+            for (int i = 0; i < _timedEffects.Count; i++)
+            {
+                if (_timedEffects[i].Kind == kind)
+                    total += _timedEffects[i].Amount;
+            }
+            return total;
+        }
+
+        /// <summary>
+        /// Start-of-turn bookkeeping: counts the turn, clears the shield and ends expired timed effects.
+        /// Corruption damage is applied separately by the turn flow.
+        /// </summary>
+        public void BeginTurn()
+        {
+            TurnsStarted++;
+            Shield = 0;
+            for (int i = _timedEffects.Count - 1; i >= 0; i--)
+            {
+                if (_timedEffects[i].ExpiresOnTurn <= TurnsStarted)
+                    _timedEffects.RemoveAt(i);
+            }
+        }
 
         /// <summary>Vessel damage this Apostle takes from Corruption at the start of its turn.</summary>
         public int GetCorruptionDamage()

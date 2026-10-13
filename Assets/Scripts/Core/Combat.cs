@@ -4,21 +4,22 @@ namespace SoulBind.Core
 {
     /// <summary>
     /// Resolves one attack between two Apostles. It does not check range, turns, Capacity
-    /// or the engage-once rule; the caller (Match, and later card play) does that.
+    /// or the engage-once rule; the caller (Match) does that.
     /// Pure rules code: no Unity types.
     /// </summary>
     public static class Combat
     {
-        /// <summary>Damage = total ATK minus the target's Shield, minimum 0.</summary>
-        public static int GetDamage(int totalAttack, int targetShield) => Math.Max(0, totalAttack - targetShield);
+        /// <summary>Damage = total ATK minus the target's DEF, minimum 0.</summary>
+        public static int GetDamage(int totalAttack, int targetDefense) => Math.Max(0, totalAttack - targetDefense);
 
         /// <summary>
-        /// Applies one attack. On a hit (damage above 0), in this order:
+        /// Applies one attack against the target's DEF (shield plus timed DEF). On a hit (damage above 0):
         /// 1. the target takes the damage;
         /// 2. unless the attacker is Soullocked, 1 Soul moves from the target to the attacker;
         /// 3. the attacker gains +1 Corruption.
         /// Soullock is checked before step 3, so an attacker at 4 Corruption still steals.
-        /// A 0-damage attack changes nothing. The Shield is never used up.
+        /// On a failed attack (0 damage) nothing happens, except that a target protected by
+        /// The Moon gives the attacker its Corruption. DEF is never used up.
         /// </summary>
         public static AttackOutcome Resolve(ApostleState attacker, ApostleState target, int totalAttack)
         {
@@ -35,9 +36,14 @@ namespace SoulBind.Core
             if (target.IsEliminated)
                 throw new InvalidOperationException("An eliminated Apostle cannot be attacked.");
 
-            int damage = GetDamage(totalAttack, target.Shield);
+            int damage = GetDamage(totalAttack, target.Defense);
             if (damage == 0)
-                return new AttackOutcome(0, 0, 0);
+            {
+                int punishment = target.GetTimedTotal(TimedEffectKind.FailedAttackCorruption);
+                if (punishment > 0)
+                    attacker.AddCorruption(punishment);
+                return new AttackOutcome(0, 0, punishment);
+            }
 
             target.TakeDamage(damage);
 

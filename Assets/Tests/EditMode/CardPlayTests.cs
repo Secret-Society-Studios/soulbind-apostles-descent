@@ -8,7 +8,7 @@ namespace SoulBind.Tests.EditMode
     public class CardPlayTests
     {
         // Both Apostles get this hand, so the tests do not depend on who plays first.
-        // Magician A2 D1 C1, Death A7 D4 C5, Star A0 D6 C4, Fool A0 D0 C0, Moon A4 D10 C6.
+        // Magician A2 D1 C1 (+1 ATK when attacking), Death A7 D4 C5, Star A0 D6 C4, Fool A0 D0 C0, Moon A4 D10 C6.
         private static readonly ArcanaId[] StartingHand =
         {
             ArcanaId.Magician, ArcanaId.Death, ArcanaId.Star, ArcanaId.Fool, ArcanaId.Moon
@@ -48,7 +48,7 @@ namespace SoulBind.Tests.EditMode
             throw new InvalidOperationException($"No free tile next to {tile}.");
         }
 
-        // A match where the current Apostle has engaged its opponent with The Magician (ATK 2).
+        // A match where the current Apostle has engaged its opponent with The Magician (ATK 2 + 1 = 3).
         private static Match EngagedMatch(out ApostleState target)
         {
             Match match = NewMatch();
@@ -148,7 +148,7 @@ namespace SoulBind.Tests.EditMode
 
             Assert.AreEqual(EngagementState.Engaged, match.Engagement);
             Assert.AreEqual(target.Id, match.EngagedTargetId);
-            Assert.AreEqual(2, match.PendingAttack);
+            Assert.AreEqual(3, match.PendingAttack);
             Assert.AreEqual(GameConstants.Phase1Capacity - 1, match.CurrentCapacity.Remaining);
             Assert.AreEqual(50, target.Vessel, "Nothing is resolved until Strike");
         }
@@ -159,7 +159,7 @@ namespace SoulBind.Tests.EditMode
             Match match = EngagedMatch(out _);
 
             Assert.AreEqual(CardPlayResult.Success, match.PlayCard(ArcanaId.Death, 0));
-            Assert.AreEqual(9, match.PendingAttack);
+            Assert.AreEqual(10, match.PendingAttack);
             Assert.AreEqual(GameConstants.Phase1Capacity - 6, match.CurrentCapacity.Remaining);
         }
 
@@ -199,7 +199,7 @@ namespace SoulBind.Tests.EditMode
             Match match = EngagedMatch(out _);
 
             Assert.AreEqual(CardPlayResult.WrongTarget, match.PlayCard(ArcanaId.Death, 99));
-            Assert.AreEqual(2, match.PendingAttack);
+            Assert.AreEqual(3, match.PendingAttack);
         }
 
         // ---- Strike and disengaging ----
@@ -209,12 +209,12 @@ namespace SoulBind.Tests.EditMode
         {
             Match match = EngagedMatch(out ApostleState target);
             target.AddShield(3);
-            match.PlayCard(ArcanaId.Death, 0); // 2 + 7 = 9 ATK
+            match.PlayCard(ArcanaId.Death, 0); // 3 + 7 = 10 ATK
 
             Assert.IsTrue(match.Strike(out AttackOutcome outcome));
 
-            Assert.AreEqual(6, outcome.Damage);
-            Assert.AreEqual(44, target.Vessel);
+            Assert.AreEqual(7, outcome.Damage);
+            Assert.AreEqual(43, target.Vessel);
             Assert.AreEqual(EngagementState.Disengaged, match.Engagement);
             Assert.AreEqual(0, match.PendingAttack);
             Assert.AreEqual(0, match.EngagedTargetId);
@@ -283,7 +283,7 @@ namespace SoulBind.Tests.EditMode
 
             match.EndTurn();
 
-            Assert.AreEqual(48, target.Vessel);
+            Assert.AreEqual(47, target.Vessel);
         }
 
         [Test]
@@ -304,7 +304,7 @@ namespace SoulBind.Tests.EditMode
             Match match = EngagedMatch(out ApostleState target);
             ApostleState attacker = match.CurrentApostle;
             target.TakeDamage(GameConstants.StartingVessel - 5);
-            match.PlayCard(ArcanaId.Death, 0); // 9 ATK
+            match.PlayCard(ArcanaId.Death, 0); // 10 ATK
 
             match.Strike(out _);
 

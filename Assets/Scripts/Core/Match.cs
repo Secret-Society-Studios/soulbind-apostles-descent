@@ -16,6 +16,24 @@ namespace SoulBind.Core
         // One hand per Apostle, at the same index as Battlefield.Apostles.
         private readonly Hand[] _hands;
 
+        // Reused for every card effect, so playing a card allocates nothing.
+        private readonly CardPlayContext _playContext;
+
+        // Set by Death while Engaged: a target below this Vessel is executed if the attack breaks DEF. 0 = off.
+        private int _executeBelowVessel;
+
+        // Corruption-reducing cards played so far this turn (for Strength).
+        private int _corruptionReducersThisTurn;
+
+        // A Strength played this turn that has not been paired with another reducer yet.
+        private bool _strengthAwaitingPartner;
+
+        // Every card that is part of the current attack, in play order (for The Lovers).
+        private readonly List<ArcanaId> _attackCards = new List<ArcanaId>(8);
+
+        // Set by The Emperor: the attack doubles at Strike if the target is more Corrupted than the player.
+        private bool _emperorArmed;
+
         public Battlefield Battlefield { get; }
         public TurnTracker Turns { get; }
 
@@ -57,6 +75,7 @@ namespace SoulBind.Core
             Deck = deck;
             _random = random;
             Ascension = new AscensionTracker();
+            _playContext = new CardPlayContext(this);
 
             _hands = new Hand[battlefield.Apostles.Count];
             for (int i = 0; i < _hands.Length; i++)
@@ -225,7 +244,70 @@ namespace SoulBind.Core
             }
             // While Free with no target, the card's ATK is lost and only its DEF applies.
 
+            // Then the card's own effect, if it has one.
+            CardEffect effect = CardEffects.Get(card);
+            if (effect != null)
+            {
+                // Strength: a Strength played earlier this turn is doubled once another
+                // Corruption-reducing card joins it (checked before this card's own effect,
+                // so a Strength never pairs with itself).
+                if (effect.ReducesCorruption && _strengthAwaitingPartner)
+                {
+                    CurrentApostle.ReduceCorruption(StrengthEffect.BaseReduction);
+                    _strengthAwaitingPartner = false;
+                }
+
+                effect.OnPlayed(_playContext);
+
+                if (effect.ReducesCorruption)
+                    _corruptionReducersThisTurn++;
+
+                UpdateGameOver();
+            }
+
+            // Remember the cards that make up the attack. This happens after the effect,
+            // so an effect only ever sees the cards played before it.
+            if (Engagement == EngagementState.Engaged)
+                _attackCards.Add(card);
+
             return CardPlayResult.Success;
+        }
+
+        // ---- Called by card effects through CardPlayContext ----
+
+        internal ApostleState EngagedTarget =>
+            Engagement == EngagementState.Engaged ? FindApostle(EngagedTargetId) : null;
+
+        internal int CorruptionReducersThisTurn => _corruptionReducersThisTurn;
+
+        internal void MarkStrengthAwaitingPartner() => _strengthAwaitingPartner = true;
+
+        // How many copies of this card are already part of the current attack.
+        internal int CountInCurrentAttack(ArcanaId card)
+        {
+            int count = 0;
+            for (int i = 0; i < _attackCards.Count; i++)
+            {
+                if (_attackCards[i] == card)
+                    count++;
+            }
+            return count;
+        }
+
+        internal void ArmEmperor()
+        {
+            if (Engagement != EngagementState.Engaged)
+                throw new InvalidOperationException("The Emperor can only be armed while Engaged.");
+            _emperorArmed = true;
+        }
+
+        // Draws one card into the current Apostle's hand. Returns false if both piles are empty.
+        internal bool DrawCardForCurrent()
+        {
+            if (!Deck.TryDraw(out ArcanaId card))
+                return false;
+            _hands[IndexOf(CurrentApostle.Id)].Add(card);
+            return true;
         }
 
         /// <summary>
@@ -242,18 +324,49 @@ namespace SoulBind.Core
 
             ApostleState target = FindApostle(EngagedTargetId);
             int totalAttack = PendingAttack;
+            int executeBelowVessel = _executeBelowVessel;
+            bool emperorArmed = _emperorArmed;
 
+            ResetEngagement();
             Engagement = EngagementState.Disengaged;
-            EngagedTargetId = 0;
-            PendingAttack = 0;
 
             // The target cannot move while we are engaged, so it is still adjacent.
             // If something else eliminated it meanwhile, the attack has nothing to hit.
             if (!target.IsEliminated)
+            {
+                // The Emperor: compared now, as the attack resolves.
+                if (emperorArmed && target.Corruption > CurrentApostle.Corruption)
+                    totalAttack *= EmperorEffect.AttackMultiplier;
+
+                int vesselBefore = target.Vessel;
                 outcome = Combat.Resolve(CurrentApostle, target, totalAttack);
+
+                // Death: a broken defense on a target that had less than 5 Vessel is an execution.
+                if (executeBelowVessel > 0 && outcome.BrokeDefense
+                    && vesselBefore < executeBelowVessel && !target.IsEliminated)
+                    target.TakeDamage(target.Vessel);
+            }
 
             UpdateGameOver();
             return true;
+        }
+
+        // Called by card effects through CardPlayContext.
+        internal void AddToPendingAttack(int amount)
+        {
+            if (Engagement != EngagementState.Engaged)
+                throw new InvalidOperationException("ATK can only be added while Engaged.");
+            if (amount < 0)
+                throw new ArgumentOutOfRangeException(nameof(amount), "Amount cannot be negative.");
+            PendingAttack += amount;
+        }
+
+        // Called by card effects through CardPlayContext.
+        internal void ArmExecute(int vesselBelow)
+        {
+            if (Engagement != EngagementState.Engaged)
+                throw new InvalidOperationException("An execute can only be armed while Engaged.");
+            _executeBelowVessel = Math.Max(_executeBelowVessel, vesselBelow);
         }
 
         /// <summary>
@@ -384,18 +497,21 @@ namespace SoulBind.Core
                 apostle.AddCorruption(GameConstants.HandOverLimitCorruption);
         }
 
-        // Applies start-of-turn effects to the current Apostle: the shield clears, then
+        // Applies start-of-turn effects to the current Apostle: the shield clears and expired
+        // timed effects end (BeginTurn), then
         // Corruption damage applies. If that eliminates them, their turn passes on.
         private void StartTurn()
         {
             ResetEngagement();
+            _corruptionReducersThisTurn = 0;
+            _strengthAwaitingPartner = false;
             while (true)
             {
                 if (UpdateGameOver())
                     return;
 
                 ApostleState apostle = FindApostle(Turns.CurrentApostleId);
-                apostle.ClearShield();
+                apostle.BeginTurn();
                 apostle.ApplyCorruptionDamage();
 
                 if (!apostle.IsEliminated)
@@ -422,6 +538,9 @@ namespace SoulBind.Core
             Engagement = EngagementState.Free;
             EngagedTargetId = 0;
             PendingAttack = 0;
+            _executeBelowVessel = 0;
+            _attackCards.Clear();
+            _emperorArmed = false;
         }
 
         private void RequireActiveTurn()
