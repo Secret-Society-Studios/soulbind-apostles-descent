@@ -131,26 +131,32 @@ namespace SoulBind.Core
         }
 
         /// <summary>
-        /// Adds an effect that lasts for this many of this Apostle's turns: it is active for the
-        /// rest of this turn and the next (ownTurns - 1) turns, and ends at the start of the one after.
+        /// Adds an effect that lasts for ownTurns of this Apostle's turns.
+        /// With delayTurns 0 it is active right away (for the rest of the current turn, then the next
+        /// ownTurns - 1 turns). With delayTurns 1 it starts at this Apostle's next turn instead.
+        /// It ends at the start of the turn after its last one.
         /// </summary>
-        public void AddTimedEffect(TimedEffectKind kind, int amount, int ownTurns)
+        public void AddTimedEffect(TimedEffectKind kind, int amount, int ownTurns, int delayTurns = 0)
         {
             RequireNonNegative(amount, nameof(amount));
             if (ownTurns < 1)
                 throw new ArgumentOutOfRangeException(nameof(ownTurns), "An effect lasts at least 1 turn.");
+            if (delayTurns < 0)
+                throw new ArgumentOutOfRangeException(nameof(delayTurns), "A delay cannot be negative.");
 
-            _timedEffects.Add(new TimedEffect(kind, amount, TurnsStarted + ownTurns));
+            int starts = TurnsStarted + delayTurns;
+            _timedEffects.Add(new TimedEffect(kind, amount, starts, starts + ownTurns));
         }
 
-        /// <summary>The total amount of every active timed effect of this kind.</summary>
+        /// <summary>The total amount of every timed effect of this kind that is active right now.</summary>
         public int GetTimedTotal(TimedEffectKind kind)
         {
             int total = 0;
             for (int i = 0; i < _timedEffects.Count; i++)
             {
-                if (_timedEffects[i].Kind == kind)
-                    total += _timedEffects[i].Amount;
+                TimedEffect effect = _timedEffects[i];
+                if (effect.Kind == kind && effect.IsActiveOn(TurnsStarted))
+                    total += effect.Amount;
             }
             return total;
         }

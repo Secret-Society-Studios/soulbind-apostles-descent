@@ -27,12 +27,16 @@ namespace SoulBind.Core
             effects[(int)ArcanaId.HighPriestess] = new HighPriestessEffect();
             effects[(int)ArcanaId.Empress] = new EmpressEffect();
             effects[(int)ArcanaId.Emperor] = new EmperorEffect();
+            effects[(int)ArcanaId.Hierophant] = new HierophantEffect();
             effects[(int)ArcanaId.Lovers] = new LoversEffect();
             effects[(int)ArcanaId.Chariot] = new ChariotEffect();
             effects[(int)ArcanaId.Strength] = new StrengthEffect();
+            effects[(int)ArcanaId.Hermit] = new HermitEffect();
             effects[(int)ArcanaId.Justice] = new JusticeEffect();
+            effects[(int)ArcanaId.HangedMan] = new HangedManEffect();
             effects[(int)ArcanaId.Death] = new DeathEffect();
             effects[(int)ArcanaId.Devil] = new DevilEffect();
+            effects[(int)ArcanaId.Tower] = new TowerEffect();
             effects[(int)ArcanaId.Star] = new StarEffect();
             effects[(int)ArcanaId.Moon] = new MoonEffect();
             effects[(int)ArcanaId.Sun] = new SunEffect();

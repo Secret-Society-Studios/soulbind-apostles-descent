@@ -294,6 +294,21 @@ namespace SoulBind.Core
             return count;
         }
 
+        // Raises the current turn's maximum Capacity; Capacity already spent stays spent.
+        internal void IncreaseCurrentCapacity(int amount)
+        {
+            if (amount < 0)
+                throw new ArgumentOutOfRangeException(nameof(amount), "Amount cannot be negative.");
+            if (amount == 0)
+                return;
+
+            int spent = CurrentCapacity.Maximum - CurrentCapacity.Remaining;
+            var raised = new TurnCapacity(CurrentCapacity.Maximum + amount);
+            if (spent > 0)
+                raised.Spend(spent);
+            CurrentCapacity = raised;
+        }
+
         internal void ArmEmperor()
         {
             if (Engagement != EngagementState.Engaged)
@@ -334,7 +349,10 @@ namespace SoulBind.Core
             // If something else eliminated it meanwhile, the attack has nothing to hit.
             if (!target.IsEliminated)
             {
-                // The Emperor: compared now, as the attack resolves.
+                // Timed ATK bonuses (Hierophant, Hanged Man) join the attack once, as it resolves.
+                totalAttack += CurrentApostle.GetTimedTotal(TimedEffectKind.Attack);
+
+                // The Emperor: compared now, as the attack resolves, and doubles the whole total.
                 if (emperorArmed && target.Corruption > CurrentApostle.Corruption)
                     totalAttack *= EmperorEffect.AttackMultiplier;
 
@@ -517,7 +535,7 @@ namespace SoulBind.Core
                 if (!apostle.IsEliminated)
                 {
                     CurrentApostle = apostle;
-                    CurrentCapacity = Turns.CreateTurnCapacity();
+                    CurrentCapacity = CreateCapacityFor(apostle);
                     return;
                 }
 
@@ -531,6 +549,17 @@ namespace SoulBind.Core
                     return;
                 }
             }
+        }
+
+        // The Phase's Capacity, adjusted by timed effects (The Hermit's bonus, The Tower's penalty).
+        private TurnCapacity CreateCapacityFor(ApostleState apostle)
+        {
+            TurnCapacity phaseCapacity = Turns.CreateTurnCapacity();
+            int change = apostle.GetTimedTotal(TimedEffectKind.MaxCapacity)
+                       - apostle.GetTimedTotal(TimedEffectKind.CapacityPenalty);
+            if (change == 0)
+                return phaseCapacity;
+            return new TurnCapacity(Math.Max(0, phaseCapacity.Maximum + change));
         }
 
         private void ResetEngagement()

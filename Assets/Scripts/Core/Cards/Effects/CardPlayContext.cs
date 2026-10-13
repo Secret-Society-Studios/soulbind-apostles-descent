@@ -54,6 +54,9 @@ namespace SoulBind.Core
         /// </summary>
         public void ArmExecute(int vesselBelow) => _match.ArmExecute(vesselBelow);
 
+        /// <summary>Raises this turn's maximum Capacity (and what is left of it) by this amount.</summary>
+        public void AddCapacityThisTurn(int amount) => _match.IncreaseCurrentCapacity(amount);
+
         /// <summary>Draws one card into the player's hand. Returns false if both piles are empty.</summary>
         public bool DrawCard() => _match.DrawCardForCurrent();
 

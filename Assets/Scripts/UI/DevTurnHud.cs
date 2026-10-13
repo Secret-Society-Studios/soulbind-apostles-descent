@@ -3,6 +3,7 @@ using System.Text;
 using SoulBind.Core;
 using SoulBind.Managers;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace SoulBind.UI
 {
@@ -15,8 +16,13 @@ namespace SoulBind.UI
     {
         private const float DesignHeight = 720f;
         private const int CardButtonsPerRow = 2;
+        private const float PanelWidth = 440f;
+        private const float Margin = 10f;
+        private const float MaxBoardShiftFraction = 0.6f;
 
         [SerializeField] private MatchController matchController;
+        [Tooltip("Optional. Found automatically if left empty. The camera keeps the board clear of the panel.")]
+        [SerializeField] private BoardView boardView;
 
         private readonly StringBuilder _text = new StringBuilder(1024);
         private readonly List<ApostleState> _targets = new List<ApostleState>(6);
@@ -25,7 +31,17 @@ namespace SoulBind.UI
         private readonly List<ArcanaId> _cardIds = new List<ArcanaId>(12);
         private readonly List<string> _cardLabels = new List<string>(12);
 
-        private Rect _panel = new Rect(10f, 10f, 560f, 700f);
+        private Rect _panel;
+        private readonly Rect _showButton = new Rect(Margin, Margin, 150f, 28f);
+        private Vector2 _scroll;
+        private bool _hidden;
+        private bool _togglePressed;
+
+        // The screen fraction last given to the camera, and the screen size it was worked out for.
+        private float _appliedFraction = -1f;
+        private int _lastScreenWidth;
+        private int _lastScreenHeight;
+
         private string _summary = string.Empty;
         private string _strikeLabel = string.Empty;
         private bool _showStrike;
@@ -60,16 +76,30 @@ namespace SoulBind.UI
                 matchController.StateChanged -= Rebuild;
         }
 
-        /// <summary>True if a screen position (origin bottom-left) is over this panel.</summary>
+        private void Start()
+        {
+            if (boardView == null)
+                boardView = FindFirstObjectByType<BoardView>();
+        }
+
+        /// <summary>True if a screen position (origin bottom-left) is over this panel (or its Show button).</summary>
         public bool ContainsScreenPoint(Vector2 screenPoint)
         {
             float scale = UiScale;
             var guiPoint = new Vector2(screenPoint.x / scale, (Screen.height - screenPoint.y) / scale);
-            return _panel.Contains(guiPoint);
+            return _hidden ? _showButton.Contains(guiPoint) : _panel.Contains(guiPoint);
         }
 
         private void Update()
         {
+            Keyboard keyboard = Keyboard.current;
+            if (_togglePressed || (keyboard != null && keyboard.hKey.wasPressedThisFrame))
+                _hidden = !_hidden;
+            _togglePressed = false;
+
+            UpdatePanelRect();
+            KeepBoardClearOfPanel();
+
             if (matchController == null)
                 return;
 
@@ -103,9 +133,23 @@ namespace SoulBind.UI
 
             float scale = UiScale;
             GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
+
+            if (_hidden)
+            {
+                if (GUI.Button(_showButton, "Show panel (H)"))
+                    _togglePressed = true;
+                return;
+            }
+
+            UpdatePanelRect();
             GUI.Box(_panel, GUIContent.none);
 
             GUILayout.BeginArea(new Rect(_panel.x + 8f, _panel.y + 8f, _panel.width - 16f, _panel.height - 16f));
+            if (GUILayout.Button("Hide panel (H)"))
+                _togglePressed = true;
+
+            // Scrolls when the content is taller than the screen.
+            _scroll = GUILayout.BeginScrollView(_scroll);
             GUILayout.Label(_summary);
 
             Match match = matchController.CurrentMatch;
@@ -150,12 +194,41 @@ namespace SoulBind.UI
 #endif
                 }
             }
+            GUILayout.EndScrollView();
             GUILayout.EndArea();
+        }
+
+        // The panel runs down the left edge at a fixed width and fills the screen's height.
+        private void UpdatePanelRect()
+        {
+            float height = Screen.height / UiScale - 2f * Margin;
+            _panel = new Rect(Margin, Margin, PanelWidth, height);
+        }
+
+        // Moves the camera so the board sits in the space to the right of the panel.
+        // Only re-fits when the panel is shown or hidden, or the screen size changes.
+        private void KeepBoardClearOfPanel()
+        {
+            if (boardView == null || Screen.width <= 0)
+                return;
+
+            float fraction = 0f;
+            if (!_hidden)
+                fraction = Mathf.Min((_panel.xMax + Margin) * UiScale / Screen.width, MaxBoardShiftFraction);
+
+            bool screenChanged = Screen.width != _lastScreenWidth || Screen.height != _lastScreenHeight;
+            if (!screenChanged && Mathf.Approximately(fraction, _appliedFraction))
+                return;
+
+            boardView.FitCamera(fraction);
+            _appliedFraction = fraction;
+            _lastScreenWidth = Screen.width;
+            _lastScreenHeight = Screen.height;
         }
 
         private void DrawHandButtons()
         {
-            _attackMode = GUILayout.Toggle(_attackMode, " Attack with ATK cards (targets the lowest-Id adjacent Apostle)");
+            _attackMode = GUILayout.Toggle(_attackMode, " Attack with ATK cards (lowest-Id adjacent target)");
 
             for (int i = 0; i < _cardIds.Count; i += CardButtonsPerRow)
             {
@@ -253,7 +326,7 @@ namespace SoulBind.UI
                      .Append("  Vessel ").Append(apostle.Vessel)
                      .Append("  Souls ").Append(apostle.Souls)
                      .Append("  Corr ").Append(apostle.Corruption)
-                     .Append("  Shield ").Append(apostle.Shield)
+                     .Append("  DEF ").Append(apostle.Defense)
                      .Append("  Hand ").Append(match.GetHand(apostle.Id).Count);
                 if (apostle.IsEliminated)
                     _text.Append("  (out)");

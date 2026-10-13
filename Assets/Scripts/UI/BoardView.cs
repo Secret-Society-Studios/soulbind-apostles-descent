@@ -34,6 +34,8 @@ namespace SoulBind.UI
         private HexCoord _ascensionTile;
         private float _centerX;
         private float _centerY;
+        private float _boardWidth;
+        private float _boardHeight;
 
         public HexBoard Board { get; private set; }
 
@@ -122,7 +124,6 @@ namespace SoulBind.UI
             _highlighted.Clear();
         }
 
-        
         /// <summary>
         /// Marks the tiles under attackable Apostles, clearing any earlier marks.
         /// Call it last, after ShowSpecialTiles, ShowAscensionTile and SetHighlights.
@@ -146,6 +147,35 @@ namespace SoulBind.UI
             for (int i = 0; i < _attackMarks.Count; i++)
                 _tiles[_attackMarks[i]].color = BaseColor(_attackMarks[i]);
             _attackMarks.Clear();
+        }
+
+        /// <summary>
+        /// Fits the orthographic camera to the board, keeping the left part of the screen free
+        /// (for a panel). reservedLeftFraction is the share of the screen width to keep clear: 0 to 0.8.
+        /// </summary>
+        public void FitCamera(float reservedLeftFraction)
+        {
+            if (!fitCameraToBoard || Board == null)
+                return;
+
+            Camera cam = Camera.main;
+            if (cam == null || !cam.orthographic)
+                return;
+
+            float reserved = Mathf.Clamp(reservedLeftFraction, 0f, 0.8f);
+            float usable = 1f - reserved;
+
+            float halfHeight = _boardHeight / 2f + cameraMargin;
+            float halfWidth = _boardWidth / 2f + cameraMargin;
+            float size = Mathf.Max(halfHeight, halfWidth / (cam.aspect * usable));
+            cam.orthographicSize = size;
+
+            // Move the camera left so the board is centered in the free part of the screen.
+            float visibleWidth = 2f * size * cam.aspect;
+            float shift = reserved * visibleWidth / 2f;
+
+            Vector3 cameraPosition = cam.transform.position;
+            cam.transform.position = new Vector3(transform.position.x - shift, transform.position.y, cameraPosition.z);
         }
 
         private bool IsAscensionTile(HexCoord tile) => _hasAscensionTile && _ascensionTile == tile;
@@ -197,6 +227,8 @@ namespace SoulBind.UI
             }
             _centerX = (minX + maxX) / 2f;
             _centerY = (minY + maxY) / 2f;
+            _boardWidth = (maxX - minX) + Mathf.Sqrt(3f) * hexSize;
+            _boardHeight = (maxY - minY) + 2f * hexSize;
 
             foreach (HexCoord tile in board.Tiles)
             {
@@ -225,26 +257,7 @@ namespace SoulBind.UI
             Board = board;
             Debug.Log($"BoardView: built {_tiles.Count} tiles ({board.EdgeTiles.Count} edge).");
 
-            if (fitCameraToBoard)
-            {
-                float width = (maxX - minX) + Mathf.Sqrt(3f) * hexSize;
-                float height = (maxY - minY) + 2f * hexSize;
-                FitCamera(width, height);
-            }
-        }
-
-        private void FitCamera(float boardWidth, float boardHeight)
-        {
-            Camera cam = Camera.main;
-            if (cam == null || !cam.orthographic)
-                return;
-
-            float halfHeight = boardHeight / 2f + cameraMargin;
-            float halfWidth = boardWidth / 2f + cameraMargin;
-            cam.orthographicSize = Mathf.Max(halfHeight, halfWidth / cam.aspect);
-
-            Vector3 cameraPosition = cam.transform.position;
-            cam.transform.position = new Vector3(transform.position.x, transform.position.y, cameraPosition.z);
+            FitCamera(0f);
         }
     }
 }
