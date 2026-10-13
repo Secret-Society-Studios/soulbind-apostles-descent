@@ -546,6 +546,9 @@ MonoBehaviour:
   healTileColor: {r: 0.9, g: 0.4, b: 0.45, a: 1}
   purifyTileColor: {r: 0.5, g: 0.75, b: 0.95, a: 1}
   soulTileColor: {r: 0.68, g: 0.45, b: 0.9, a: 1}
+  ascensionTileColor: {r: 1, g: 0.8, b: 0.2, a: 1}
+  ascensionHighlightColor: {r: 1, g: 0.95, b: 0.6, a: 1}
+  attackTargetColor: {r: 0.45, g: 0.08, b: 0.1, a: 1}
   fitCameraToBoard: 1
   cameraMargin: 1
 --- !u!1 &1066798566
