@@ -1,0 +1,34 @@
+using System.Collections.Generic;
+
+namespace SoulBind.Core
+{
+    /// <summary>
+    /// The cards one Apostle holds. Hidden information: only its owner may see it.
+    /// Pure rules data: no Unity types.
+    /// </summary>
+    public sealed class Hand
+    {
+        private readonly List<ArcanaId> _cards = new List<ArcanaId>(GameConstants.MaxHandSize + 2);
+
+        public IReadOnlyList<ArcanaId> Cards => _cards;
+        public int Count => _cards.Count;
+
+        /// <summary>True when the hand holds more than the maximum (7).</summary>
+        public bool IsOverLimit => _cards.Count > GameConstants.MaxHandSize;
+
+        public void Add(ArcanaId card) => _cards.Add(card);
+
+        public bool Contains(ArcanaId card) => _cards.Contains(card);
+
+        /// <summary>Removes one copy of the card. Returns false if the hand does not hold it.</summary>
+        public bool Remove(ArcanaId card) => _cards.Remove(card);
+
+        /// <summary>Moves every card in the hand to the deck's discard pile.</summary>
+        public void DiscardAllTo(Deck deck)
+        {
+            for (int i = 0; i < _cards.Count; i++)
+                deck.Discard(_cards[i]);
+            _cards.Clear();
+        }
+    }
+}
