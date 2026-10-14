@@ -35,6 +35,8 @@ namespace SoulBind.EditorTools
         private static readonly Color StrikeColor = new Color(0.65f, 0.15f, 0.20f);
         private const string HudName = "MatchHud";
         private const string PileName = "DiscardPile";
+        private const string DrawPileName = "DrawPile";
+        private const float PileOffset = 0.65f; // both piles sit this many card heights from the side area's middle
 
         private const float PortraitWidth = 280f;
         private const float PortraitHeight = 96f;
@@ -186,6 +188,7 @@ namespace SoulBind.EditorTools
             }
 
             BuildDiscardPile(root, cardPrefab, handView, controller);
+            BuildDrawPile(root.gameObject.scene, controller);
 
             if (controllerObject == null)
                 Debug.LogWarning("MatchHudBuilder: no GameObject named 'MatchController' was found. Drag it into the " +
@@ -298,14 +301,117 @@ namespace SoulBind.EditorTools
             handSo.FindProperty("discardPile").objectReferenceValue = view;
             handSo.ApplyModifiedProperties();
 
-            // Keep the board and the pile left of the buttons on the right.
-            MatchHud hud = hudRoot.GetComponent<MatchHud>();
-            Transform actionArea = hudRoot.Find("ActionArea");
-            if (hud != null && actionArea != null)
+        }
+
+        /// <summary>
+        /// Adds the face-down draw pile on the table, below the discard pile. Running it again replaces it.
+        /// </summary>
+        [MenuItem("SoulBind/Add Draw Pile")]
+        private static void AddDrawPile()
+        {
+            Scene scene = SceneManager.GetActiveScene();
+            GameObject controllerObject = GameObject.Find("MatchController");
+            MatchController controller = controllerObject != null ? controllerObject.GetComponent<MatchController>() : null;
+            if (controller == null)
             {
-                var hudSo = new SerializedObject(hud);
-                hudSo.FindProperty("rightReservedArea").objectReferenceValue = actionArea;
-                hudSo.ApplyModifiedProperties();
+                EditorUtility.DisplayDialog("Add Draw Pile", "No GameObject named 'MatchController' was found in the open scene.", "OK");
+                return;
+            }
+
+            BuildDrawPile(scene, controller);
+
+            // Make room for it: move an existing discard pile up to its matching place.
+            foreach (GameObject sceneRoot in scene.GetRootGameObjects())
+            {
+                DiscardPileView discard = sceneRoot.GetComponent<DiscardPileView>();
+                if (discard == null)
+                    continue;
+                var discardSo = new SerializedObject(discard);
+                discardSo.FindProperty("heightOffset").floatValue = PileOffset;
+                discardSo.ApplyModifiedProperties();
+            }
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            Debug.Log("MatchHudBuilder: added the DrawPile on the table. Save the scene.");
+        }
+
+        // Like the discard pile: a World Space canvas lying on the table, placed by DrawPileView at runtime.
+        private static void BuildDrawPile(Scene scene, MatchController controller)
+        {
+            foreach (GameObject sceneRoot in scene.GetRootGameObjects())
+            {
+                if (sceneRoot.GetComponent<DrawPileView>() != null)
+                    Undo.DestroyObjectImmediate(sceneRoot);
+            }
+
+            var pileObject = new GameObject(DrawPileName, typeof(RectTransform));
+            SceneManager.MoveGameObjectToScene(pileObject, scene);
+            Undo.RegisterCreatedObjectUndo(pileObject, "Add Draw Pile");
+            Canvas pileCanvas = pileObject.AddComponent<Canvas>();
+            pileCanvas.renderMode = RenderMode.WorldSpace;
+            pileCanvas.sortingOrder = 5; // above the table and mat sprites
+            var pile = (RectTransform)pileObject.transform;
+            pile.sizeDelta = new Vector2(CardWidth + 60f, CardHeight + 80f);
+            pile.localScale = Vector3.one * (2.4f / CardHeight); // DrawPileView sets the real size and place
+
+            RectTransform slot = CreateRect("Slot", pile);
+            Centered(slot, new Vector2(CardWidth, CardHeight));
+            AddImage(slot.gameObject, new Color(0f, 0f, 0f, 0.35f));
+            Outline outline = slot.gameObject.AddComponent<Outline>();
+            outline.effectColor = FrameColor;
+            outline.effectDistance = new Vector2(3f, -3f);
+
+            TMP_Text emptyText = CreateText("EmptyText", slot, "Draw pile\n\nEmpty: the discard pile is shuffled in on the next draw",
+                16f, TextAlignmentOptions.Center);
+            Stretch(emptyText.rectTransform, 12f, 12f, 12f, 12f);
+            emptyText.color = new Color(1f, 1f, 1f, 0.6f);
+
+            RectTransform stack = CreateRect("Stack", pile);
+            Centered(stack, new Vector2(CardWidth, CardHeight));
+
+            // The placeholder card back: gold frame, dark inside, a name in the middle.
+            RectTransform back = CreateRect("CardBackTemplate", pile);
+            Centered(back, new Vector2(CardWidth, CardHeight));
+            AddImage(back.gameObject, FrameColor);
+            RectTransform inner = CreateRect("Inner", back);
+            Stretch(inner, 8f, 8f, 8f, 8f);
+            AddImage(inner.gameObject, new Color(0.20f, 0.12f, 0.28f));
+            RectTransform emblem = CreateRect("Emblem", inner);
+            Centered(emblem, new Vector2(90f, 90f));
+            emblem.localRotation = Quaternion.Euler(0f, 0f, 45f);
+            AddImage(emblem.gameObject, new Color(0.62f, 0.48f, 0.24f, 0.5f));
+            TMP_Text backTitle = CreateText("Title", inner, "SoulBind", 26f, TextAlignmentOptions.Center);
+            Stretch(backTitle.rectTransform, 0f, 0f, 0f, 0f);
+            backTitle.color = ParchmentColor;
+            back.gameObject.SetActive(false);
+
+            TMP_Text countText = CreateText("CountText", pile, "", 26f, TextAlignmentOptions.Center);
+            countText.rectTransform.anchorMin = new Vector2(0.5f, 0f);
+            countText.rectTransform.anchorMax = new Vector2(0.5f, 0f);
+            countText.rectTransform.pivot = new Vector2(0.5f, 0f);
+            countText.rectTransform.anchoredPosition = Vector2.zero;
+            countText.rectTransform.sizeDelta = new Vector2(CardWidth, 32f);
+
+            DrawPileView view = pileObject.AddComponent<DrawPileView>();
+            var so = new SerializedObject(view);
+            so.FindProperty("matchController").objectReferenceValue = controller;
+            so.FindProperty("cardBackTemplate").objectReferenceValue = back;
+            so.FindProperty("stack").objectReferenceValue = stack;
+            so.FindProperty("slot").objectReferenceValue = slot;
+            so.FindProperty("countText").objectReferenceValue = countText;
+            so.FindProperty("emptyText").objectReferenceValue = emptyText;
+            so.FindProperty("heightOffset").floatValue = PileOffset;
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            // Drawn cards fly from here into the hand.
+            foreach (GameObject sceneRoot in scene.GetRootGameObjects())
+            {
+                HandView handView = sceneRoot.GetComponentInChildren<HandView>(true);
+                if (handView == null)
+                    continue;
+                var handSo = new SerializedObject(handView);
+                handSo.FindProperty("drawPile").objectReferenceValue = view;
+                handSo.ApplyModifiedProperties();
             }
         }
 

@@ -32,7 +32,7 @@ namespace SoulBind.UI
         [SerializeField] private Sprite purifyTileSprite;
         [SerializeField] private Sprite soulTileSprite;
         [SerializeField] private bool fitCameraToBoard = true;
-        [SerializeField] private float cameraMargin = 1f;
+        [SerializeField] private float cameraMargin = 0.4f;
 
         [Header("Table view")]
         [Tooltip("How far the camera tilts away from straight down, in degrees.")]
@@ -44,9 +44,9 @@ namespace SoulBind.UI
         [SerializeField] private Color matColor = new Color(0.16f, 0.14f, 0.20f);
         [SerializeField] private float matPadding = 0.6f;
         [Tooltip("Width of the table area kept on screen right of the mat, for the discard pile (and the deck later).")]
-        [SerializeField] private float sideAreaWidth = 2.6f;
+        [SerializeField] private float sideAreaWidth = 2f;
         [Tooltip("Gap between the mat and the side area.")]
-        [SerializeField] private float sideAreaGap = 0.5f;
+        [SerializeField] private float sideAreaGap = 0.4f;
 
         private readonly Dictionary<HexCoord, SpriteRenderer> _tiles = new Dictionary<HexCoord, SpriteRenderer>();
         private readonly Dictionary<HexCoord, SpecialTileType> _specialTypes = new Dictionary<HexCoord, SpecialTileType>();
@@ -63,7 +63,6 @@ namespace SoulBind.UI
         private float _reservedLeft;
         private float _reservedTop;
         private float _reservedBottom;
-        private float _reservedRight;
 
         public HexBoard Board { get; private set; }
 
@@ -191,13 +190,6 @@ namespace SoulBind.UI
             FitCamera();
         }
 
-        /// <summary>Keeps this share of the screen width clear on the right (0 to 0.5) and re-fits the camera.</summary>
-        public void SetReservedRight(float fraction)
-        {
-            _reservedRight = Mathf.Clamp(fraction, 0f, 0.5f);
-            FitCamera();
-        }
-
         /// <summary>
         /// The middle of the table area right of the mat, on the board's plane. The camera always keeps
         /// this area on screen. The discard pile sits here.
@@ -258,7 +250,9 @@ namespace SoulBind.UI
 
             // The free part of the screen, in viewport units (0 to 1).
             float freeMinX = _reservedLeft;
-            float freeMaxX = 1f - _reservedRight;
+            // The right edge is free: the buttons and portrait on the right only cover the bottom corner,
+            // and the turn info the top corner, both outside the band the board and piles use.
+            float freeMaxX = 1f;
             float freeMinY = _reservedBottom;
             float freeMaxY = 1f - _reservedTop;
             var freeCenter = new Vector2((freeMinX + freeMaxX) / 2f, (freeMinY + freeMaxY) / 2f);
@@ -275,7 +269,7 @@ namespace SoulBind.UI
             {
                 float middle = (near + far) / 2f;
                 cam.transform.position = boardCenter - forward * middle;
-                GetViewportBounds(cam, out Vector2 min, out Vector2 max);
+                GetViewportBounds(cam, true, out Vector2 min, out Vector2 max);
                 if (max.x - min.x <= freeWidth && max.y - min.y <= freeHeight)
                     far = middle;
                 else
@@ -283,24 +277,34 @@ namespace SoulBind.UI
             }
             cam.transform.position = boardCenter - forward * far;
 
-            // 2. Slide sideways and up/down so the mat is centered in the free area.
+            // 2. Slide sideways and up/down. The board itself is centered in the screen width the left
+            //    panel leaves, then nudged left only as far as needed to keep the piles on screen.
             float frustumHeight = 2f * far * Mathf.Tan(fieldOfView * 0.5f * Mathf.Deg2Rad);
             float frustumWidth = frustumHeight * cam.aspect;
-            for (int i = 0; i < 4; i++)
+            float boardTargetX = (freeMinX + 1f) / 2f;
+            for (int i = 0; i < 6; i++)
             {
-                GetViewportBounds(cam, out Vector2 min, out Vector2 max);
-                Vector2 offset = (min + max) / 2f - freeCenter;
-                cam.transform.position += cam.transform.right * (offset.x * frustumWidth)
-                                        + cam.transform.up * (offset.y * frustumHeight);
+                GetViewportBounds(cam, false, out Vector2 boardMin, out Vector2 boardMax);
+                GetViewportBounds(cam, true, out Vector2 allMin, out Vector2 allMax);
+
+                // A positive offset moves everything left on screen.
+                float offsetX = (boardMin.x + boardMax.x) / 2f - boardTargetX;
+                offsetX = Mathf.Max(offsetX, allMax.x - freeMaxX); // piles stay on screen
+                offsetX = Mathf.Min(offsetX, allMin.x - freeMinX); // board stays right of the left panel
+                float offsetY = (allMin.y + allMax.y) / 2f - freeCenter.y;
+
+                cam.transform.position += cam.transform.right * (offsetX * frustumWidth)
+                                        + cam.transform.up * (offsetY * frustumHeight);
             }
         }
 
-        // The screen-space box (viewport units) around the four corners of the mat and the side area
-        // on its right, plus margin.
-        private void GetViewportBounds(Camera cam, out Vector2 min, out Vector2 max)
+        // The screen-space box (viewport units) around the four corners of the mat plus margin,
+        // and with includeSide, the side area on its right for the piles too.
+        private void GetViewportBounds(Camera cam, bool includeSide, out Vector2 min, out Vector2 max)
         {
             float left = -(_boardWidth / 2f + matPadding + cameraMargin);
-            float right = _boardWidth / 2f + matPadding + sideAreaGap + sideAreaWidth + cameraMargin;
+            float right = _boardWidth / 2f + matPadding + cameraMargin
+                          + (includeSide ? sideAreaGap + sideAreaWidth : 0f);
             float halfHeight = _boardHeight / 2f + matPadding + cameraMargin;
             min = new Vector2(float.MaxValue, float.MaxValue);
             max = new Vector2(float.MinValue, float.MinValue);

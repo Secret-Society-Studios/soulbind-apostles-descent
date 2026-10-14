@@ -32,7 +32,7 @@ namespace SoulBind.UI
         [Tooltip("Height of one card on the table, in world units (a hex tile is about 1).")]
         [SerializeField] private float cardWorldHeight = 2.4f;
         [Tooltip("How far above the middle of the side area the pile sits, in card heights (the deck goes below later).")]
-        [SerializeField] private float heightOffset = 0.55f;
+        [SerializeField] private float heightOffset = 0.65f;
 
         [Header("Stack")]
         [Tooltip("Only the top cards are drawn; the ones under them can't be seen anyway.")]
@@ -45,6 +45,8 @@ namespace SoulBind.UI
         [SerializeField] private float pulseSpeed = 4f;
 
         private readonly List<CardView> _views = new List<CardView>(20);
+        private readonly Vector3[] _corners = new Vector3[4];
+        private int _held;
         private Camera _camera;
         private int _lastCount;
         private bool _dragging;
@@ -93,6 +95,32 @@ namespace SoulBind.UI
             // A ray from the camera onto the pile's tilted rectangle.
             return slot != null && _camera != null
                 && RectTransformUtility.RectangleContainsScreenPoint(slot, screenPoint, _camera);
+        }
+
+        /// <summary>
+        /// Hides the top cards for now: they are still flying here. Call ReleaseOne as each one lands.
+        /// </summary>
+        public void HoldTop(int cards)
+        {
+            _held += Mathf.Max(0, cards);
+            Refresh();
+        }
+
+        /// <summary>A flying card has landed: show it on top of the pile.</summary>
+        public void ReleaseOne()
+        {
+            if (_held > 0)
+                _held--;
+            Refresh();
+        }
+
+        /// <summary>
+        /// Where the pile's top card is on screen, and how tall a card looks there (in screen pixels),
+        /// so a flying card can land exactly on it.
+        /// </summary>
+        public bool TryGetScreenSpot(out Vector2 center, out float cardPixelHeight)
+        {
+            return TableSpot.TryGet(slot, _camera, _corners, out center, out cardPixelHeight);
         }
 
         /// <summary>Called by HandView while a card is dragged. The glow is brighter over the pile.</summary>
@@ -160,7 +188,10 @@ namespace SoulBind.UI
 
             Match match = matchController.CurrentMatch;
             IReadOnlyList<ArcanaId> pile = match != null ? match.Deck.DiscardPile : null;
-            int count = pile != null ? pile.Count : 0;
+            int total = pile != null ? pile.Count : 0;
+            if (_held > total)
+                _held = total; // the pile was shuffled back into the draw pile meanwhile
+            int count = total - _held; // cards still in the air are not shown yet
             int shown = Mathf.Min(count, _views.Count);
             int first = count - shown; // pile index of the lowest card drawn
 

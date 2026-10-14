@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 6c5b9f72dd08ca1499f4bd18861e8721
+guid: 060bb6d97d0b5d84ab2115fa475fa836
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 5366988109102844141
-    second: Special Tiles HEALTH FINAL-1_0
+      213: -2795719809818713561
+    second: Special Tiles HEALTH(2)_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -141,13 +141,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Special Tiles HEALTH FINAL-1_0
+      name: Special Tiles HEALTH(2)_0
       rect:
         serializedVersion: 2
-        x: 0
-        y: 0
-        width: 3000
-        height: 3000
+        x: 162
+        y: 26
+        width: 1838
+        height: 2108
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -156,8 +156,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: de802dcef3f5b7a40800000000000000
-      internalID: 5366988109102844141
+      spriteID: 722ab3435ab9339d0800000000000000
+      internalID: -2795719809818713561
       vertices: []
       indices: 
       edges: []
@@ -176,7 +176,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      Special Tiles HEALTH FINAL-1_0: 5366988109102844141
+      Special Tiles HEALTH(2)_0: -2795719809818713561
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

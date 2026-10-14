@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 5229c63e44548224186110c0cea67323
+guid: c1d0938585ccf5941b1d823a6a485de2
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -8648500197935648917
-    second: Special Tiles CORR-1_0
+      213: -8246103488371625927
+    second: card_back_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -37,7 +37,7 @@ TextureImporter:
   maxTextureSize: 2048
   textureSettings:
     serializedVersion: 2
-    filterMode: 0
+    filterMode: 1
     aniso: 1
     mipBias: 0
     wrapU: 1
@@ -48,7 +48,7 @@ TextureImporter:
   compressionQuality: 50
   spriteMode: 1
   spriteExtrude: 1
-  spriteMeshType: 1
+  spriteMeshType: 0
   alignment: 0
   spritePivot: {x: 0.5, y: 0.5}
   spritePixelsToUnits: 100
@@ -77,7 +77,7 @@ TextureImporter:
     maxTextureSize: 2048
     resizeAlgorithm: 0
     textureFormat: -1
-    textureCompression: 0
+    textureCompression: 1
     compressionQuality: 50
     crunchedCompression: 0
     allowsAlphaSplitting: 0
@@ -141,13 +141,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Special Tiles CORR-1_0
+      name: card_back_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 3000
-        height: 3000
+        width: 2600
+        height: 3640
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -156,8 +156,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: b6f662644ea5af780800000000000000
-      internalID: -8648500197935648917
+      spriteID: 930ff7a2194ff8d80800000000000000
+      internalID: -8246103488371625927
       vertices: []
       indices: 
       edges: []
@@ -176,7 +176,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      Special Tiles CORR-1_0: -8648500197935648917
+      card_back_0: -8246103488371625927
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
