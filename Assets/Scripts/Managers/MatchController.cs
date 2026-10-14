@@ -321,18 +321,21 @@ namespace SoulBind.Managers
                 return;
 
             int attackerId = CurrentMatch.CurrentApostle.Id;
-            int targetId = CurrentMatch.EngagedTargetId;
             if (!CurrentMatch.Strike(out AttackOutcome outcome))
             {
                 Debug.Log("MatchController: not engaged, so there is nothing to strike.");
                 return;
             }
 
-            if (outcome.BrokeDefense)
-                Debug.Log($"MatchController: Apostle {attackerId} hit Apostle {targetId} for {outcome.Damage} " +
-                          $"(stole {outcome.SoulsStolen} Soul, +{outcome.CorruptionGained} Corruption).");
-            else
-                Debug.Log($"MatchController: Apostle {attackerId} failed to break Apostle {targetId}'s DEF.");
+            foreach (StrikeHit hit in CurrentMatch.LastStrikeHits)
+            {
+                if (hit.BrokeDefense)
+                    Debug.Log($"MatchController: Apostle {attackerId} hit Apostle {hit.TargetId} with {hit.Attack} ATK " +
+                              $"for {hit.Damage} damage (stole {hit.SoulsStolen} Soul).");
+                else
+                    Debug.Log($"MatchController: {hit.Attack} ATK failed to break Apostle {hit.TargetId}'s DEF.");
+            }
+            Debug.Log($"MatchController: Apostle {attackerId} gained {outcome.CorruptionGained} Corruption from the attack.");
 
             LogIfOver();
             AfterStateChange();
@@ -422,9 +425,9 @@ namespace SoulBind.Managers
             if (IsChoosingComboTarget)
                 return "Nocturne combo: click an opponent's portrait or disc. Right-click to cancel.";
             if (HasSelectedCard)
-                return "Click a red-ringed Apostle to attack, or play it without attacking.";
+                return "Click a red-ringed Apostle to attack (everyone adjacent is hit), or play it without attacking.";
             if (match.Engagement == EngagementState.Engaged)
-                return $"Engaged with Apostle {match.EngagedTargetId}: add cards, or Strike.";
+                return "Engaged: add cards, or Strike. The ATK is divided between everyone adjacent.";
             if (match.Engagement == EngagementState.Disengaged)
                 return "Attack done: you can still move, or end your turn.";
             return string.Empty;

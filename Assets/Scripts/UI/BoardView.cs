@@ -23,6 +23,14 @@ namespace SoulBind.UI
         [SerializeField] private Color ascensionTileColor = new Color(1.00f, 0.80f, 0.20f);
         [SerializeField] private Color ascensionHighlightColor = new Color(1.00f, 0.95f, 0.60f);
         [SerializeField] private Color attackTargetColor = new Color(0.45f, 0.08f, 0.10f);
+
+        [Header("Tile art (optional: an empty slot keeps the placeholder hex and color)")]
+        [Tooltip("A normal tile. Also used for edge tiles if Edge Tile Sprite is empty.")]
+        [SerializeField] private Sprite plainTileSprite;
+        [SerializeField] private Sprite edgeTileSprite;
+        [SerializeField] private Sprite healTileSprite;
+        [SerializeField] private Sprite purifyTileSprite;
+        [SerializeField] private Sprite soulTileSprite;
         [SerializeField] private bool fitCameraToBoard = true;
         [SerializeField] private float cameraMargin = 1f;
 
@@ -40,6 +48,8 @@ namespace SoulBind.UI
         private readonly Dictionary<HexCoord, SpecialTileType> _specialTypes = new Dictionary<HexCoord, SpecialTileType>();
         private readonly List<HexCoord> _highlighted = new List<HexCoord>(6);
         private readonly List<HexCoord> _attackMarks = new List<HexCoord>(6);
+        private readonly List<HexCoord> _changedTiles = new List<HexCoord>(16);
+        private Sprite _placeholderSprite;
         private bool _hasAscensionTile;
         private HexCoord _ascensionTile;
         private float _centerX;
@@ -82,16 +92,20 @@ namespace SoulBind.UI
         /// </summary>
         public void ShowSpecialTiles(IReadOnlyDictionary<HexCoord, SpecialTileType> active)
         {
+            // Turn the old special tiles back into ordinary ones first.
+            _changedTiles.Clear();
             foreach (HexCoord tile in _specialTypes.Keys)
-                _tiles[tile].color = PlainColor(tile);
+                _changedTiles.Add(tile);
             _specialTypes.Clear();
+            for (int i = 0; i < _changedTiles.Count; i++)
+                ApplyBase(_changedTiles[i]);
 
             foreach (KeyValuePair<HexCoord, SpecialTileType> pair in active)
             {
                 if (_tiles.TryGetValue(pair.Key, out SpriteRenderer spriteRenderer))
                 {
                     _specialTypes[pair.Key] = pair.Value;
-                    spriteRenderer.color = BaseColor(pair.Key);
+                    ApplyBase(pair.Key);
                 }
             }
         }
@@ -105,7 +119,7 @@ namespace SoulBind.UI
             if (_hasAscensionTile)
             {
                 _hasAscensionTile = false;
-                _tiles[_ascensionTile].color = BaseColor(_ascensionTile);
+                ApplyBase(_ascensionTile);
             }
 
             if (visible && _tiles.TryGetValue(tile, out SpriteRenderer spriteRenderer))
@@ -133,7 +147,7 @@ namespace SoulBind.UI
         public void ClearHighlights()
         {
             for (int i = 0; i < _highlighted.Count; i++)
-                _tiles[_highlighted[i]].color = BaseColor(_highlighted[i]);
+                ApplyBase(_highlighted[i]);
             _highlighted.Clear();
         }
 
@@ -158,7 +172,7 @@ namespace SoulBind.UI
         public void ClearAttackMarks()
         {
             for (int i = 0; i < _attackMarks.Count; i++)
-                _tiles[_attackMarks[i]].color = BaseColor(_attackMarks[i]);
+                ApplyBase(_attackMarks[i]);
             _attackMarks.Clear();
         }
 
@@ -314,16 +328,54 @@ namespace SoulBind.UI
 
         private bool IsAscensionTile(HexCoord tile) => _hasAscensionTile && _ascensionTile == tile;
 
-        private Color PlainColor(HexCoord tile) => Board.IsEdge(tile) ? edgeTileColor : tileColor;
-
-        // The color a tile has when it is not highlighted.
-        private Color BaseColor(HexCoord tile)
+        // Puts a tile back to how it looks when nothing is highlighted or marked: its art (or the
+        // placeholder hex), sized to the board, with its color. Highlights then tint over the art.
+        private void ApplyBase(HexCoord tile)
         {
+            SpriteRenderer spriteRenderer = _tiles[tile];
+            Sprite art = ArtFor(tile);
+            Sprite sprite = art != null ? art : _placeholderSprite;
+
+            if (spriteRenderer.sprite != sprite)
+            {
+                spriteRenderer.sprite = sprite;
+                spriteRenderer.transform.localScale = Vector3.one * ScaleFor(sprite);
+            }
+
             if (IsAscensionTile(tile))
-                return ascensionTileColor;
+                spriteRenderer.color = ascensionTileColor;
+            else if (art != null)
+                spriteRenderer.color = Color.white; // show the art as drawn
+            else if (_specialTypes.TryGetValue(tile, out SpecialTileType type))
+                spriteRenderer.color = SpecialColor(type);
+            else
+                spriteRenderer.color = Board.IsEdge(tile) ? edgeTileColor : tileColor;
+        }
+
+        // The team's art for this tile, or null to use the placeholder.
+        private Sprite ArtFor(HexCoord tile)
+        {
             if (_specialTypes.TryGetValue(tile, out SpecialTileType type))
-                return SpecialColor(type);
-            return PlainColor(tile);
+            {
+                switch (type)
+                {
+                    case SpecialTileType.Heal: return healTileSprite;
+                    case SpecialTileType.Purify: return purifyTileSprite;
+                    default: return soulTileSprite;
+                }
+            }
+            if (Board.IsEdge(tile) && edgeTileSprite != null)
+                return edgeTileSprite;
+            return plainTileSprite;
+        }
+
+        // Scales any sprite so it is as tall as a hex tile, whatever its size or Pixels Per Unit.
+        private float ScaleFor(Sprite sprite)
+        {
+            float height = sprite.bounds.size.y;
+            if (height <= 0f)
+                return tileScale;
+            return tileScale * (2f * hexSize) / height;
         }
 
         private Color SpecialColor(SpecialTileType type)
@@ -345,7 +397,7 @@ namespace SoulBind.UI
             }
 
             HexBoard board = StandardBoard.Create();
-            Sprite sprite = HexSpriteFactory.Create(hexSize);
+            _placeholderSprite = HexSpriteFactory.Create(hexSize);
             Vector2[] outline = HexSpriteFactory.GetCorners(hexSize);
 
             // Find the board's bounds so it can be centered on this object.
@@ -376,8 +428,7 @@ namespace SoulBind.UI
                     Debug.LogError("BoardView: the HexTile prefab needs a SpriteRenderer.", hexTilePrefab);
                     return;
                 }
-                spriteRenderer.sprite = sprite;
-                spriteRenderer.color = board.IsEdge(tile) ? edgeTileColor : tileColor;
+                spriteRenderer.sprite = _placeholderSprite;
                 _tiles.Add(tile, spriteRenderer);
 
                 var collider = instance.GetComponent<PolygonCollider2D>();
@@ -389,6 +440,10 @@ namespace SoulBind.UI
             }
 
             Board = board;
+
+            // Give every tile its art (or placeholder) and color.
+            foreach (HexCoord tile in board.Tiles)
+                ApplyBase(tile);
             Debug.Log($"BoardView: built {_tiles.Count} tiles ({board.EdgeTiles.Count} edge).");
 
             CreateTableAndMat();

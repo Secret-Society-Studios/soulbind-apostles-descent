@@ -28,6 +28,10 @@ namespace SoulBind.Core
         // A Strength played this turn that has not been paired with another reducer yet.
         private bool _strengthAwaitingPartner;
 
+        // Reused by Strike, so resolving an attack allocates nothing.
+        private readonly List<ApostleState> _strikeTargets = new List<ApostleState>(6);
+        private readonly List<StrikeHit> _lastStrikeHits = new List<StrikeHit>(6);
+
         // Every card that is part of the current attack, in play order (for The Lovers).
         private readonly List<ArcanaId> _attackCards = new List<ArcanaId>(8);
 
@@ -436,8 +440,13 @@ namespace SoulBind.Core
         }
 
         /// <summary>
-        /// Resolves the built-up attack against the engaged target, then disengages: no more cards
-        /// this turn. Returns false (and changes nothing) if the current Apostle is not Engaged.
+        /// Resolves the built-up attack against every living Apostle adjacent to the player, then
+        /// disengages: no more cards this turn. Returns false (and changes nothing) if not Engaged.
+        /// The total ATK (plus timed ATK bonuses) is divided between the targets as evenly as
+        /// possible, any leftover going one point each to the primary target first, then the others
+        /// in Id order. Each target's own DEF reduces its share. The player steals 1 Soul from each
+        /// target whose DEF breaks, and gains +1 Corruption once if any DEF broke.
+        /// outcome sums the whole strike; LastStrikeHits has the result for each target.
         /// A strike can Awaken someone, eliminate someone or end the match: check IsOver afterwards.
         /// </summary>
         public bool Strike(out AttackOutcome outcome)
@@ -447,37 +456,76 @@ namespace SoulBind.Core
             if (Engagement != EngagementState.Engaged)
                 return false;
 
-            ApostleState target = FindApostle(EngagedTargetId);
-            int totalAttack = PendingAttack;
+            int primaryId = EngagedTargetId;
+            int totalAttack = PendingAttack + CurrentApostle.GetTimedTotal(TimedEffectKind.Attack);
             int executeBelowVessel = _executeBelowVessel;
             bool emperorArmed = _emperorArmed;
 
             ResetEngagement();
             Engagement = EngagementState.Disengaged;
+            _lastStrikeHits.Clear();
 
-            // The target cannot move while we are engaged, so it is still adjacent.
-            // If something else eliminated it meanwhile, the attack has nothing to hit.
-            if (!target.IsEliminated)
+            // Nobody moves while the player is engaged, so these are the Apostles it engaged next to,
+            // minus anyone eliminated meanwhile. The primary target goes first.
+            Battlefield.GetAttackTargets(CurrentApostle, _strikeTargets);
+            for (int i = 1; i < _strikeTargets.Count; i++)
             {
-                // Timed ATK bonuses (Hierophant, Hanged Man) join the attack once, as it resolves.
-                totalAttack += CurrentApostle.GetTimedTotal(TimedEffectKind.Attack);
-
-                // The Emperor: compared now, as the attack resolves, and doubles the whole total.
-                if (emperorArmed && target.Corruption > CurrentApostle.Corruption)
-                    totalAttack *= EmperorEffect.AttackMultiplier;
-
-                int vesselBefore = target.Vessel;
-                outcome = Combat.Resolve(CurrentApostle, target, totalAttack);
-
-                // Death: a broken defense on a target that had less than 5 Vessel is an execution.
-                if (executeBelowVessel > 0 && outcome.BrokeDefense
-                    && vesselBefore < executeBelowVessel && !target.IsEliminated)
-                    target.TakeDamage(target.Vessel);
+                if (_strikeTargets[i].Id == primaryId)
+                {
+                    ApostleState primary = _strikeTargets[i];
+                    _strikeTargets.RemoveAt(i);
+                    _strikeTargets.Insert(0, primary);
+                    break;
+                }
             }
 
+            ApostleState attacker = CurrentApostle;
+            int targetCount = _strikeTargets.Count;
+            int totalDamage = 0;
+            int totalSouls = 0;
+            int corruptionGained = 0;
+            bool anyBroken = false;
+
+            for (int i = 0; i < targetCount; i++)
+            {
+                ApostleState target = _strikeTargets[i];
+                int share = Combat.GetShare(totalAttack, targetCount, i);
+                if (share == 0)
+                    continue; // not enough ATK to reach this one
+
+                // The Emperor: compared for each target as the attack resolves; doubles that target's share.
+                if (emperorArmed && target.Corruption > attacker.Corruption)
+                    share *= EmperorEffect.AttackMultiplier;
+
+                int vesselBefore = target.Vessel;
+                AttackOutcome hit = Combat.ResolveHit(attacker, target, share);
+
+                // Death: a broken defense on a target that had less than 5 Vessel is an execution.
+                if (executeBelowVessel > 0 && hit.BrokeDefense
+                    && vesselBefore < executeBelowVessel && !target.IsEliminated)
+                    target.TakeDamage(target.Vessel);
+
+                anyBroken |= hit.BrokeDefense;
+                totalDamage += hit.Damage;
+                totalSouls += hit.SoulsStolen;
+                corruptionGained += hit.CorruptionGained; // The Moon's punishment, if any
+                _lastStrikeHits.Add(new StrikeHit(target.Id, share, hit.Damage, hit.SoulsStolen, target.IsEliminated));
+            }
+
+            // One attack: +1 Corruption once, if any DEF broke.
+            if (anyBroken)
+            {
+                attacker.AddCorruption(GameConstants.AttackCorruption);
+                corruptionGained += GameConstants.AttackCorruption;
+            }
+
+            outcome = new AttackOutcome(totalDamage, totalSouls, corruptionGained);
             UpdateGameOver();
             return true;
         }
+
+        /// <summary>What the last Strike did to each target, primary target first.</summary>
+        public IReadOnlyList<StrikeHit> LastStrikeHits => _lastStrikeHits;
 
         // Called by card effects through CardPlayContext.
         internal void AddToPendingAttack(int amount)
@@ -520,7 +568,7 @@ namespace SoulBind.Core
 
         /// <summary>
         /// Fills results with the Apostles the current Apostle can attack right now: every adjacent
-        /// living Apostle while Free, only the engaged target while Engaged, and nobody once Disengaged.
+        /// living Apostle while Free or Engaged (a Strike hits all of them), and nobody once Disengaged.
         /// The caller supplies the list to avoid allocating.
         /// </summary>
         public void GetAttackTargets(List<ApostleState> results)
@@ -533,15 +581,8 @@ namespace SoulBind.Core
                 return;
             }
 
+            // While Engaged these are everyone the Strike will hit.
             Battlefield.GetAttackTargets(CurrentApostle, results);
-            if (Engagement == EngagementState.Engaged)
-            {
-                for (int i = results.Count - 1; i >= 0; i--)
-                {
-                    if (results[i].Id != EngagedTargetId)
-                        results.RemoveAt(i);
-                }
-            }
         }
 
         /// <summary>
