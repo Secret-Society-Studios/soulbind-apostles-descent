@@ -43,6 +43,10 @@ namespace SoulBind.UI
         [Tooltip("Placeholder play-mat color under the board.")]
         [SerializeField] private Color matColor = new Color(0.16f, 0.14f, 0.20f);
         [SerializeField] private float matPadding = 0.6f;
+        [Tooltip("Width of the table area kept on screen right of the mat, for the discard pile (and the deck later).")]
+        [SerializeField] private float sideAreaWidth = 2.6f;
+        [Tooltip("Gap between the mat and the side area.")]
+        [SerializeField] private float sideAreaGap = 0.5f;
 
         private readonly Dictionary<HexCoord, SpriteRenderer> _tiles = new Dictionary<HexCoord, SpriteRenderer>();
         private readonly Dictionary<HexCoord, SpecialTileType> _specialTypes = new Dictionary<HexCoord, SpecialTileType>();
@@ -59,6 +63,7 @@ namespace SoulBind.UI
         private float _reservedLeft;
         private float _reservedTop;
         private float _reservedBottom;
+        private float _reservedRight;
 
         public HexBoard Board { get; private set; }
 
@@ -186,6 +191,20 @@ namespace SoulBind.UI
             FitCamera();
         }
 
+        /// <summary>Keeps this share of the screen width clear on the right (0 to 0.5) and re-fits the camera.</summary>
+        public void SetReservedRight(float fraction)
+        {
+            _reservedRight = Mathf.Clamp(fraction, 0f, 0.5f);
+            FitCamera();
+        }
+
+        /// <summary>
+        /// The middle of the table area right of the mat, on the board's plane. The camera always keeps
+        /// this area on screen. The discard pile sits here.
+        /// </summary>
+        public Vector3 SideAreaCenter =>
+            transform.position + new Vector3(_boardWidth / 2f + matPadding + sideAreaGap + sideAreaWidth / 2f, 0f, 0f);
+
         /// <summary>The share of the screen height kept clear at the bottom (for the player's strip and hand).</summary>
         public float ReservedBottomFraction => _reservedBottom;
 
@@ -239,7 +258,7 @@ namespace SoulBind.UI
 
             // The free part of the screen, in viewport units (0 to 1).
             float freeMinX = _reservedLeft;
-            float freeMaxX = 1f;
+            float freeMaxX = 1f - _reservedRight;
             float freeMinY = _reservedBottom;
             float freeMaxY = 1f - _reservedTop;
             var freeCenter = new Vector2((freeMinX + freeMaxX) / 2f, (freeMinY + freeMaxY) / 2f);
@@ -276,17 +295,19 @@ namespace SoulBind.UI
             }
         }
 
-        // The screen-space box (viewport units) around the four corners of the mat plus margin.
+        // The screen-space box (viewport units) around the four corners of the mat and the side area
+        // on its right, plus margin.
         private void GetViewportBounds(Camera cam, out Vector2 min, out Vector2 max)
         {
-            float halfWidth = _boardWidth / 2f + matPadding + cameraMargin;
+            float left = -(_boardWidth / 2f + matPadding + cameraMargin);
+            float right = _boardWidth / 2f + matPadding + sideAreaGap + sideAreaWidth + cameraMargin;
             float halfHeight = _boardHeight / 2f + matPadding + cameraMargin;
             min = new Vector2(float.MaxValue, float.MaxValue);
             max = new Vector2(float.MinValue, float.MinValue);
 
             for (int corner = 0; corner < 4; corner++)
             {
-                float x = (corner & 1) == 0 ? -halfWidth : halfWidth;
+                float x = (corner & 1) == 0 ? left : right;
                 float y = (corner & 2) == 0 ? -halfHeight : halfHeight;
                 Vector3 viewport = cam.WorldToViewportPoint(transform.position + new Vector3(x, y, 0f));
                 if (viewport.z <= 0f)

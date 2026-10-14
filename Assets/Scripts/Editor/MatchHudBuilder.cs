@@ -4,6 +4,7 @@ using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 namespace SoulBind.EditorTools
@@ -33,6 +34,7 @@ namespace SoulBind.EditorTools
         private static readonly Color ButtonColor = new Color(0.22f, 0.18f, 0.30f);
         private static readonly Color StrikeColor = new Color(0.65f, 0.15f, 0.20f);
         private const string HudName = "MatchHud";
+        private const string PileName = "DiscardPile";
 
         private const float PortraitWidth = 280f;
         private const float PortraitHeight = 96f;
@@ -183,6 +185,8 @@ namespace SoulBind.EditorTools
                 wiring.ApplyModifiedPropertiesWithoutUndo();
             }
 
+            BuildDiscardPile(root, cardPrefab, handView, controller);
+
             if (controllerObject == null)
                 Debug.LogWarning("MatchHudBuilder: no GameObject named 'MatchController' was found. Drag it into the " +
                                  "Match Controller field of MatchHud, HandArea (HandView) and ActionArea (ActionBar).", hud);
@@ -190,6 +194,129 @@ namespace SoulBind.EditorTools
             EditorSceneManager.MarkSceneDirty(canvas.gameObject.scene);
             Selection.activeGameObject = root.gameObject;
             Debug.Log("MatchHudBuilder: built the Match HUD, " + PanelPrefabPath + " and " + CardPrefabPath + ". Save the scene.");
+        }
+
+        /// <summary>
+        /// Adds only the discard pile (on the table, right of the board) to a HUD that was already built,
+        /// so nothing else is rebuilt. Select the Canvas first. Running it again replaces the old pile.
+        /// </summary>
+        [MenuItem("SoulBind/Add Discard Pile")]
+        private static void AddDiscardPile()
+        {
+            Canvas canvas = Selection.activeGameObject != null ? Selection.activeGameObject.GetComponent<Canvas>() : null;
+            Transform root = canvas != null ? canvas.transform.Find(HudName) : null;
+            if (root == null)
+            {
+                EditorUtility.DisplayDialog("Add Discard Pile",
+                    "Select the Canvas that holds the MatchHud in the Hierarchy first, then run this again.", "OK");
+                return;
+            }
+
+            var cardPrefab = AssetDatabase.LoadAssetAtPath<CardView>(CardPrefabPath);
+            HandView handView = root.GetComponentInChildren<HandView>(true);
+            if (cardPrefab == null || handView == null)
+            {
+                EditorUtility.DisplayDialog("Add Discard Pile",
+                    "Couldn't find " + CardPrefabPath + " or the HandArea. Run SoulBind > Build Match HUD instead.", "OK");
+                return;
+            }
+
+            GameObject controllerObject = GameObject.Find("MatchController");
+            MatchController controller = controllerObject != null ? controllerObject.GetComponent<MatchController>() : null;
+            BuildDiscardPile((RectTransform)root, cardPrefab, handView, controller);
+
+            EditorSceneManager.MarkSceneDirty(canvas.gameObject.scene);
+            Debug.Log("MatchHudBuilder: added the DiscardPile on the table. Save the scene.");
+        }
+
+        // The pile is a World Space canvas lying on the table; DiscardPileView moves it next to the board
+        // when the match starts. The board is also kept clear of the action buttons on the right.
+        private static void BuildDiscardPile(RectTransform hudRoot, CardView cardPrefab, HandView handView,
+            MatchController controller)
+        {
+            // Remove an old pile: the screen version under the HUD, or an earlier table version.
+            Transform oldScreenPile = hudRoot.Find(PileName);
+            if (oldScreenPile != null)
+                Undo.DestroyObjectImmediate(oldScreenPile.gameObject);
+            foreach (GameObject sceneRoot in hudRoot.gameObject.scene.GetRootGameObjects())
+            {
+                if (sceneRoot.GetComponent<DiscardPileView>() != null)
+                    Undo.DestroyObjectImmediate(sceneRoot);
+            }
+
+            var pileObject = new GameObject(PileName, typeof(RectTransform));
+            SceneManager.MoveGameObjectToScene(pileObject, hudRoot.gameObject.scene);
+            Undo.RegisterCreatedObjectUndo(pileObject, "Add Discard Pile");
+            Canvas pileCanvas = pileObject.AddComponent<Canvas>();
+            pileCanvas.renderMode = RenderMode.WorldSpace;
+            pileCanvas.sortingOrder = 5; // above the table and mat sprites
+            var pile = (RectTransform)pileObject.transform;
+            pile.sizeDelta = new Vector2(CardWidth + 60f, CardHeight + 80f);
+            pile.localScale = Vector3.one * (2.4f / CardHeight); // DiscardPileView sets the real size and place
+
+            // The glow sits behind everything, a little larger than a card.
+            RectTransform glowRect = CreateRect("Glow", pile);
+            Centered(glowRect, new Vector2(CardWidth + 36f, CardHeight + 36f));
+            Image glow = AddImage(glowRect.gameObject, new Color(1f, 0.85f, 0.4f, 0.6f));
+
+            // The empty card-sized slot printed on the table.
+            RectTransform slot = CreateRect("Slot", pile);
+            Centered(slot, new Vector2(CardWidth, CardHeight));
+            AddImage(slot.gameObject, new Color(0f, 0f, 0f, 0.35f));
+            Outline outline = slot.gameObject.AddComponent<Outline>();
+            outline.effectColor = FrameColor;
+            outline.effectDistance = new Vector2(3f, -3f);
+
+            TMP_Text emptyText = CreateText("EmptyText", slot, "Discard pile\n\nDrag a card here to play it", 18f,
+                TextAlignmentOptions.Center);
+            Stretch(emptyText.rectTransform, 12f, 12f, 12f, 12f);
+            emptyText.color = new Color(1f, 1f, 1f, 0.6f);
+
+            // The played cards are created under here at runtime.
+            RectTransform stack = CreateRect("Stack", pile);
+            Centered(stack, new Vector2(CardWidth, CardHeight));
+
+            TMP_Text countText = CreateText("CountText", pile, "", 26f, TextAlignmentOptions.Center);
+            countText.rectTransform.anchorMin = new Vector2(0.5f, 0f);
+            countText.rectTransform.anchorMax = new Vector2(0.5f, 0f);
+            countText.rectTransform.pivot = new Vector2(0.5f, 0f);
+            countText.rectTransform.anchoredPosition = new Vector2(0f, 0f);
+            countText.rectTransform.sizeDelta = new Vector2(CardWidth, 32f);
+
+            DiscardPileView view = pileObject.AddComponent<DiscardPileView>();
+            var so = new SerializedObject(view);
+            so.FindProperty("matchController").objectReferenceValue = controller;
+            so.FindProperty("cardPrefab").objectReferenceValue = cardPrefab;
+            so.FindProperty("stack").objectReferenceValue = stack;
+            so.FindProperty("slot").objectReferenceValue = slot;
+            so.FindProperty("countText").objectReferenceValue = countText;
+            so.FindProperty("emptyText").objectReferenceValue = emptyText;
+            so.FindProperty("glow").objectReferenceValue = glow;
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            var handSo = new SerializedObject(handView);
+            handSo.FindProperty("discardPile").objectReferenceValue = view;
+            handSo.ApplyModifiedProperties();
+
+            // Keep the board and the pile left of the buttons on the right.
+            MatchHud hud = hudRoot.GetComponent<MatchHud>();
+            Transform actionArea = hudRoot.Find("ActionArea");
+            if (hud != null && actionArea != null)
+            {
+                var hudSo = new SerializedObject(hud);
+                hudSo.FindProperty("rightReservedArea").objectReferenceValue = actionArea;
+                hudSo.ApplyModifiedProperties();
+            }
+        }
+
+        // A fixed-size box in the middle of the parent.
+        private static void Centered(RectTransform rect, Vector2 size)
+        {
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = Vector2.zero;
+            rect.sizeDelta = size;
         }
 
         // 1920x1080 reference, scaling evenly between width and height.

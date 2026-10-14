@@ -3,12 +3,15 @@ using SoulBind.Core;
 using SoulBind.Managers;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 namespace SoulBind.UI
 {
     /// <summary>
     /// The current Apostle's hand, fanned along the bottom of the screen and partly below its edge.
     /// Hovering a card lifts it and shows a large preview; clicking it asks MatchController to play it.
+    /// A card can also be dragged: dropped on the discard pile it is played like a click, dropped on a
+    /// red-ringed enemy it attacks that enemy, and dropped anywhere else it slides back to the hand.
     /// Cards that can't be played are dimmed, and the preview says why.
     /// Card views are pooled, so changing the hand does not create garbage every turn.
     /// </summary>
@@ -20,6 +23,8 @@ namespace SoulBind.UI
         [SerializeField] private CardView preview;
         [Tooltip("Shown under the preview when the hovered card can't be played.")]
         [SerializeField] private TMP_Text previewReason;
+        [Tooltip("Where dragged cards are dropped to play them.")]
+        [SerializeField] private DiscardPileView discardPile;
 
         [Header("Layout")]
         [SerializeField] private float cardScale = 0.9f;
@@ -32,11 +37,14 @@ namespace SoulBind.UI
         [SerializeField] private float fanAngle = 3f;
         [SerializeField] private float fanDrop = 5f;
         [SerializeField] private float moveSpeed = 14f;
+        [Tooltip("Size of a card while it is dragged, so the board stays visible under it.")]
+        [SerializeField] private float dragScale = 0.7f;
 
         private readonly List<CardView> _cards = new List<CardView>(12);
         private int _shownCount;
         private CardView _hovered;
         private RectTransform _rect;
+        private CardView _dragged;
 
         private void Awake()
         {
@@ -106,6 +114,14 @@ namespace SoulBind.UI
             }
             _shownCount = count;
 
+            if (_dragged != null && !_dragged.gameObject.activeSelf)
+            {
+                _dragged.GetComponent<CanvasGroup>().blocksRaycasts = true;
+                _dragged = null;
+                if (discardPile != null)
+                    discardPile.SetDragging(false, false);
+            }
+
             if (_hovered != null && !_hovered.gameObject.activeSelf)
                 EndHover();
             else if (_hovered != null)
@@ -123,6 +139,12 @@ namespace SoulBind.UI
             card.HoverStarted += OnHoverStarted;
             card.HoverEnded += OnHoverEnded;
             card.Clicked += OnClicked;
+            card.DragStarted += OnDragStarted;
+            card.Dragged += OnDragged;
+            card.DragEnded += OnDragEnded;
+            // Lets the pointer "see through" the dragged card to the pile and the board.
+            if (card.GetComponent<CanvasGroup>() == null)
+                card.gameObject.AddComponent<CanvasGroup>();
             return card;
         }
 
@@ -140,6 +162,8 @@ namespace SoulBind.UI
             for (int i = 0; i < count; i++)
             {
                 CardView card = _cards[i];
+                if (card == _dragged)
+                    continue; // follows the pointer instead
                 float offset = i - middle;
                 bool hovered = card == _hovered;
                 bool selected = matchController.HasSelectedCard && matchController.SelectedCard == card.CardId;
@@ -157,6 +181,8 @@ namespace SoulBind.UI
 
         private void OnHoverStarted(CardView card)
         {
+            if (_dragged != null)
+                return;
             _hovered = card;
             card.transform.SetAsLastSibling(); // in front of its neighbours
             ShowPreview(card);
@@ -208,6 +234,60 @@ namespace SoulBind.UI
         private void OnClicked(CardView card)
         {
             matchController.ClickCard(card.CardId);
+        }
+
+        // ---- Dragging ----
+
+        private void OnDragStarted(CardView card, PointerEventData eventData)
+        {
+            // Cards that can't be played (dimmed) stay in the hand.
+            if (_dragged != null || matchController.GetUnplayableReason(card.CardId) != null
+                || matchController.IsChoosingComboTarget)
+                return;
+
+            _dragged = card;
+            EndHover();
+            card.transform.SetAsLastSibling();
+            card.GetComponent<CanvasGroup>().blocksRaycasts = false;
+            card.Rect.localRotation = Quaternion.identity;
+            card.Rect.localScale = Vector3.one * dragScale;
+            FollowPointer(card, eventData);
+        }
+
+        private void OnDragged(CardView card, PointerEventData eventData)
+        {
+            if (card == _dragged)
+                FollowPointer(card, eventData);
+        }
+
+        private void OnDragEnded(CardView card, PointerEventData eventData)
+        {
+            if (card != _dragged)
+                return;
+
+            _dragged = null;
+            card.GetComponent<CanvasGroup>().blocksRaycasts = true;
+            RestoreOrder();
+            if (discardPile != null)
+                discardPile.SetDragging(false, false);
+
+            // Played cards leave the hand when the controller refreshes it; anything else slides back.
+            Vector2 point = eventData.position;
+            if (discardPile != null && discardPile.ContainsScreenPoint(point))
+                matchController.DropCardOnPile(card.CardId);
+            else
+                matchController.TryDropCardOnBoard(card.CardId, point);
+        }
+
+        private void FollowPointer(CardView card, PointerEventData eventData)
+        {
+            RectTransform rect = card.Rect;
+            if (RectTransformUtility.ScreenPointToWorldPointInRectangle(_rect, eventData.position,
+                    eventData.pressEventCamera, out Vector3 world))
+                rect.position = world;
+
+            if (discardPile != null)
+                discardPile.SetDragging(true, discardPile.ContainsScreenPoint(eventData.position));
         }
     }
 }

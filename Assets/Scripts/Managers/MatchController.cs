@@ -205,6 +205,46 @@ namespace SoulBind.Managers
             AfterStateChange();
         }
 
+        /// <summary>
+        /// A card was dropped on the discard pile (the play area). Same as clicking it, except that
+        /// dropping an already selected card keeps it selected instead of cancelling it.
+        /// </summary>
+        public void DropCardOnPile(ArcanaId card)
+        {
+            if (HasSelectedCard && SelectedCard == card)
+                return;
+            ClickCard(card);
+        }
+
+        /// <summary>
+        /// A card was dropped over the board. An ATK card dropped on a red-ringed Apostle attacks it
+        /// (it becomes the primary target); while Engaged, any card dropped on a target joins the attack.
+        /// Returns false if the drop means nothing, so the card goes back to the hand and nothing is spent.
+        /// </summary>
+        public bool TryDropCardOnBoard(ArcanaId card, Vector2 screenPoint)
+        {
+            if (!CanAct || IsChoosingComboTarget || GetUnplayableReason(card) != null)
+                return false;
+            if (!boardView.TryGetTileAtScreen(screenPoint, out HexCoord tile))
+                return false;
+
+            ApostleState apostle = CurrentMatch.Battlefield.GetApostleAt(tile);
+            if (apostle == null || !IsAttackTarget(apostle))
+                return false;
+
+            if (CurrentMatch.Engagement == EngagementState.Engaged)
+            {
+                PlayFromHand(card, 0, 0);
+                return true;
+            }
+
+            if (CardCatalog.Get(card).Attack == 0)
+                return false;
+
+            PlayFromHand(card, apostle.Id, 0);
+            return true;
+        }
+
         /// <summary>Plays the selected ATK card for its DEF only (its ATK is lost).</summary>
         public void PlaySelectedWithoutAttacking()
         {
@@ -430,7 +470,7 @@ namespace SoulBind.Managers
                 return "Engaged: add cards, or Strike. The ATK is divided between everyone adjacent.";
             if (match.Engagement == EngagementState.Disengaged)
                 return "Attack done: you can still move, or end your turn.";
-            return string.Empty;
+            return "Drag a card to the discard pile to play it, or onto a red-ringed enemy to attack.";
         }
 
         private void SyncViews()

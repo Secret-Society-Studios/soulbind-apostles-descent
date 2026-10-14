@@ -13,7 +13,8 @@ namespace SoulBind.UI
     /// Everything shown comes from CardCatalog, so a card can never show a stat the rules don't use.
     /// The art window and frame are placeholders until the flat card art is imported.
     /// </summary>
-    public sealed class CardView : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
+    public sealed class CardView : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler,
+        IBeginDragHandler, IDragHandler, IEndDragHandler
     {
         [SerializeField] private Image highlight;
         [SerializeField] private Image artWindow;
@@ -33,6 +34,9 @@ namespace SoulBind.UI
         public event Action<CardView> HoverStarted;
         public event Action<CardView> HoverEnded;
         public event Action<CardView> Clicked;
+        public event Action<CardView, PointerEventData> DragStarted;
+        public event Action<CardView, PointerEventData> Dragged;
+        public event Action<CardView, PointerEventData> DragEnded;
 
         public void Show(CardDefinition card)
         {
@@ -77,6 +81,25 @@ namespace SoulBind.UI
         {
             if (eventData.button == PointerEventData.InputButton.Left)
                 Clicked?.Invoke(this);
+        }
+
+        // Dragging: uGUI does not send a click when the pointer was dragged, so the two never mix.
+        public void OnBeginDrag(PointerEventData eventData)
+        {
+            if (eventData.button == PointerEventData.InputButton.Left)
+                DragStarted?.Invoke(this, eventData);
+        }
+
+        public void OnDrag(PointerEventData eventData)
+        {
+            if (eventData.button == PointerEventData.InputButton.Left)
+                Dragged?.Invoke(this, eventData);
+        }
+
+        public void OnEndDrag(PointerEventData eventData)
+        {
+            if (eventData.button == PointerEventData.InputButton.Left)
+                DragEnded?.Invoke(this, eventData);
         }
 
         // Placeholder element colors until the medallion art is imported.

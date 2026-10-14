@@ -21,6 +21,8 @@ namespace SoulBind.UI
         [SerializeField] private RectTransform topReservedArea;
         [Tooltip("The board stays above this area (the hand).")]
         [SerializeField] private RectTransform bottomReservedArea;
+        [Tooltip("The board stays left of this area (the action buttons and the card preview).")]
+        [SerializeField] private RectTransform rightReservedArea;
         [Tooltip("Where the opponents' portraits go, along the top.")]
         [SerializeField] private RectTransform opponentRow;
         [Tooltip("Where the current Apostle's portrait goes, in the bottom-right corner.")]
@@ -35,6 +37,7 @@ namespace SoulBind.UI
         private Canvas _canvas;
         private float _appliedTop = -1f;
         private float _appliedBottom = -1f;
+        private float _appliedRight = -1f;
         private int _lastScreenWidth;
         private int _lastScreenHeight;
 
@@ -158,14 +161,19 @@ namespace SoulBind.UI
 
             float top = topReservedArea != null ? CoveredFromTop(topReservedArea) : 0f;
             float bottom = bottomReservedArea != null ? CoveredFromBottom(bottomReservedArea) : 0f;
+            float right = rightReservedArea != null ? CoveredFromRight(rightReservedArea) : 0f;
 
             bool screenChanged = Screen.width != _lastScreenWidth || Screen.height != _lastScreenHeight;
-            if (!screenChanged && Mathf.Approximately(top, _appliedTop) && Mathf.Approximately(bottom, _appliedBottom))
+            if (!screenChanged && Mathf.Approximately(top, _appliedTop) && Mathf.Approximately(bottom, _appliedBottom)
+                && Mathf.Approximately(right, _appliedRight))
                 return;
 
+            if (screenChanged || !Mathf.Approximately(right, _appliedRight))
+                matchController.BoardView.SetReservedRight(right);
             matchController.BoardView.SetReservedTopAndBottom(top, bottom);
             _appliedTop = top;
             _appliedBottom = bottom;
+            _appliedRight = right;
             _lastScreenWidth = Screen.width;
             _lastScreenHeight = Screen.height;
         }
@@ -175,6 +183,13 @@ namespace SoulBind.UI
         {
             area.GetWorldCorners(_corners); // overlay canvas: world corners are screen pixels
             return Mathf.Clamp01(1f - _corners[0].y / Screen.height);
+        }
+
+        // How much of the screen width, from the right edge in, this area reaches.
+        private float CoveredFromRight(RectTransform area)
+        {
+            area.GetWorldCorners(_corners);
+            return Screen.width > 0 ? Mathf.Clamp01(1f - _corners[0].x / Screen.width) : 0f;
         }
 
         // How much of the screen height, from the bottom edge up, this area reaches.
