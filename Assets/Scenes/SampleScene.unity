@@ -526,7 +526,6 @@ RectTransform:
   - {fileID: 558425158}
   - {fileID: 97799973}
   - {fileID: 980034797}
-  - {fileID: 358149621}
   - {fileID: 1561972222}
   - {fileID: 1550286449}
   m_Father: {fileID: 386350828}
@@ -550,7 +549,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SoulBind.UI.MatchHud
   matchController: {fileID: 1066798567}
   topReservedArea: {fileID: 1568647723}
-  bottomReservedArea: {fileID: 358149621}
+  bottomReservedArea: {fileID: 0}
   opponentRow: {fileID: 1568647723}
   playerSlot: {fileID: 97799973}
   panelPrefab: {fileID: 757708277475402109, guid: ef262cb691694b04da03de1e51bd7993, type: 3}
@@ -694,73 +693,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 331999870}
   m_CullTransparentMesh: 1
---- !u!1 &358149620
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 358149621}
-  - component: {fileID: 358149622}
-  m_Layer: 5
-  m_Name: HandArea
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!224 &358149621
-RectTransform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 358149620}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 297886198}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 1, y: 0}
-  m_AnchoredPosition: {x: -185, y: 0}
-  m_SizeDelta: {x: -410, y: 150}
-  m_Pivot: {x: 0.5, y: 0}
---- !u!114 &358149622
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 358149620}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3df071e307c38724eb526aa5e9addccb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SoulBind.UI.HandView
-  matchController: {fileID: 1066798567}
-  cardPrefab: {fileID: 5896621125988605786, guid: 8736e988818637c44868eaa552be909e, type: 3}
-  preview: {fileID: 1561972223}
-  previewReason: {fileID: 1550286450}
-  discardPile: {fileID: 2141627598}
-  drawPile: {fileID: 1098083871}
-  cardScale: 0.9
-  hoverScale: 1.05
-  restY: 75
-  selectedY: 135
-  hoverY: 160
-  maxSpacing: 150
-  fanAngle: 3
-  fanDrop: 5
-  moveSpeed: 14
-  dragScale: 0.7
-  playFlightTime: 0.35
-  drawFlightTime: 0.5
-  arcHeight: 60
 --- !u!1 &386350824
 GameObject:
   m_ObjectHideFlags: 0
@@ -1457,6 +1389,116 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &549267689
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 549267693}
+  - component: {fileID: 549267692}
+  - component: {fileID: 549267691}
+  - component: {fileID: 549267690}
+  m_Layer: 0
+  m_Name: TableHands
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &549267690
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 549267689}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 120283b564996df43a8abf3903565eaf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SoulBind.UI.TableHandsView
+  matchController: {fileID: 1066798567}
+  cardPrefab: {fileID: 5896621125988605786, guid: 8736e988818637c44868eaa552be909e, type: 3}
+  drawPile: {fileID: 1098083871}
+  discardPile: {fileID: 2141627598}
+  preview: {fileID: 1561972223}
+  previewReason: {fileID: 1550286450}
+  cardWorldHeight: 1.4
+  yourCardScale: 1.25
+  cardGap: 10
+  trayColor: {r: 0.04, g: 0.04, b: 0.07, a: 0.8}
+  trayPadding: 12
+  maxCardsShown: 10
+  hoverLift: 70
+  hoverScale: 1.1
+  selectedLift: 45
+  moveSpeed: 14
+  playFlightTime: 0.4
+  drawFlightTime: 0.5
+  arcHeight: 60
+--- !u!114 &549267691
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 549267689}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dc42784cf147c0c48a680349fa168899, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.GraphicRaycaster
+  m_IgnoreReversedGraphics: 1
+  m_BlockingObjects: 0
+  m_BlockingMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+--- !u!223 &549267692
+Canvas:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 549267689}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_RenderMode: 2
+  m_Camera: {fileID: 0}
+  m_PlaneDistance: 100
+  m_PixelPerfect: 0
+  m_ReceivesEvents: 1
+  m_OverrideSorting: 0
+  m_OverridePixelPerfect: 0
+  m_SortingBucketNormalizedSize: 0
+  m_VertexColorAlwaysGammaSpace: 0
+  m_UseReflectionProbes: 0
+  m_AdditionalShaderChannelsFlag: 0
+  m_UpdateRectTransformForStandalone: 0
+  m_SortingLayerID: 0
+  m_SortingOrder: 6
+  m_TargetDisplay: 0
+--- !u!224 &549267693
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 549267689}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &558425157
 GameObject:
   m_ObjectHideFlags: 0
@@ -1855,8 +1897,11 @@ MonoBehaviour:
   tableColor: {r: 0.32, g: 0.21, b: 0.13, a: 1}
   matColor: {r: 0.16, g: 0.14, b: 0.2, a: 1}
   matPadding: 0.6
-  sideAreaWidth: 2.6
-  sideAreaGap: 0.5
+  matRimWidth: 0.15
+  pileCardHeight: 2.4
+  pileGap: 0.3
+  seatGap: 0.15
+  seatDepth: 2.3
 --- !u!1 &980034796
 GameObject:
   m_ObjectHideFlags: 0
@@ -2254,13 +2299,18 @@ MonoBehaviour:
   boardView: {fileID: 844109290}
   apostlePrefab: {fileID: 2518714460669325445, guid: fa75c4a0ccf4c624fbf30d671313b655, type: 3}
   hud: {fileID: 1090074782}
-  playerCount: 2
+  playerCount: 6
   seed: 7
   apostleDiameter: 0.6
   localApostleId: 1
   botsPlayOthers: 1
   botActionDelay: 0.6
   botTurnStartDelay: 0.6
+  discMoveSpeed: 7
+  lungeDistance: 0.4
+  lungeTime: 0.3
+  showStatPopups: 1
+  popupFontSize: 5
 --- !u!4 &1066798568
 Transform:
   m_ObjectHideFlags: 0
@@ -2519,10 +2569,8 @@ MonoBehaviour:
   countText: {fileID: 1507401409}
   emptyText: {fileID: 1764997969}
   cardBackSprite: {fileID: 21300000, guid: c1d0938585ccf5941b1d823a6a485de2, type: 3}
-  cardWorldHeight: 2.4
-  heightOffset: 0.65
-  cardsPerLayer: 6
-  maxLayers: 11
+  cardsPerLayer: 1
+  maxLayers: 20
   layerStep: 3
   drawLift: 1.12
   settleSpeed: 12
@@ -5126,8 +5174,6 @@ MonoBehaviour:
   countText: {fileID: 411442646}
   emptyText: {fileID: 191061858}
   glow: {fileID: 1598799870}
-  cardWorldHeight: 2.4
-  heightOffset: 0.65
   maxShown: 8
   maxTurn: 10
   maxShift: 10
@@ -5195,3 +5241,4 @@ SceneRoots:
   - {fileID: 1090074783}
   - {fileID: 1098083873}
   - {fileID: 2141627600}
+  - {fileID: 549267693}
