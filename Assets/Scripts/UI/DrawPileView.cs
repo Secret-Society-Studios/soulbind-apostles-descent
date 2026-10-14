@@ -49,6 +49,14 @@ namespace SoulBind.UI
         private Camera _camera;
         private int _lastCount = -1;
 
+        // The card back art goes on the template first thing, so every copy made later (the stack,
+        // flying cards, the opponents' hands) shows it.
+        private void Awake()
+        {
+            if (cardBackTemplate != null)
+                ApplyBackArt();
+        }
+
         private void Start()
         {
             if (matchController == null || cardBackTemplate == null || stack == null || slot == null)
@@ -62,7 +70,6 @@ namespace SoulBind.UI
             if (canvas != null && canvas.worldCamera == null)
                 canvas.worldCamera = _camera;
 
-            ApplyBackArt();
             cardBackTemplate.gameObject.SetActive(false);
             PlaceOnTable();
             for (int i = 0; i < maxLayers; i++)

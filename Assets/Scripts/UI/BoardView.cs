@@ -47,6 +47,10 @@ namespace SoulBind.UI
         [SerializeField] private float sideAreaWidth = 2f;
         [Tooltip("Gap between the mat and the side area.")]
         [SerializeField] private float sideAreaGap = 0.4f;
+        [Tooltip("Depth of the table strip kept on screen above the mat, for the opponents' face-down hands.")]
+        [SerializeField] private float topAreaDepth = 1.9f;
+        [Tooltip("Gap between the mat and the top strip.")]
+        [SerializeField] private float topAreaGap = 0.2f;
 
         private readonly Dictionary<HexCoord, SpriteRenderer> _tiles = new Dictionary<HexCoord, SpriteRenderer>();
         private readonly Dictionary<HexCoord, SpecialTileType> _specialTypes = new Dictionary<HexCoord, SpecialTileType>();
@@ -194,6 +198,19 @@ namespace SoulBind.UI
         /// The middle of the table area right of the mat, on the board's plane. The camera always keeps
         /// this area on screen. The discard pile sits here.
         /// </summary>
+        /// <summary>
+        /// The middle of the table strip above the mat (the far side of the table), on the board's plane.
+        /// The camera always keeps it on screen. The opponents' face-down hands sit here.
+        /// </summary>
+        public Vector3 TopAreaCenter =>
+            transform.position + new Vector3(0f, _boardHeight / 2f + matPadding + topAreaGap + topAreaDepth / 2f, 0f);
+
+        /// <summary>Width of the top strip (as wide as the mat), in world units.</summary>
+        public float TopAreaWidth => _boardWidth + 2f * matPadding;
+
+        /// <summary>Depth of the top strip, in world units.</summary>
+        public float TopAreaDepth => topAreaDepth;
+
         public Vector3 SideAreaCenter =>
             transform.position + new Vector3(_boardWidth / 2f + matPadding + sideAreaGap + sideAreaWidth / 2f, 0f, 0f);
 
@@ -299,20 +316,22 @@ namespace SoulBind.UI
         }
 
         // The screen-space box (viewport units) around the four corners of the mat plus margin,
-        // and with includeSide, the side area on its right for the piles too.
+        // the strip above it for the opponents' hands, and with includeSide, the side area on its right
+        // for the piles too.
         private void GetViewportBounds(Camera cam, bool includeSide, out Vector2 min, out Vector2 max)
         {
             float left = -(_boardWidth / 2f + matPadding + cameraMargin);
             float right = _boardWidth / 2f + matPadding + cameraMargin
                           + (includeSide ? sideAreaGap + sideAreaWidth : 0f);
             float halfHeight = _boardHeight / 2f + matPadding + cameraMargin;
+            float top = halfHeight + topAreaGap + topAreaDepth; // the opponents' hands above the mat
             min = new Vector2(float.MaxValue, float.MaxValue);
             max = new Vector2(float.MinValue, float.MinValue);
 
             for (int corner = 0; corner < 4; corner++)
             {
                 float x = (corner & 1) == 0 ? left : right;
-                float y = (corner & 2) == 0 ? -halfHeight : halfHeight;
+                float y = (corner & 2) == 0 ? -halfHeight : top;
                 Vector3 viewport = cam.WorldToViewportPoint(transform.position + new Vector3(x, y, 0f));
                 if (viewport.z <= 0f)
                 {

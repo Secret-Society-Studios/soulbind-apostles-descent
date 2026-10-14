@@ -8,7 +8,8 @@ using UnityEngine.EventSystems;
 namespace SoulBind.UI
 {
     /// <summary>
-    /// The current Apostle's hand, fanned along the bottom of the screen and partly below its edge.
+    /// This screen's player's hand, fanned along the bottom of the screen and partly below its edge.
+    /// It stays on screen during other players' turns, dimmed, so cards can be looked at but not played.
     /// Hovering a card lifts it and shows a large preview; clicking it asks MatchController to play it.
     /// A card can also be dragged: dropped on the discard pile it is played like a click, dropped on a
     /// red-ringed enemy it attacks that enemy, and dropped anywhere else it slides back to the hand.
@@ -76,6 +77,9 @@ namespace SoulBind.UI
         private readonly List<CardView> _freeCards = new List<CardView>(12);
         private readonly List<CardView> _arriving = new List<CardView>(4);
 
+        /// <summary>The layer that flying cards are drawn on (shared with the opponents' hands). Null until Start.</summary>
+        public CardFlightLayer Flights => _flights;
+
         private void Awake()
         {
             _rect = (RectTransform)transform;
@@ -130,7 +134,8 @@ namespace SoulBind.UI
                 return;
 
             Match match = matchController.CurrentMatch;
-            int playerToShow = match != null && match.CurrentApostle != null ? match.CurrentApostle.Id : 0;
+            // Always this screen's player's hand (on other players' turns too, dimmed).
+            int playerToShow = match != null ? matchController.ViewerId : 0;
 
             // A new match, or the first look: just show the hand.
             if (match == null || match != _shownMatch)

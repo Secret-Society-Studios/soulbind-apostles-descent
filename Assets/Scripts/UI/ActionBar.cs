@@ -65,9 +65,10 @@ namespace SoulBind.UI
         {
             Match match = matchController != null ? matchController.CurrentMatch : null;
             bool running = match != null && !match.IsOver;
-            bool canAct = running && match.CurrentApostle != null;
+            // Buttons only work for this screen's player, on their own turn.
+            bool canAct = running && matchController.IsLocalTurn;
             bool engaged = canAct && match.Engagement == EngagementState.Engaged;
-            bool choosingDirection = running && match.IsAwaitingPhaseStart;
+            bool choosingDirection = running && matchController.IsLocalPhaseChooser;
 
             SetVisible(strikeButton, engaged);
             if (engaged && strikeLabel != null)

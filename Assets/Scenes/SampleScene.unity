@@ -551,7 +551,6 @@ MonoBehaviour:
   matchController: {fileID: 1066798567}
   topReservedArea: {fileID: 1568647723}
   bottomReservedArea: {fileID: 358149621}
-  rightReservedArea: {fileID: 980034797}
   opponentRow: {fileID: 1568647723}
   playerSlot: {fileID: 97799973}
   panelPrefab: {fileID: 757708277475402109, guid: ef262cb691694b04da03de1e51bd7993, type: 3}
@@ -2255,9 +2254,13 @@ MonoBehaviour:
   boardView: {fileID: 844109290}
   apostlePrefab: {fileID: 2518714460669325445, guid: fa75c4a0ccf4c624fbf30d671313b655, type: 3}
   hud: {fileID: 1090074782}
-  playerCount: 4
+  playerCount: 2
   seed: 7
   apostleDiameter: 0.6
+  localApostleId: 1
+  botsPlayOthers: 1
+  botActionDelay: 0.6
+  botTurnStartDelay: 0.6
 --- !u!4 &1066798568
 Transform:
   m_ObjectHideFlags: 0

@@ -415,6 +415,60 @@ namespace SoulBind.EditorTools
             }
         }
 
+        /// <summary>
+        /// Adds the opponents' face-down hands on the far side of the table. Running it again replaces them.
+        /// Needs the draw and discard piles (SoulBind > Add Draw Pile / Add Discard Pile) first.
+        /// </summary>
+        [MenuItem("SoulBind/Add Opponent Hands")]
+        private static void AddOpponentHands()
+        {
+            Scene scene = SceneManager.GetActiveScene();
+            GameObject controllerObject = GameObject.Find("MatchController");
+            MatchController controller = controllerObject != null ? controllerObject.GetComponent<MatchController>() : null;
+
+            HandView handView = null;
+            DrawPileView drawPile = null;
+            DiscardPileView discardPile = null;
+            foreach (GameObject sceneRoot in scene.GetRootGameObjects())
+            {
+                if (handView == null)
+                    handView = sceneRoot.GetComponentInChildren<HandView>(true);
+                if (drawPile == null)
+                    drawPile = sceneRoot.GetComponentInChildren<DrawPileView>(true);
+                if (discardPile == null)
+                    discardPile = sceneRoot.GetComponentInChildren<DiscardPileView>(true);
+                if (sceneRoot.GetComponent<OpponentHandsView>() != null)
+                    Undo.DestroyObjectImmediate(sceneRoot);
+            }
+
+            if (controller == null || handView == null || drawPile == null || discardPile == null)
+            {
+                EditorUtility.DisplayDialog("Add Opponent Hands",
+                    "Couldn't find the MatchController, the HandArea, the DrawPile or the DiscardPile in the open scene. " +
+                    "Add the piles first (SoulBind > Add Discard Pile, then Add Draw Pile).", "OK");
+                return;
+            }
+
+            var handsObject = new GameObject("OpponentHands", typeof(RectTransform));
+            SceneManager.MoveGameObjectToScene(handsObject, scene);
+            Undo.RegisterCreatedObjectUndo(handsObject, "Add Opponent Hands");
+            Canvas canvas = handsObject.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.WorldSpace;
+            canvas.sortingOrder = 5; // above the table and mat sprites
+
+            OpponentHandsView view = handsObject.AddComponent<OpponentHandsView>();
+            var so = new SerializedObject(view);
+            so.FindProperty("matchController").objectReferenceValue = controller;
+            so.FindProperty("handView").objectReferenceValue = handView;
+            so.FindProperty("drawPile").objectReferenceValue = drawPile;
+            so.FindProperty("discardPile").objectReferenceValue = discardPile;
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            Selection.activeGameObject = handsObject;
+            Debug.Log("MatchHudBuilder: added the OpponentHands on the table. Save the scene.");
+        }
+
         // A fixed-size box in the middle of the parent.
         private static void Centered(RectTransform rect, Vector2 size)
         {

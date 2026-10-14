@@ -6,8 +6,9 @@ using UnityEngine;
 namespace SoulBind.UI
 {
     /// <summary>
-    /// Cards flying across the screen: from the hand to the discard pile when played, and from the
-    /// draw pile to the hand when drawn. A flight is only a picture on top of everything: the rules have
+    /// Cards flying across the screen: from a hand to the discard pile when played, and from the
+    /// draw pile to a hand when drawn. Opponents' cards fly face-down, and turn face-up only when they
+    /// land on the (public) discard pile. A flight is only a picture on top of everything: the rules have
     /// already moved the card, and the piles and hand hide it until it lands.
     /// HandView creates this layer at runtime as the last child of the Canvas, so it needs no setup.
     /// </summary>
@@ -25,7 +26,8 @@ namespace SoulBind.UI
             public float ToScale;
             public float Elapsed;
             public float Duration;
-            public bool Flip;
+            public bool StartFaceDown;
+            public bool EndFaceDown;
             public Action Landed;
             public bool Active;
         }
@@ -62,6 +64,13 @@ namespace SoulBind.UI
             return layer;
         }
 
+        /// <summary>The scale that makes a flying card this many screen pixels tall.</summary>
+        public float ScaleForPixels(float pixelHeight)
+        {
+            float height = ((RectTransform)_cardPrefab.transform).sizeDelta.y * transform.lossyScale.y;
+            return height > 0f ? pixelHeight / height : 1f;
+        }
+
         /// <summary>
         /// Flies a face-up card from a hand card's place to a fixed point (the discard pile).
         /// Positions are in the canvas's world space, which for an Overlay canvas is screen pixels.
@@ -69,7 +78,7 @@ namespace SoulBind.UI
         public void FlyTo(ArcanaId card, Vector3 from, Quaternion fromRotation, float fromScale,
             Vector3 to, float toScale, float duration, Action landed)
         {
-            Flight flight = Take(card, false);
+            Flight flight = Take(card, false, false);
             flight.To = to;
             flight.ToScale = toScale;
             flight.Follow = null;
@@ -83,8 +92,30 @@ namespace SoulBind.UI
         public void FlyToFollow(ArcanaId card, Vector3 from, float fromScale, RectTransform follow,
             float duration, Action landed)
         {
-            Flight flight = Take(card, _backTemplate != null);
+            Flight flight = Take(card, _backTemplate != null, false);
             flight.Follow = follow;
+            Begin(flight, from, Quaternion.identity, fromScale, duration, landed);
+        }
+
+        /// <summary>
+        /// Flies a card between two fixed points, face-down or face-up at each end; it turns over
+        /// halfway if the two differ. Used for opponents' cards: their draws stay face-down all the way,
+        /// and the cards they play turn face-up as they reach the discard pile.
+        /// A face-down flight needs the card back; without it, nothing flies (the card is never revealed).
+        /// </summary>
+        public void Fly(ArcanaId card, Vector3 from, float fromScale, Vector3 to, float toScale,
+            bool startFaceDown, bool endFaceDown, float duration, Action landed)
+        {
+            if ((startFaceDown || endFaceDown) && _backTemplate == null)
+            {
+                landed?.Invoke();
+                return;
+            }
+
+            Flight flight = Take(card, startFaceDown, endFaceDown);
+            flight.To = to;
+            flight.ToScale = toScale;
+            flight.Follow = null;
             Begin(flight, from, Quaternion.identity, fromScale, duration, landed);
         }
 
@@ -109,7 +140,7 @@ namespace SoulBind.UI
         }
 
         // Reuses a finished flight, or makes a new one.
-        private Flight Take(ArcanaId card, bool flip)
+        private Flight Take(ArcanaId card, bool startFaceDown, bool endFaceDown)
         {
             Flight flight = null;
             for (int i = 0; i < _flights.Count; i++)
@@ -145,9 +176,10 @@ namespace SoulBind.UI
             flight.Card.Show(CardCatalog.Get(card));
             flight.Card.SetSelected(false);
             flight.Card.SetDimmed(false);
-            flight.Flip = flip;
+            flight.StartFaceDown = startFaceDown && flight.Back != null;
+            flight.EndFaceDown = endFaceDown && flight.Back != null;
             if (flight.Back != null)
-                flight.Back.gameObject.SetActive(flip);
+                flight.Back.gameObject.SetActive(flight.StartFaceDown);
             return flight;
         }
 
@@ -200,17 +232,19 @@ namespace SoulBind.UI
             rect.rotation = Quaternion.Slerp(flight.FromRotation, toRotation, eased);
 
             float scale = Mathf.Lerp(flight.FromScale, toScale, eased);
-            if (flight.Flip)
+            if (flight.StartFaceDown != flight.EndFaceDown)
             {
-                // Turns over halfway: the back shrinks to an edge, then the face grows out of it.
+                // Turns over halfway: one side shrinks to an edge, then the other grows out of it.
                 float turn = Mathf.Abs(Mathf.Cos(t * Mathf.PI));
                 rect.localScale = new Vector3(scale * turn, scale, 1f);
                 if (flight.Back != null)
-                    flight.Back.gameObject.SetActive(t < 0.5f);
+                    flight.Back.gameObject.SetActive(t < 0.5f ? flight.StartFaceDown : flight.EndFaceDown);
             }
             else
             {
                 rect.localScale = new Vector3(scale, scale, 1f);
+                if (flight.Back != null)
+                    flight.Back.gameObject.SetActive(flight.StartFaceDown);
             }
         }
     }

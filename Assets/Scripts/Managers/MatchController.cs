@@ -12,6 +12,9 @@ namespace SoulBind.Managers
     /// <summary>
     /// Starts a Match, shows its Apostles and passes player input to it.
     /// The Match owns every rule; this script only creates it, forwards actions and displays the result.
+    /// The screen belongs to one Apostle (the local player): only their hand is shown face-up and only
+    /// they can act on their turn. Until online play exists, bots play every other seat. With bots off,
+    /// the screen follows whoever's turn it is, so one person can play every seat (hot-seat testing).
     /// </summary>
     public sealed class MatchController : MonoBehaviour
     {
@@ -23,6 +26,26 @@ namespace SoulBind.Managers
         [Tooltip("0 means a different random match every time.")]
         [SerializeField] private int seed;
         [SerializeField] private float apostleDiameter = 0.6f;
+
+        [Header("Players")]
+        [Tooltip("The Apostle this screen belongs to.")]
+        [SerializeField, Range(1, 6)] private int localApostleId = 1;
+        [Tooltip("On: bots play every other Apostle. Off: you play every Apostle and the screen follows the turn.")]
+        [SerializeField] private bool botsPlayOthers = true;
+        [Tooltip("Seconds between a bot's actions, so you can follow what it does.")]
+        [SerializeField] private float botActionDelay = 0.6f;
+        [Tooltip("Extra pause before a bot's first action of a turn.")]
+        [SerializeField] private float botTurnStartDelay = 0.6f;
+
+        [Header("Animation")]
+        [Tooltip("How fast Apostle discs slide from tile to tile, in world units per second.")]
+        [SerializeField] private float discMoveSpeed = 7f;
+        [Tooltip("How far an attacker's disc lunges toward its target when it Strikes.")]
+        [SerializeField] private float lungeDistance = 0.4f;
+        [SerializeField] private float lungeTime = 0.3f;
+        [Tooltip("Rising numbers above Apostles for damage, healing, Souls and Corruption.")]
+        [SerializeField] private bool showStatPopups = true;
+        [SerializeField] private float popupFontSize = 5f;
 
         private readonly List<ApostleView> _views = new List<ApostleView>(GameConstants.MaxPlayers);
         private readonly List<HexCoord> _legalDestinations = new List<HexCoord>(6);
@@ -52,6 +75,59 @@ namespace SoulBind.Managers
 
         private ArcanaId _comboCard;
 
+        private readonly SimpleBot _bot = new SimpleBot();
+        private float _botWait;
+        private int _botTurnOwner = -1;
+        private int _botActionsThisTurn;
+        private int _lastViewerId = 1;
+        private const int MaxBotActionsPerTurn = 60;
+        private string _lastBotAction = string.Empty;
+
+        // Disc animation: each disc slides toward its tile; a Striking disc lunges at its target.
+        private readonly List<Vector3> _discTargets = new List<Vector3>(GameConstants.MaxPlayers);
+        private readonly List<Vector3> _discPositions = new List<Vector3>(GameConstants.MaxPlayers);
+        private int _lungeIndex = -1;
+        private Vector3 _lungeDirection;
+        private float _lungeElapsed;
+        private bool _wasEngaged;
+        private int _engagedAttackerId;
+
+        // Stat popups: the numbers as they were last shown.
+        private readonly int[] _lastVessel = new int[GameConstants.MaxPlayers];
+        private readonly int[] _lastSouls = new int[GameConstants.MaxPlayers];
+        private readonly int[] _lastCorruption = new int[GameConstants.MaxPlayers];
+        private bool _statsTaken;
+        private FloatingNumbers _numbers;
+
+        // ---- Whose screen this is ----
+
+        /// <summary>
+        /// The Apostle whose hand and portrait this screen shows. Fixed while bots play the other seats;
+        /// with bots off it follows the turn (and stays on the last player between Phases).
+        /// </summary>
+        public int ViewerId
+        {
+            get
+            {
+                if (!botsPlayOthers && CurrentMatch != null && CurrentMatch.CurrentApostle != null)
+                    _lastViewerId = CurrentMatch.CurrentApostle.Id;
+                else if (botsPlayOthers)
+                    _lastViewerId = localApostleId;
+                return _lastViewerId;
+            }
+        }
+
+        /// <summary>True while bots play every seat except the local one.</summary>
+        public bool BotsPlayOthers => botsPlayOthers;
+
+        /// <summary>True when it is this screen's player's turn, so cards, moves and buttons work.</summary>
+        public bool IsLocalTurn => CanAct && (!botsPlayOthers || CurrentMatch.CurrentApostle.Id == localApostleId);
+
+        /// <summary>True when this screen's player must choose the turn direction for the next Phase.</summary>
+        public bool IsLocalPhaseChooser =>
+            CurrentMatch != null && !CurrentMatch.IsOver && CurrentMatch.IsAwaitingPhaseStart
+            && (!botsPlayOthers || CurrentMatch.GetNextPhaseChooserId() == localApostleId);
+
         // True while someone's turn is active and the match is still running.
         private bool CanAct => CurrentMatch != null && !CurrentMatch.IsOver && CurrentMatch.CurrentApostle != null;
 
@@ -68,6 +144,8 @@ namespace SoulBind.Managers
                 return;
             }
 
+            localApostleId = Mathf.Clamp(localApostleId, 1, playerCount);
+            _lastViewerId = localApostleId;
             var random = seed == 0 ? new System.Random() : new System.Random(seed);
             List<HexCoord> spawns = SpawnPlanner.PickSpread(boardView.Board, playerCount);
             CurrentMatch = Match.Create(playerCount, boardView.Board, spawns, random);
@@ -88,7 +166,13 @@ namespace SoulBind.Managers
 
                 view.Initialize(apostle.Id, disc, ApostleColors.Get(apostle.Id));
                 _views.Add(view);
+                Vector3 position = boardView.GetWorldPosition(apostle.Position);
+                _discTargets.Add(position);
+                _discPositions.Add(position);
             }
+
+            if (showStatPopups)
+                _numbers = FloatingNumbers.Create(transform, 1.3f, 0.9f, popupFontSize);
 
             Debug.Log($"MatchController: {playerCount} players. Apostle {CurrentMatch.CurrentApostle.Id} " +
                       $"plays first with {CurrentMatch.CurrentCapacity.Remaining} Capacity.");
@@ -97,7 +181,9 @@ namespace SoulBind.Managers
 
         private void Update()
         {
-            if (!CanAct)
+            AnimateDiscs();
+            RunBots();
+            if (!IsLocalTurn)
                 return;
 
             Keyboard keyboard = Keyboard.current;
@@ -153,7 +239,7 @@ namespace SoulBind.Managers
         /// </summary>
         public string GetUnplayableReason(ArcanaId card)
         {
-            if (!CanAct)
+            if (!IsLocalTurn)
                 return "Not your turn";
             if (CurrentMatch.Engagement == EngagementState.Disengaged)
                 return "No more cards after Strike";
@@ -169,7 +255,7 @@ namespace SoulBind.Managers
         /// </summary>
         public void ClickCard(ArcanaId card)
         {
-            if (!CanAct || IsChoosingComboTarget)
+            if (!IsLocalTurn || IsChoosingComboTarget)
                 return;
 
             string reason = GetUnplayableReason(card);
@@ -223,7 +309,7 @@ namespace SoulBind.Managers
         /// </summary>
         public bool TryDropCardOnBoard(ArcanaId card, Vector2 screenPoint)
         {
-            if (!CanAct || IsChoosingComboTarget || GetUnplayableReason(card) != null)
+            if (!IsLocalTurn || IsChoosingComboTarget || GetUnplayableReason(card) != null)
                 return false;
             if (!boardView.TryGetTileAtScreen(screenPoint, out HexCoord tile))
                 return false;
@@ -306,7 +392,7 @@ namespace SoulBind.Managers
 
         public void TryMove(HexCoord destination)
         {
-            if (!CanAct)
+            if (!IsLocalTurn)
                 return;
 
             MoveResult result = CurrentMatch.Move(destination);
@@ -328,7 +414,7 @@ namespace SoulBind.Managers
         /// </summary>
         public void PlayCard(ArcanaId card, bool attack, int comboTargetId)
         {
-            if (!CanAct)
+            if (!IsLocalTurn)
                 return;
 
             int targetId = 0;
@@ -357,7 +443,7 @@ namespace SoulBind.Managers
         /// <summary>Resolves the built-up attack and disengages.</summary>
         public void Strike()
         {
-            if (!CanAct)
+            if (!IsLocalTurn)
                 return;
 
             int attackerId = CurrentMatch.CurrentApostle.Id;
@@ -383,7 +469,7 @@ namespace SoulBind.Managers
 
         public void EndTurn()
         {
-            if (CurrentMatch == null || CurrentMatch.IsOver || CurrentMatch.IsAwaitingPhaseStart)
+            if (!IsLocalTurn)
                 return;
 
             HasSelectedCard = false;
@@ -395,7 +481,7 @@ namespace SoulBind.Managers
 
         public void BeginNextPhase(TurnDirection direction)
         {
-            if (CurrentMatch == null || CurrentMatch.IsOver || !CurrentMatch.IsAwaitingPhaseStart)
+            if (!IsLocalPhaseChooser)
                 return;
 
             HasSelectedCard = false;
@@ -435,6 +521,199 @@ namespace SoulBind.Managers
         }
 #endif
 
+        // ---- Bots ----
+
+        // Lets the bot whose turn it is (or who chooses the next Phase's direction) take one action
+        // every botActionDelay seconds. If the rules refuse an action, the bot's turn ends, so a bot
+        // can never get stuck.
+        private void RunBots()
+        {
+            if (!botsPlayOthers || CurrentMatch == null || CurrentMatch.IsOver)
+                return;
+
+            int actorId = CurrentMatch.IsAwaitingPhaseStart
+                ? CurrentMatch.GetNextPhaseChooserId()
+                : CurrentMatch.CurrentApostle != null ? CurrentMatch.CurrentApostle.Id : 0;
+            if (actorId == 0 || actorId == localApostleId)
+                return;
+
+            // A new bot turn starts with a longer pause.
+            int turnKey = CurrentMatch.IsAwaitingPhaseStart ? -actorId : actorId;
+            if (turnKey != _botTurnOwner)
+            {
+                _botTurnOwner = turnKey;
+                _botActionsThisTurn = 0;
+                _lastBotAction = string.Empty;
+                _botWait = botTurnStartDelay + botActionDelay;
+            }
+
+            _botWait -= Time.deltaTime;
+            if (_botWait > 0f)
+                return;
+            _botWait = botActionDelay;
+
+            BotAction action = ++_botActionsThisTurn > MaxBotActionsPerTurn ? BotAction.EndTurn : _bot.Decide(CurrentMatch);
+            if (action.Kind == BotActionKind.None)
+                return;
+
+            if (SimpleBot.Apply(CurrentMatch, action))
+            {
+                _lastBotAction = Describe(action);
+                Debug.Log($"MatchController: bot A{actorId}: {action}.");
+            }
+            else
+            {
+                Debug.LogWarning($"MatchController: bot A{actorId} tried '{action}' but the rules refused it. Ending its turn.");
+                if (CurrentMatch.CurrentApostle != null && !CurrentMatch.IsOver)
+                    CurrentMatch.EndTurn();
+            }
+
+            // Turns that end on their own (Temperance, The World) mean a new turn: reset the pause.
+            if (CurrentMatch.CurrentApostle == null || CurrentMatch.CurrentApostle.Id != actorId)
+                _botTurnOwner = -1;
+
+            LogIfOver();
+            AfterStateChange();
+        }
+
+#if UNITY_EDITOR
+        /// <summary>DEV ONLY: switches bots on or off for the other seats.</summary>
+        public void DevSetBots(bool on)
+        {
+            botsPlayOthers = on;
+            _botTurnOwner = -1;
+            CancelSelection();
+        }
+
+        /// <summary>DEV ONLY: makes this screen belong to the next Apostle (with bots on).</summary>
+        public void DevCycleLocalApostle()
+        {
+            if (CurrentMatch == null)
+                return;
+            int count = CurrentMatch.Battlefield.Apostles.Count;
+            localApostleId = localApostleId % count + 1;
+            _botTurnOwner = -1;
+            CancelSelection();
+        }
+#endif
+
+        // ---- Animation ----
+
+        // A short sentence for the hint line, so you can follow what a bot just did.
+        private static string Describe(BotAction action)
+        {
+            switch (action.Kind)
+            {
+                case BotActionKind.ChooseDirection:
+                    return $"chose the {action.Direction} direction";
+                case BotActionKind.Move:
+                    return "moved";
+                case BotActionKind.PlayCard:
+                    string name = CardCatalog.Get(action.Card).Name;
+                    return action.TargetId != 0 ? $"played {name} on Apostle {action.TargetId}" : $"played {name}";
+                case BotActionKind.Strike:
+                    return "struck!";
+                case BotActionKind.EndTurn:
+                    return "ended the turn";
+                default:
+                    return string.Empty;
+            }
+        }
+
+        // Slides each disc toward its tile, and plays the attacker's lunge.
+        private void AnimateDiscs()
+        {
+            if (_views.Count == 0)
+                return;
+
+            float step = discMoveSpeed * Time.deltaTime;
+            float lunge = 0f;
+            if (_lungeIndex >= 0)
+            {
+                _lungeElapsed += Time.deltaTime;
+                float t = _lungeElapsed / Mathf.Max(0.05f, lungeTime);
+                if (t >= 1f)
+                    _lungeIndex = -1;
+                else
+                    lunge = Mathf.Sin(t * Mathf.PI) * lungeDistance;
+            }
+
+            for (int i = 0; i < _views.Count; i++)
+            {
+                _discPositions[i] = Vector3.MoveTowards(_discPositions[i], _discTargets[i], step);
+                Vector3 position = _discPositions[i];
+                if (i == _lungeIndex)
+                    position += _lungeDirection * lunge;
+                _views[i].transform.position = position;
+            }
+        }
+
+        // A Strike just happened (by a button, a bot, or automatically at End Turn): the attacker lunges.
+        private void DetectStrike()
+        {
+            bool engaged = CurrentMatch.Engagement == EngagementState.Engaged;
+            IReadOnlyList<StrikeHit> hits = CurrentMatch.LastStrikeHits;
+            if (_wasEngaged && !engaged && hits.Count > 0)
+            {
+                int attacker = IndexOfApostle(_engagedAttackerId);
+                int target = IndexOfApostle(hits[0].TargetId);
+                if (attacker >= 0 && target >= 0)
+                {
+                    Vector3 direction = _discTargets[target] - _discTargets[attacker];
+                    _lungeDirection = direction.sqrMagnitude > 0f ? direction.normalized : Vector3.zero;
+                    _lungeIndex = attacker;
+                    _lungeElapsed = 0f;
+                }
+            }
+
+            _wasEngaged = engaged;
+            if (engaged)
+                _engagedAttackerId = CurrentMatch.CurrentApostle.Id;
+        }
+
+        private int IndexOfApostle(int id)
+        {
+            IReadOnlyList<ApostleState> apostles = CurrentMatch.Battlefield.Apostles;
+            for (int i = 0; i < apostles.Count; i++)
+            {
+                if (apostles[i].Id == id)
+                    return i;
+            }
+            return -1;
+        }
+
+        // Rising numbers for whatever changed since the last update: red damage, green healing,
+        // gold Souls and purple Corruption.
+        private void ShowStatChanges()
+        {
+            IReadOnlyList<ApostleState> apostles = CurrentMatch.Battlefield.Apostles;
+            for (int i = 0; i < apostles.Count && i < _lastVessel.Length; i++)
+            {
+                ApostleState apostle = apostles[i];
+                if (_statsTaken && _numbers != null)
+                {
+                    Vector3 above = _discTargets[i] + new Vector3(0f, 0.45f, -0.1f);
+                    int line = 0;
+                    int vessel = apostle.Vessel - _lastVessel[i];
+                    if (vessel != 0)
+                        _numbers.Show(above + Vector3.up * (0.4f * line++), vessel > 0 ? $"+{vessel}" : vessel.ToString(),
+                            vessel > 0 ? new Color(0.45f, 1f, 0.5f) : new Color(1f, 0.35f, 0.3f));
+                    int souls = apostle.Souls - _lastSouls[i];
+                    if (souls != 0)
+                        _numbers.Show(above + Vector3.up * (0.4f * line++), souls > 0 ? $"+{souls} Soul" : $"{souls} Soul",
+                            new Color(1f, 0.85f, 0.3f));
+                    int corruption = apostle.Corruption - _lastCorruption[i];
+                    if (corruption != 0)
+                        _numbers.Show(above + Vector3.up * (0.4f * line), corruption > 0 ? $"+{corruption} Corr" : $"{corruption} Corr",
+                            new Color(0.8f, 0.5f, 1f));
+                }
+                _lastVessel[i] = apostle.Vessel;
+                _lastSouls[i] = apostle.Souls;
+                _lastCorruption[i] = apostle.Corruption;
+            }
+            _statsTaken = true;
+        }
+
         private void LogIfOver()
         {
             if (CurrentMatch.IsOver)
@@ -451,6 +730,8 @@ namespace SoulBind.Managers
             boardView.ShowAscensionTile(CurrentMatch.Ascension.HasAwakened, CurrentMatch.Ascension.Tile);
             RefreshHighlights();
             RefreshAttackMarks();
+            DetectStrike();
+            ShowStatChanges();
             Hint = BuildHint();
             StateChanged?.Invoke();
         }
@@ -461,7 +742,17 @@ namespace SoulBind.Managers
             if (match.IsOver)
                 return string.Empty;
             if (match.IsAwaitingPhaseStart)
-                return $"Apostle {match.GetNextPhaseChooserId()}: choose the turn direction.";
+                return IsLocalPhaseChooser
+                    ? "Phase over: you choose the turn direction."
+                    : $"Phase over: Apostle {match.GetNextPhaseChooserId()} chooses the turn direction.";
+            if (!IsLocalTurn)
+            {
+                if (match.CurrentApostle == null)
+                    return string.Empty;
+                return _lastBotAction.Length > 0
+                    ? $"Apostle {match.CurrentApostle.Id} {_lastBotAction}"
+                    : $"Apostle {match.CurrentApostle.Id} is playing...";
+            }
             if (IsChoosingComboTarget)
                 return "Nocturne combo: click an opponent's portrait or disc. Right-click to cancel.";
             if (HasSelectedCard)
@@ -482,16 +773,27 @@ namespace SoulBind.Managers
                 ApostleState apostle = apostles[i];
                 ApostleView view = _views[i];
 
+                // Discs slide to their tile (see AnimateDiscs); one coming back into view just appears there.
+                bool wasShown = view.gameObject.activeSelf;
                 view.gameObject.SetActive(!apostle.IsEliminated);
-                view.transform.position = boardView.GetWorldPosition(apostle.Position);
+                _discTargets[i] = boardView.GetWorldPosition(apostle.Position);
+                if (!wasShown)
+                {
+                    _discPositions[i] = _discTargets[i];
+                    view.transform.position = _discTargets[i];
+                }
                 view.SetActiveTurn(apostle == CurrentMatch.CurrentApostle);
                 view.SetAwakened(ascension.HasAwakened && apostle.Id == ascension.AwakenedId);
             }
         }
 
+        // Moves and attack marks are only shown to the player whose turn it is on this screen.
         private void RefreshHighlights()
         {
-            CurrentMatch.GetLegalDestinations(_legalDestinations);
+            if (IsLocalTurn)
+                CurrentMatch.GetLegalDestinations(_legalDestinations);
+            else
+                _legalDestinations.Clear();
             if (_legalDestinations.Count == 0)
                 boardView.ClearHighlights();
             else
@@ -500,7 +802,10 @@ namespace SoulBind.Managers
 
         private void RefreshAttackMarks()
         {
-            CurrentMatch.GetAttackTargets(_attackTargets);
+            if (IsLocalTurn)
+                CurrentMatch.GetAttackTargets(_attackTargets);
+            else
+                _attackTargets.Clear();
             _attackTiles.Clear();
             for (int i = 0; i < _attackTargets.Count; i++)
                 _attackTiles.Add(_attackTargets[i].Position);

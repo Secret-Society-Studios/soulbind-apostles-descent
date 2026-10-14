@@ -9,9 +9,9 @@ namespace SoulBind.UI
 {
     /// <summary>
     /// The match HUD, laid out like a digital card game seen from the current player's seat:
-    /// opponents' portraits along the top, the current Apostle's portrait in the bottom-right
-    /// corner, the hand along the bottom (U2), and turn info in the top-right. In hot-seat play,
-    /// "you" is whoever's turn it is, so portraits move as turns pass.
+    /// opponents' portraits along the top, this screen's player's portrait in the bottom-right
+    /// corner, the hand along the bottom, and turn info in the top-right. Whoever's turn it is
+    /// is highlighted. With bots off (hot-seat testing), "you" follows the turn.
     /// Display only: it reads the Match after every change, and keeps the board clear of the HUD.
     /// </summary>
     public sealed class MatchHud : MonoBehaviour
@@ -80,17 +80,20 @@ namespace SoulBind.UI
 
             AscensionTracker ascension = match.Ascension;
             IReadOnlyList<ApostleState> apostles = match.Battlefield.Apostles;
+            int viewerId = matchController.ViewerId;
             for (int i = 0; i < apostles.Count && i < _panels.Count; i++)
             {
                 ApostleState apostle = apostles[i];
                 ApostlePanelView panel = _panels[i];
                 bool isCurrent = apostle == match.CurrentApostle;
+                bool isViewer = apostle.Id == viewerId;
 
-                // The current Apostle sits bottom-right; everyone else along the top, in Id order.
-                Transform home = isCurrent ? playerSlot : opponentRow;
+                // This screen's player sits bottom-right; everyone else along the top, in Id order.
+                // Whoever's turn it is gets the TURN highlight, wherever they sit.
+                Transform home = isViewer ? playerSlot : opponentRow;
                 if (panel.transform.parent != home)
                     panel.transform.SetParent(home, false);
-                if (!isCurrent)
+                if (!isViewer)
                     panel.transform.SetSiblingIndex(i);
 
                 bool isPickable = matchController.IsChoosingComboTarget && !isCurrent && !apostle.IsEliminated;

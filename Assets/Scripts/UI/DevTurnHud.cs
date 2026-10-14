@@ -66,6 +66,8 @@ namespace SoulBind.UI
         private bool _devSoulsPressed;
         private int _devSoulsDelta;
         private bool _devShieldPressed;
+        private bool _botsTogglePressed;
+        private bool _seatCyclePressed;
 #endif
 
         private static float UiScale => Mathf.Max(1f, Screen.height / DesignHeight);
@@ -126,8 +128,16 @@ namespace SoulBind.UI
                 matchController.DevChangeCurrentSouls(_devSoulsDelta);
             if (_devShieldPressed)
                 matchController.DevAddShieldToCurrent(DevShieldStep);
+            if (_botsTogglePressed)
+                matchController.DevSetBots(!matchController.BotsPlayOthers);
+            if (_seatCyclePressed)
+                matchController.DevCycleLocalApostle();
+            if (_botsTogglePressed || _seatCyclePressed)
+                Rebuild();
             _devSoulsPressed = false;
             _devShieldPressed = false;
+            _botsTogglePressed = false;
+            _seatCyclePressed = false;
 #endif
 
             _cardPressed = false;
@@ -160,6 +170,14 @@ namespace SoulBind.UI
 
             // Scrolls when the content is taller than the screen.
             _scroll = GUILayout.BeginScrollView(_scroll);
+#if UNITY_EDITOR
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button(matchController.BotsPlayOthers ? "Bots: ON (click for hot-seat)" : "Bots: OFF (click for bots)"))
+                _botsTogglePressed = true;
+            if (matchController.BotsPlayOthers && GUILayout.Button($"You: Apostle {matchController.ViewerId} (switch)"))
+                _seatCyclePressed = true;
+            GUILayout.EndHorizontal();
+#endif
             GUILayout.Label(_summary);
 
             Match match = matchController.CurrentMatch;
