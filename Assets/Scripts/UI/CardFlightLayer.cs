@@ -22,6 +22,7 @@ namespace SoulBind.UI
             public Vector3 From;
             public Vector3 To;
             public Quaternion FromRotation;
+            public Quaternion ToRotation;
             public float FromScale;
             public float ToScale;
             public float Elapsed;
@@ -81,6 +82,7 @@ namespace SoulBind.UI
             Flight flight = Take(card, false, false);
             flight.To = to;
             flight.ToScale = toScale;
+            flight.ToRotation = Quaternion.identity;
             flight.Follow = null;
             Begin(flight, from, fromRotation, fromScale, duration, landed);
         }
@@ -106,6 +108,16 @@ namespace SoulBind.UI
         public void Fly(ArcanaId card, Vector3 from, float fromScale, Vector3 to, float toScale,
             bool startFaceDown, bool endFaceDown, float duration, Action landed)
         {
+            Fly(card, from, 0f, fromScale, to, 0f, toScale, startFaceDown, endFaceDown, duration, landed);
+        }
+
+        /// <summary>
+        /// As above, also turning from one on-screen angle to another (degrees, 0 = upright), for cards
+        /// that lie turned along the sides of the mat.
+        /// </summary>
+        public void Fly(ArcanaId card, Vector3 from, float fromAngle, float fromScale, Vector3 to, float toAngle,
+            float toScale, bool startFaceDown, bool endFaceDown, float duration, Action landed)
+        {
             if ((startFaceDown || endFaceDown) && _backTemplate == null)
             {
                 landed?.Invoke();
@@ -115,8 +127,9 @@ namespace SoulBind.UI
             Flight flight = Take(card, startFaceDown, endFaceDown);
             flight.To = to;
             flight.ToScale = toScale;
+            flight.ToRotation = Quaternion.Euler(0f, 0f, toAngle);
             flight.Follow = null;
-            Begin(flight, from, Quaternion.identity, fromScale, duration, landed);
+            Begin(flight, from, Quaternion.Euler(0f, 0f, fromAngle), fromScale, duration, landed);
         }
 
         private void Begin(Flight flight, Vector3 from, Quaternion fromRotation, float fromScale, float duration, Action landed)
@@ -221,7 +234,7 @@ namespace SoulBind.UI
             float eased = 1f - (1f - t) * (1f - t) * (1f - t); // fast start, gentle landing
 
             Vector3 to = flight.Follow != null ? flight.Follow.position : flight.To;
-            Quaternion toRotation = flight.Follow != null ? flight.Follow.rotation : Quaternion.identity;
+            Quaternion toRotation = flight.Follow != null ? flight.Follow.rotation : flight.ToRotation;
             float toScale = flight.Follow != null ? flight.Follow.localScale.x : flight.ToScale;
 
             // A small arc upward, scaled with the canvas so it looks the same at any resolution.

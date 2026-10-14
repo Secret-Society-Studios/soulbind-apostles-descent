@@ -28,5 +28,23 @@ namespace SoulBind.UI
             cardPixelHeight = Vector2.Distance(bottom, top);
             return true;
         }
+
+        /// <summary>
+        /// Also gives how far the card looks turned on screen (degrees, 0 = upright), for cards lying along
+        /// the sides of the hexagonal mat.
+        /// </summary>
+        public static bool TryGet(RectTransform slot, Camera camera, Vector3[] corners, out Vector2 center,
+            out float cardPixelHeight, out float screenAngle)
+        {
+            screenAngle = 0f;
+            if (!TryGet(slot, camera, corners, out center, out cardPixelHeight))
+                return false;
+
+            Vector3 bottom = camera.WorldToScreenPoint((corners[0] + corners[3]) * 0.5f);
+            Vector3 top = camera.WorldToScreenPoint((corners[1] + corners[2]) * 0.5f);
+            Vector2 up = (Vector2)(top - bottom);
+            screenAngle = Mathf.Atan2(up.y, up.x) * Mathf.Rad2Deg - 90f;
+            return true;
+        }
     }
 }

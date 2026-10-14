@@ -32,7 +32,7 @@ namespace SoulBind.UI
         [SerializeField] private Sprite purifyTileSprite;
         [SerializeField] private Sprite soulTileSprite;
         [SerializeField] private bool fitCameraToBoard = true;
-        [SerializeField] private float cameraMargin = 0.4f;
+        [SerializeField] private float cameraMargin = 0.2f;
 
         [Header("Table view")]
         [Tooltip("How far the camera tilts away from straight down, in degrees.")]
@@ -43,14 +43,20 @@ namespace SoulBind.UI
         [Tooltip("Placeholder play-mat color under the board.")]
         [SerializeField] private Color matColor = new Color(0.16f, 0.14f, 0.20f);
         [SerializeField] private float matPadding = 0.6f;
-        [Tooltip("Width of the table area kept on screen right of the mat, for the discard pile (and the deck later).")]
-        [SerializeField] private float sideAreaWidth = 2f;
-        [Tooltip("Gap between the mat and the side area.")]
-        [SerializeField] private float sideAreaGap = 0.4f;
-        [Tooltip("Depth of the table strip kept on screen above the mat, for the opponents' face-down hands.")]
-        [SerializeField] private float topAreaDepth = 1.9f;
-        [Tooltip("Gap between the mat and the top strip.")]
-        [SerializeField] private float topAreaGap = 0.2f;
+        [Tooltip("Width of the lighter rim around the hexagonal mat, in world units.")]
+        [SerializeField] private float matRimWidth = 0.15f;
+
+        [Header("Piles (on the mat, in its left and right corners)")]
+        [Tooltip("Height of a pile's card, in world units. The mat grows if the piles need more room.")]
+        [SerializeField] private float pileCardHeight = 2.4f;
+        [Tooltip("Gap between the board's tiles and the piles, in world units.")]
+        [SerializeField] private float pileGap = 0.3f;
+
+        [Header("Seats (a hand along each side of the mat)")]
+        [Tooltip("Gap between the mat's edge and the hands lying along it, in world units.")]
+        [SerializeField] private float seatGap = 0.15f;
+        [Tooltip("How deep each hand's place is, from the mat's edge outward, in world units (cards plus name).")]
+        [SerializeField] private float seatDepth = 2.3f;
 
         private readonly Dictionary<HexCoord, SpriteRenderer> _tiles = new Dictionary<HexCoord, SpriteRenderer>();
         private readonly Dictionary<HexCoord, SpecialTileType> _specialTypes = new Dictionary<HexCoord, SpecialTileType>();
@@ -64,6 +70,14 @@ namespace SoulBind.UI
         private float _centerY;
         private float _boardWidth;
         private float _boardHeight;
+        private float _matRadius;
+        private float _pileOffsetX;
+        private const float PileCardAspect = 180f / 252f; // width / height
+        private const float PileCountRoom = 0.35f;         // the card count under a pile, in world units
+
+        // The six sides, counter-clockwise from the bottom: the direction pointing out of each side.
+        private static readonly float[] SideNormalDegrees = { 270f, 330f, 30f, 90f, 150f, 210f };
+        private const float Sqrt3 = 1.7320508f;
         private float _reservedLeft;
         private float _reservedTop;
         private float _reservedBottom;
@@ -194,25 +208,37 @@ namespace SoulBind.UI
             FitCamera();
         }
 
+        /// <summary>Height of a pile's card on the mat, in world units.</summary>
+        public float PileCardHeight => pileCardHeight;
+
+        /// <summary>Where the draw pile lies: on the mat, in its left corner, beside the board.</summary>
+        public Vector3 DrawPileSpot => transform.position + new Vector3(-_pileOffsetX, 0f, 0f);
+
+        /// <summary>Where the discard pile lies: on the mat, in its right corner, beside the board.</summary>
+        public Vector3 DiscardPileSpot => transform.position + new Vector3(_pileOffsetX, 0f, 0f);
+
+        /// <summary>The hexagonal mat's radius (center to corner), in world units. Its corners point left and right.</summary>
+        public float MatRadius => _matRadius;
+
+        /// <summary>The radius of the hexagon that encloses the mat and the hands lying around it.</summary>
+        public float SeatRingRadius => _matRadius + (seatGap + seatDepth) * 2f / Sqrt3;
+
         /// <summary>
-        /// The middle of the table area right of the mat, on the board's plane. The camera always keeps
-        /// this area on screen. The discard pile sits here.
+        /// One of the mat's six sides, counter-clockwise from the bottom (0 bottom, 1 bottom-right,
+        /// 2 top-right, 3 top, 4 top-left, 5 bottom-left): the middle of the place where a hand lies along it,
+        /// how far its cards are turned so their tops face the board (degrees), the side's length and the
+        /// place's depth, all in world units on the board's plane.
         /// </summary>
-        /// <summary>
-        /// The middle of the table strip above the mat (the far side of the table), on the board's plane.
-        /// The camera always keeps it on screen. The opponents' face-down hands sit here.
-        /// </summary>
-        public Vector3 TopAreaCenter =>
-            transform.position + new Vector3(0f, _boardHeight / 2f + matPadding + topAreaGap + topAreaDepth / 2f, 0f);
-
-        /// <summary>Width of the top strip (as wide as the mat), in world units.</summary>
-        public float TopAreaWidth => _boardWidth + 2f * matPadding;
-
-        /// <summary>Depth of the top strip, in world units.</summary>
-        public float TopAreaDepth => topAreaDepth;
-
-        public Vector3 SideAreaCenter =>
-            transform.position + new Vector3(_boardWidth / 2f + matPadding + sideAreaGap + sideAreaWidth / 2f, 0f, 0f);
+        public void GetSeat(int side, out Vector3 center, out float rotation, out float length, out float depth)
+        {
+            side = ((side % 6) + 6) % 6;
+            float angle = SideNormalDegrees[side] * Mathf.Deg2Rad;
+            float distance = _matRadius * Sqrt3 / 2f + seatGap + seatDepth / 2f;
+            center = transform.position + new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f) * distance;
+            rotation = 60f * side;
+            length = _matRadius;
+            depth = seatDepth;
+        }
 
         /// <summary>The share of the screen height kept clear at the bottom (for the player's strip and hand).</summary>
         public float ReservedBottomFraction => _reservedBottom;
@@ -286,7 +312,7 @@ namespace SoulBind.UI
             {
                 float middle = (near + far) / 2f;
                 cam.transform.position = boardCenter - forward * middle;
-                GetViewportBounds(cam, true, out Vector2 min, out Vector2 max);
+                GetViewportBounds(cam, out Vector2 min, out Vector2 max);
                 if (max.x - min.x <= freeWidth && max.y - min.y <= freeHeight)
                     far = middle;
                 else
@@ -301,8 +327,8 @@ namespace SoulBind.UI
             float boardTargetX = (freeMinX + 1f) / 2f;
             for (int i = 0; i < 6; i++)
             {
-                GetViewportBounds(cam, false, out Vector2 boardMin, out Vector2 boardMax);
-                GetViewportBounds(cam, true, out Vector2 allMin, out Vector2 allMax);
+                GetViewportBounds(cam, out Vector2 boardMin, out Vector2 boardMax);
+                GetViewportBounds(cam, out Vector2 allMin, out Vector2 allMax);
 
                 // A positive offset moves everything left on screen.
                 float offsetX = (boardMin.x + boardMax.x) / 2f - boardTargetX;
@@ -315,34 +341,46 @@ namespace SoulBind.UI
             }
         }
 
-        // The screen-space box (viewport units) around the four corners of the mat plus margin,
-        // the strip above it for the opponents' hands, and with includeSide, the side area on its right
-        // for the piles too.
-        private void GetViewportBounds(Camera cam, bool includeSide, out Vector2 min, out Vector2 max)
+        // The screen-space box (viewport units) around the mat and the six places where hands lie,
+        // plus margin. Each place is measured by its own corners, so the empty table at the hexagon's
+        // outer corners is not counted and everything can be shown bigger.
+        private void GetViewportBounds(Camera cam, out Vector2 min, out Vector2 max)
         {
-            float left = -(_boardWidth / 2f + matPadding + cameraMargin);
-            float right = _boardWidth / 2f + matPadding + cameraMargin
-                          + (includeSide ? sideAreaGap + sideAreaWidth : 0f);
-            float halfHeight = _boardHeight / 2f + matPadding + cameraMargin;
-            float top = halfHeight + topAreaGap + topAreaDepth; // the opponents' hands above the mat
             min = new Vector2(float.MaxValue, float.MaxValue);
             max = new Vector2(float.MinValue, float.MinValue);
 
-            for (int corner = 0; corner < 4; corner++)
+            float inner = _matRadius * Sqrt3 / 2f;            // center to the mat's edge
+            float outer = inner + seatGap + seatDepth + cameraMargin;
+            float halfLength = _matRadius / 2f + cameraMargin;
+            for (int side = 0; side < 6; side++)
             {
-                float x = (corner & 1) == 0 ? left : right;
-                float y = (corner & 2) == 0 ? -halfHeight : top;
-                Vector3 viewport = cam.WorldToViewportPoint(transform.position + new Vector3(x, y, 0f));
-                if (viewport.z <= 0f)
+                float angle = SideNormalDegrees[side] * Mathf.Deg2Rad;
+                var normal = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f);
+                var along = new Vector3(-normal.y, normal.x, 0f);
+                for (int corner = 0; corner < 4; corner++)
                 {
-                    // A corner behind the camera: treat the mat as far too big to fit.
-                    min = new Vector2(-1000f, -1000f);
-                    max = new Vector2(1000f, 1000f);
-                    return;
+                    float distance = (corner & 1) == 0 ? inner : outer;
+                    float offset = (corner & 2) == 0 ? -halfLength : halfLength;
+                    if (!AddToBounds(cam, normal * distance + along * offset, ref min, ref max))
+                        return;
                 }
-                min = Vector2.Min(min, viewport);
-                max = Vector2.Max(max, viewport);
             }
+        }
+
+        // Grows the box by one point (relative to the board's center). Returns false, with a box far too
+        // big to fit, if the point is behind the camera.
+        private bool AddToBounds(Camera cam, Vector3 offset, ref Vector2 min, ref Vector2 max)
+        {
+            Vector3 viewport = cam.WorldToViewportPoint(transform.position + offset);
+            if (viewport.z <= 0f)
+            {
+                min = new Vector2(-1000f, -1000f);
+                max = new Vector2(1000f, 1000f);
+                return false;
+            }
+            min = Vector2.Min(min, viewport);
+            max = Vector2.Max(max, viewport);
+            return true;
         }
 
         // A plain table under everything and a play mat under the board (placeholders for art).
@@ -355,8 +393,97 @@ namespace SoulBind.UI
 
             CreateFlat("Table", square, tableColor, -20,
                 new Vector3(_boardWidth * 6f, _boardHeight * 6f, 1f));
-            CreateFlat("Mat", square, matColor, -10,
-                new Vector3(_boardWidth + 2f * matPadding, _boardHeight + 2f * matPadding, 1f));
+
+            // The smallest hexagon (corners left and right, flat edges at the top and bottom) around every
+            // tile. The flat bottom edge faces the player, whose hand lies along it.
+            float radius = 0f;
+            foreach (HexCoord tile in Board.Tiles)
+            {
+                tile.ToPlane(hexSize, out float cx, out float cy);
+                cx -= _centerX;
+                cy -= _centerY;
+                for (int corner = 0; corner < 6; corner++)
+                {
+                    // The tiles are pointy-top: their corners are at 30, 90, 150... degrees.
+                    float angle = (30f + 60f * corner) * Mathf.Deg2Rad;
+                    float x = Mathf.Abs(cx + hexSize * Mathf.Cos(angle));
+                    float y = Mathf.Abs(cy + hexSize * Mathf.Sin(angle));
+                    radius = Mathf.Max(radius, Mathf.Max(x + y / Sqrt3, 2f * y / Sqrt3));
+                }
+            }
+
+            // matPadding is the gap between the outermost tiles and the mat's edge.
+            _matRadius = radius + matPadding * 2f / Sqrt3;
+
+            // The piles lie in the mat's left and right corners, beside the board, at mid-height.
+            // Find how far the tiles reach sideways in that band, then grow the mat if a pile would not fit.
+            float pileHalfWidth = pileCardHeight * PileCardAspect / 2f + 0.15f; // a little room for tilted cards
+            float pileHalfHeight = pileCardHeight / 2f + PileCountRoom;
+            float tilesReach = 0f;
+            foreach (HexCoord tile in Board.Tiles)
+            {
+                tile.ToPlane(hexSize, out float cx, out float cy);
+                cx -= _centerX;
+                cy -= _centerY;
+                for (int corner = 0; corner < 6; corner++)
+                {
+                    float angle = (30f + 60f * corner) * Mathf.Deg2Rad;
+                    float y = Mathf.Abs(cy + hexSize * Mathf.Sin(angle));
+                    if (y <= pileHalfHeight + pileGap)
+                        tilesReach = Mathf.Max(tilesReach, Mathf.Abs(cx + hexSize * Mathf.Cos(angle)));
+                }
+            }
+            _pileOffsetX = tilesReach + pileGap + pileHalfWidth;
+            float pileNeeds = _pileOffsetX + pileHalfWidth + pileHalfHeight / Sqrt3 + matRimWidth + 0.1f;
+            _matRadius = Mathf.Max(_matRadius, pileNeeds);
+            Sprite hexagon = CreateHexagonSprite(_matRadius, matColor, Color.Lerp(matColor, Color.white, 0.25f), matRimWidth);
+            CreateFlat("Mat", hexagon, Color.white, -10, Vector3.one);
+        }
+
+        // Draws a hexagon (with a soft edge and a lighter rim) into a texture, sized in world units.
+        // Made once when the board is built.
+        private static Sprite CreateHexagonSprite(float radius, Color fill, Color rim, float rimWidth)
+        {
+            const int LongSide = 768;
+            int width = LongSide;
+            int height = Mathf.CeilToInt(LongSide * Sqrt3 / 2f);
+            float pixelsPerUnit = LongSide / (2f * radius);
+
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
+            {
+                filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp
+            };
+            var pixels = new Color32[width * height];
+            Color32 clear = new Color32(0, 0, 0, 0);
+            float rimPixels = rimWidth * pixelsPerUnit;
+
+            for (int py = 0; py < height; py++)
+            {
+                for (int px = 0; px < width; px++)
+                {
+                    // Position relative to the center, in units of the hexagon's radius.
+                    float x = Mathf.Abs((px + 0.5f - width / 2f) / (pixelsPerUnit * radius));
+                    float y = Mathf.Abs((py + 0.5f - height / 2f) / (pixelsPerUnit * radius));
+
+                    // Distance outside the hexagon (negative inside), in pixels.
+                    float outside = Mathf.Max(y - Sqrt3 / 2f, (Sqrt3 * x + y - Sqrt3) / 2f) * pixelsPerUnit * radius;
+                    float alpha = Mathf.Clamp01(0.5f - outside);
+                    if (alpha <= 0f)
+                    {
+                        pixels[py * width + px] = clear;
+                        continue;
+                    }
+
+                    Color color = -outside < rimPixels ? rim : fill;
+                    color.a *= alpha;
+                    pixels[py * width + px] = color;
+                }
+            }
+
+            texture.SetPixels32(pixels);
+            texture.Apply(false, true); // no longer readable: frees the CPU copy
+            return Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(0.5f, 0.5f), pixelsPerUnit);
         }
 
         private void CreateFlat(string objectName, Sprite sprite, Color color, int sortingOrder, Vector3 scale)

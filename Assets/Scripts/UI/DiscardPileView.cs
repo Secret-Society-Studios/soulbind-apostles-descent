@@ -8,7 +8,7 @@ using UnityEngine.UI;
 namespace SoulBind.UI
 {
     /// <summary>
-    /// The discard pile, lying on the table right of the board. Every played card lands on top of the
+    /// The discard pile, lying on the mat in its right corner. Every played card lands on top of the
     /// stack, a little turned and shifted like a real pile, so the last few cards peek out underneath.
     /// It sits on a World Space canvas, so it tilts with the table under the perspective camera.
     /// It glows while a card is dragged, so the player knows where to drop it.
@@ -28,11 +28,6 @@ namespace SoulBind.UI
         [Tooltip("Shown while a card is being dragged.")]
         [SerializeField] private Image glow;
 
-        [Header("On the table")]
-        [Tooltip("Height of one card on the table, in world units (a hex tile is about 1).")]
-        [SerializeField] private float cardWorldHeight = 2.4f;
-        [Tooltip("How far above the middle of the side area the pile sits, in card heights (the deck goes below later).")]
-        [SerializeField] private float heightOffset = 0.65f;
 
         [Header("Stack")]
         [Tooltip("Only the top cards are drawn; the ones under them can't be seen anyway.")]
@@ -132,18 +127,19 @@ namespace SoulBind.UI
                 glow.enabled = dragging;
         }
 
-        // Lies flat on the board's plane, in the table area the camera keeps on screen.
+        // Lies flat on the mat, in its right corner beside the board.
         private void PlaceOnTable()
         {
             BoardView board = matchController.BoardView;
+            float cardHeight = board != null ? board.PileCardHeight : 2.4f;
             float slotHeight = slot.rect.height > 0f ? slot.rect.height : 252f;
-            float scale = cardWorldHeight / slotHeight;
+            float scale = cardHeight / slotHeight;
             transform.localScale = new Vector3(scale, scale, scale);
             transform.rotation = Quaternion.identity; // facing -Z, like the board
 
-            Vector3 center = board != null ? board.SideAreaCenter : transform.position;
-            // A hair toward the camera so it never fights with the table sprite.
-            transform.position = center + new Vector3(0f, cardWorldHeight * heightOffset, -0.01f);
+            // A hair toward the camera so it never fights with the mat.
+            Vector3 spot = board != null ? board.DiscardPileSpot : transform.position;
+            transform.position = spot + new Vector3(0f, 0f, -0.01f);
         }
 
         private CardView CreateView()

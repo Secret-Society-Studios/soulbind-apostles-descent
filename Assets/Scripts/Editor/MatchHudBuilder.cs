@@ -36,7 +36,6 @@ namespace SoulBind.EditorTools
         private const string HudName = "MatchHud";
         private const string PileName = "DiscardPile";
         private const string DrawPileName = "DrawPile";
-        private const float PileOffset = 0.65f; // both piles sit this many card heights from the side area's middle
 
         private const float PortraitWidth = 280f;
         private const float PortraitHeight = 96f;
@@ -119,14 +118,6 @@ namespace SoulBind.EditorTools
             Button cancelButton = CreateButton("CancelButton", actionArea, "Cancel", ButtonColor, out _);
             Button endTurnButton = CreateButton("EndTurnButton", actionArea, "End Turn", ButtonColor, out _);
 
-            // Bottom center: the hand. Leaves room for the portrait and buttons on the right.
-            RectTransform handArea = CreateRect("HandArea", root);
-            handArea.anchorMin = new Vector2(0f, 0f);
-            handArea.anchorMax = new Vector2(1f, 0f);
-            handArea.pivot = new Vector2(0.5f, 0f);
-            handArea.offsetMin = new Vector2(EdgeMargin, 0f);
-            handArea.offsetMax = new Vector2(-(EdgeMargin * 2f + ActionWidth), HandHeight);
-
             // The large preview of a hovered card, left of the buttons.
             var previewObject = (GameObject)PrefabUtility.InstantiatePrefab(cardPrefab.gameObject, root);
             previewObject.name = "CardPreview";
@@ -143,13 +134,6 @@ namespace SoulBind.EditorTools
                 new Vector2(CardWidth * PreviewScale, 36f));
             previewReason.rectTransform.pivot = new Vector2(1f, 1f);
             previewReason.color = new Color(1f, 0.55f, 0.45f);
-
-            HandView handView = handArea.gameObject.AddComponent<HandView>();
-            var handSo = new SerializedObject(handView);
-            handSo.FindProperty("cardPrefab").objectReferenceValue = cardPrefab;
-            handSo.FindProperty("preview").objectReferenceValue = preview;
-            handSo.FindProperty("previewReason").objectReferenceValue = previewReason;
-            handSo.ApplyModifiedPropertiesWithoutUndo();
 
             ActionBar actionBar = actionArea.gameObject.AddComponent<ActionBar>();
             var actionSo = new SerializedObject(actionBar);
@@ -170,7 +154,7 @@ namespace SoulBind.EditorTools
             so.FindProperty("matchController").objectReferenceValue =
                 controllerObject != null ? controllerObject.GetComponent<MatchController>() : null;
             so.FindProperty("topReservedArea").objectReferenceValue = opponentRow;
-            so.FindProperty("bottomReservedArea").objectReferenceValue = handArea;
+            so.FindProperty("bottomReservedArea").objectReferenceValue = null; // the hands lie on the table now
             so.FindProperty("opponentRow").objectReferenceValue = opponentRow;
             so.FindProperty("playerSlot").objectReferenceValue = playerSlot;
             so.FindProperty("panelPrefab").objectReferenceValue = panelPrefab;
@@ -180,19 +164,17 @@ namespace SoulBind.EditorTools
             so.ApplyModifiedPropertiesWithoutUndo();
 
             MatchController controller = controllerObject != null ? controllerObject.GetComponent<MatchController>() : null;
-            foreach (Object scriptWithController in new Object[] { handView, actionBar })
-            {
-                var wiring = new SerializedObject(scriptWithController);
-                wiring.FindProperty("matchController").objectReferenceValue = controller;
-                wiring.ApplyModifiedPropertiesWithoutUndo();
-            }
+            var actionWiring = new SerializedObject(actionBar);
+            actionWiring.FindProperty("matchController").objectReferenceValue = controller;
+            actionWiring.ApplyModifiedPropertiesWithoutUndo();
 
-            BuildDiscardPile(root, cardPrefab, handView, controller);
-            BuildDrawPile(root.gameObject.scene, controller);
+            BuildDiscardPile(root, cardPrefab, controller);
+            DrawPileView drawPile = BuildDrawPile(root.gameObject.scene, controller);
+            BuildTableHands(root.gameObject.scene, controller, cardPrefab, drawPile, preview, previewReason);
 
             if (controllerObject == null)
                 Debug.LogWarning("MatchHudBuilder: no GameObject named 'MatchController' was found. Drag it into the " +
-                                 "Match Controller field of MatchHud, HandArea (HandView) and ActionArea (ActionBar).", hud);
+                                 "Match Controller field of MatchHud, ActionArea (ActionBar), the piles and TableHands.", hud);
 
             EditorSceneManager.MarkSceneDirty(canvas.gameObject.scene);
             Selection.activeGameObject = root.gameObject;
@@ -216,17 +198,16 @@ namespace SoulBind.EditorTools
             }
 
             var cardPrefab = AssetDatabase.LoadAssetAtPath<CardView>(CardPrefabPath);
-            HandView handView = root.GetComponentInChildren<HandView>(true);
-            if (cardPrefab == null || handView == null)
+            if (cardPrefab == null)
             {
                 EditorUtility.DisplayDialog("Add Discard Pile",
-                    "Couldn't find " + CardPrefabPath + " or the HandArea. Run SoulBind > Build Match HUD instead.", "OK");
+                    "Couldn't find " + CardPrefabPath + ". Run SoulBind > Build Match HUD instead.", "OK");
                 return;
             }
 
             GameObject controllerObject = GameObject.Find("MatchController");
             MatchController controller = controllerObject != null ? controllerObject.GetComponent<MatchController>() : null;
-            BuildDiscardPile((RectTransform)root, cardPrefab, handView, controller);
+            BuildDiscardPile((RectTransform)root, cardPrefab, controller);
 
             EditorSceneManager.MarkSceneDirty(canvas.gameObject.scene);
             Debug.Log("MatchHudBuilder: added the DiscardPile on the table. Save the scene.");
@@ -234,8 +215,7 @@ namespace SoulBind.EditorTools
 
         // The pile is a World Space canvas lying on the table; DiscardPileView moves it next to the board
         // when the match starts. The board is also kept clear of the action buttons on the right.
-        private static void BuildDiscardPile(RectTransform hudRoot, CardView cardPrefab, HandView handView,
-            MatchController controller)
+        private static DiscardPileView BuildDiscardPile(RectTransform hudRoot, CardView cardPrefab, MatchController controller)
         {
             // Remove an old pile: the screen version under the HUD, or an earlier table version.
             Transform oldScreenPile = hudRoot.Find(PileName);
@@ -296,10 +276,7 @@ namespace SoulBind.EditorTools
             so.FindProperty("emptyText").objectReferenceValue = emptyText;
             so.FindProperty("glow").objectReferenceValue = glow;
             so.ApplyModifiedPropertiesWithoutUndo();
-
-            var handSo = new SerializedObject(handView);
-            handSo.FindProperty("discardPile").objectReferenceValue = view;
-            handSo.ApplyModifiedProperties();
+            return view;
 
         }
 
@@ -320,23 +297,12 @@ namespace SoulBind.EditorTools
 
             BuildDrawPile(scene, controller);
 
-            // Make room for it: move an existing discard pile up to its matching place.
-            foreach (GameObject sceneRoot in scene.GetRootGameObjects())
-            {
-                DiscardPileView discard = sceneRoot.GetComponent<DiscardPileView>();
-                if (discard == null)
-                    continue;
-                var discardSo = new SerializedObject(discard);
-                discardSo.FindProperty("heightOffset").floatValue = PileOffset;
-                discardSo.ApplyModifiedProperties();
-            }
-
             EditorSceneManager.MarkSceneDirty(scene);
             Debug.Log("MatchHudBuilder: added the DrawPile on the table. Save the scene.");
         }
 
         // Like the discard pile: a World Space canvas lying on the table, placed by DrawPileView at runtime.
-        private static void BuildDrawPile(Scene scene, MatchController controller)
+        private static DrawPileView BuildDrawPile(Scene scene, MatchController controller)
         {
             foreach (GameObject sceneRoot in scene.GetRootGameObjects())
             {
@@ -400,73 +366,97 @@ namespace SoulBind.EditorTools
             so.FindProperty("slot").objectReferenceValue = slot;
             so.FindProperty("countText").objectReferenceValue = countText;
             so.FindProperty("emptyText").objectReferenceValue = emptyText;
-            so.FindProperty("heightOffset").floatValue = PileOffset;
             so.ApplyModifiedPropertiesWithoutUndo();
-
-            // Drawn cards fly from here into the hand.
-            foreach (GameObject sceneRoot in scene.GetRootGameObjects())
-            {
-                HandView handView = sceneRoot.GetComponentInChildren<HandView>(true);
-                if (handView == null)
-                    continue;
-                var handSo = new SerializedObject(handView);
-                handSo.FindProperty("drawPile").objectReferenceValue = view;
-                handSo.ApplyModifiedProperties();
-            }
+            return view;
         }
 
         /// <summary>
-        /// Adds the opponents' face-down hands on the far side of the table. Running it again replaces them.
-        /// Needs the draw and discard piles (SoulBind > Add Draw Pile / Add Discard Pile) first.
+        /// Puts every Apostle's hand on the table, one along each side of the hexagonal mat (yours face-up at
+        /// the bottom, the others face-down). Removes the old screen hand (HandArea) and the old opponents'
+        /// hands. Needs the HUD and both piles. Running it again replaces the table hands.
         /// </summary>
-        [MenuItem("SoulBind/Add Opponent Hands")]
-        private static void AddOpponentHands()
+        [MenuItem("SoulBind/Set Up Table Hands")]
+        private static void SetUpTableHands()
         {
             Scene scene = SceneManager.GetActiveScene();
             GameObject controllerObject = GameObject.Find("MatchController");
             MatchController controller = controllerObject != null ? controllerObject.GetComponent<MatchController>() : null;
+            var cardPrefab = AssetDatabase.LoadAssetAtPath<CardView>(CardPrefabPath);
 
-            HandView handView = null;
+            MatchHud hud = null;
             DrawPileView drawPile = null;
-            DiscardPileView discardPile = null;
             foreach (GameObject sceneRoot in scene.GetRootGameObjects())
             {
-                if (handView == null)
-                    handView = sceneRoot.GetComponentInChildren<HandView>(true);
+                if (hud == null)
+                    hud = sceneRoot.GetComponentInChildren<MatchHud>(true);
                 if (drawPile == null)
                     drawPile = sceneRoot.GetComponentInChildren<DrawPileView>(true);
-                if (discardPile == null)
-                    discardPile = sceneRoot.GetComponentInChildren<DiscardPileView>(true);
-                if (sceneRoot.GetComponent<OpponentHandsView>() != null)
-                    Undo.DestroyObjectImmediate(sceneRoot);
             }
 
-            if (controller == null || handView == null || drawPile == null || discardPile == null)
+            Transform hudRoot = hud != null ? hud.transform : null;
+            CardView preview = hudRoot != null && hudRoot.Find("CardPreview") != null
+                ? hudRoot.Find("CardPreview").GetComponent<CardView>() : null;
+            TMP_Text previewReason = hudRoot != null && hudRoot.Find("PreviewReason") != null
+                ? hudRoot.Find("PreviewReason").GetComponent<TMP_Text>() : null;
+
+            if (controller == null || cardPrefab == null || hud == null || drawPile == null || preview == null)
             {
-                EditorUtility.DisplayDialog("Add Opponent Hands",
-                    "Couldn't find the MatchController, the HandArea, the DrawPile or the DiscardPile in the open scene. " +
-                    "Add the piles first (SoulBind > Add Discard Pile, then Add Draw Pile).", "OK");
+                EditorUtility.DisplayDialog("Set Up Table Hands",
+                    "Couldn't find the MatchController, " + CardPrefabPath + ", the MatchHud (with its CardPreview) " +
+                    "or the DrawPile in the open scene. Build the HUD and add the piles first.", "OK");
                 return;
             }
 
-            var handsObject = new GameObject("OpponentHands", typeof(RectTransform));
+            // The old screen hand: its area is removed and the board may use the bottom of the screen again.
+            Transform handArea = hudRoot.Find("HandArea");
+            if (handArea != null)
+                Undo.DestroyObjectImmediate(handArea.gameObject);
+            var hudSo = new SerializedObject(hud);
+            hudSo.FindProperty("bottomReservedArea").objectReferenceValue = null;
+            hudSo.ApplyModifiedProperties();
+
+            // The old opponents' hands.
+            foreach (GameObject sceneRoot in scene.GetRootGameObjects())
+            {
+                if (sceneRoot.name == "OpponentHands")
+                    Undo.DestroyObjectImmediate(sceneRoot);
+            }
+
+            BuildTableHands(scene, controller, cardPrefab, drawPile, preview, previewReason);
+            EditorSceneManager.MarkSceneDirty(scene);
+            Debug.Log("MatchHudBuilder: set up the TableHands. Save the scene.");
+        }
+
+        // A World Space canvas lying on the table; TableHandsView lays the hands out when the match starts.
+        private static void BuildTableHands(Scene scene, MatchController controller, CardView cardPrefab,
+            DrawPileView drawPile, CardView preview, TMP_Text previewReason)
+        {
+            DiscardPileView discardPile = null;
+            foreach (GameObject sceneRoot in scene.GetRootGameObjects())
+            {
+                if (sceneRoot.GetComponent<TableHandsView>() != null)
+                    Undo.DestroyObjectImmediate(sceneRoot);
+                else if (discardPile == null)
+                    discardPile = sceneRoot.GetComponentInChildren<DiscardPileView>(true);
+            }
+
+            var handsObject = new GameObject("TableHands", typeof(RectTransform));
             SceneManager.MoveGameObjectToScene(handsObject, scene);
-            Undo.RegisterCreatedObjectUndo(handsObject, "Add Opponent Hands");
+            Undo.RegisterCreatedObjectUndo(handsObject, "Set Up Table Hands");
             Canvas canvas = handsObject.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.WorldSpace;
-            canvas.sortingOrder = 5; // above the table and mat sprites
+            canvas.sortingOrder = 6;
+            handsObject.AddComponent<GraphicRaycaster>();
 
-            OpponentHandsView view = handsObject.AddComponent<OpponentHandsView>();
+            TableHandsView view = handsObject.AddComponent<TableHandsView>();
             var so = new SerializedObject(view);
             so.FindProperty("matchController").objectReferenceValue = controller;
-            so.FindProperty("handView").objectReferenceValue = handView;
+            so.FindProperty("cardPrefab").objectReferenceValue = cardPrefab;
             so.FindProperty("drawPile").objectReferenceValue = drawPile;
             so.FindProperty("discardPile").objectReferenceValue = discardPile;
+            so.FindProperty("preview").objectReferenceValue = preview;
+            so.FindProperty("previewReason").objectReferenceValue = previewReason;
             so.ApplyModifiedPropertiesWithoutUndo();
-
-            EditorSceneManager.MarkSceneDirty(scene);
-            Selection.activeGameObject = handsObject;
-            Debug.Log("MatchHudBuilder: added the OpponentHands on the table. Save the scene.");
         }
 
         // A fixed-size box in the middle of the parent.

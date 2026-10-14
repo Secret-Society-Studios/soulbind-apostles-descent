@@ -8,7 +8,7 @@ using UnityEngine.UI;
 namespace SoulBind.UI
 {
     /// <summary>
-    /// The shared draw pile, lying face-down on the table below the discard pile. The stack gets
+    /// The shared draw pile, lying face-down on the mat in its left corner. The stack gets
     /// thinner as cards are drawn, and the count under it says exactly how many are left.
     /// When it runs out, the rules shuffle the discard pile back in and the stack grows again.
     /// Display only: drawing is done by the rules at the end of each turn.
@@ -29,11 +29,6 @@ namespace SoulBind.UI
         [Header("Art (optional: empty keeps the placeholder back)")]
         [SerializeField] private Sprite cardBackSprite;
 
-        [Header("On the table")]
-        [Tooltip("Height of one card on the table, in world units (a hex tile is about 1).")]
-        [SerializeField] private float cardWorldHeight = 2.4f;
-        [Tooltip("How far below the middle of the side area the pile sits, in card heights.")]
-        [SerializeField] private float heightOffset = 0.65f;
 
         [Header("Stack")]
         [Tooltip("One card edge is drawn for every this many cards, so a full deck looks thick.")]
@@ -115,17 +110,19 @@ namespace SoulBind.UI
                 cardBackTemplate.GetChild(i).gameObject.SetActive(false);
         }
 
-        // Lies flat on the board's plane, below the discard pile.
+        // Lies flat on the mat, in its left corner beside the board.
         private void PlaceOnTable()
         {
             BoardView board = matchController.BoardView;
+            float cardHeight = board != null ? board.PileCardHeight : 2.4f;
             float slotHeight = slot.rect.height > 0f ? slot.rect.height : 252f;
-            float scale = cardWorldHeight / slotHeight;
+            float scale = cardHeight / slotHeight;
             transform.localScale = new Vector3(scale, scale, scale);
             transform.rotation = Quaternion.identity; // facing -Z, like the board
 
-            Vector3 center = board != null ? board.SideAreaCenter : transform.position;
-            transform.position = center + new Vector3(0f, -cardWorldHeight * heightOffset, -0.01f);
+            // A hair toward the camera so it never fights with the mat.
+            Vector3 spot = board != null ? board.DrawPileSpot : transform.position;
+            transform.position = spot + new Vector3(0f, 0f, -0.01f);
         }
 
         private RectTransform CreateLayer(int index)
