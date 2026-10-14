@@ -1,6 +1,8 @@
+using System;
 using SoulBind.Core;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace SoulBind.UI
@@ -10,7 +12,7 @@ namespace SoulBind.UI
     /// Display only. Bars are fill rectangles whose width is set from the numbers, so they work
     /// with placeholder art and with real sprites later.
     /// </summary>
-    public sealed class ApostlePanelView : MonoBehaviour
+    public sealed class ApostlePanelView : MonoBehaviour, IPointerClickHandler
     {
         // The Corruption bar is full at this value (Corruption itself has no cap).
         private const int CorruptionBarMax = 15;
@@ -34,8 +36,12 @@ namespace SoulBind.UI
         [SerializeField] private Color eliminatedBackground = new Color(0.10f, 0.10f, 0.10f, 0.80f);
         [SerializeField] private Color corruptionColor = new Color(0.55f, 0.30f, 0.70f);
         [SerializeField] private Color corruptedColor = new Color(0.85f, 0.15f, 0.30f);
+        [SerializeField] private Color pickableBackground = new Color(0.55f, 0.20f, 0.45f, 0.95f);
 
         public int ApostleId { get; private set; }
+
+        /// <summary>Raised with the Apostle's id when the portrait is left-clicked.</summary>
+        public event Action<int> Clicked;
 
         public void Initialize(int apostleId, Color color)
         {
@@ -46,14 +52,22 @@ namespace SoulBind.UI
                 nameText.text = $"Apostle {apostleId}";
             if (portraitText != null)
                 portraitText.text = $"A{apostleId}";
+
+            // The background catches clicks, so the portrait can be picked as a target.
+            if (background != null)
+                background.raycastTarget = true;
         }
 
-        /// <summary>Shows the Apostle's current numbers. Called whenever the match state changes.</summary>
-        public void Show(ApostleState apostle, bool isCurrentTurn, bool isAwakened)
+        /// <summary>
+        /// Shows the Apostle's current numbers. Called whenever the match state changes.
+        /// isPickable highlights the portrait when the player is choosing a target for an effect.
+        /// </summary>
+        public void Show(ApostleState apostle, bool isCurrentTurn, bool isAwakened, bool isPickable = false)
         {
             if (background != null)
             {
                 background.color = apostle.IsEliminated ? eliminatedBackground
+                    : isPickable ? pickableBackground
                     : isCurrentTurn ? currentTurnBackground
                     : normalBackground;
             }
@@ -61,6 +75,7 @@ namespace SoulBind.UI
             if (statusText != null)
             {
                 statusText.text = apostle.IsEliminated ? "OUT"
+                    : isPickable ? "CLICK TO PICK"
                     : isAwakened ? "AWAKENED"
                     : isCurrentTurn ? "TURN"
                     : string.Empty;
@@ -83,6 +98,12 @@ namespace SoulBind.UI
                     ? $"Souls {apostle.Souls}/{GameConstants.SoulsToAwaken}   DEF {apostle.Defense}   Soullocked"
                     : $"Souls {apostle.Souls}/{GameConstants.SoulsToAwaken}   DEF {apostle.Defense}";
             }
+        }
+
+        public void OnPointerClick(PointerEventData eventData)
+        {
+            if (eventData.button == PointerEventData.InputButton.Left)
+                Clicked?.Invoke(ApostleId);
         }
 
         // A bar's fill stretches from the left edge to this fraction of the bar's width.

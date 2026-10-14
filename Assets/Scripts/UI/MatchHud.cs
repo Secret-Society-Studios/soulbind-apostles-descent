@@ -93,7 +93,8 @@ namespace SoulBind.UI
                 if (!isCurrent)
                     panel.transform.SetSiblingIndex(i);
 
-                panel.Show(apostle, isCurrent, ascension.HasAwakened && ascension.AwakenedId == apostle.Id);
+                bool isPickable = matchController.IsChoosingComboTarget && !isCurrent && !apostle.IsEliminated;
+                panel.Show(apostle, isCurrent, ascension.HasAwakened && ascension.AwakenedId == apostle.Id, isPickable);
             }
         }
 
@@ -110,8 +111,19 @@ namespace SoulBind.UI
                 ApostlePanelView panel = Instantiate(panelPrefab, opponentRow);
                 panel.name = $"Apostle {apostle.Id} Portrait";
                 panel.Initialize(apostle.Id, ApostleColors.Get(apostle.Id));
+                panel.Clicked += OnPortraitClicked;
                 _panels.Add(panel);
             }
+        }
+
+        // A portrait click picks the Nocturne combo's target while the player is choosing one.
+        private void OnPortraitClicked(int apostleId)
+        {
+            if (matchController == null || !matchController.IsChoosingComboTarget)
+                return;
+            ApostleState current = matchController.CurrentMatch.CurrentApostle;
+            if (current != null && current.Id != apostleId)
+                matchController.ChooseComboTarget(apostleId);
         }
 
         private void ShowTurnInfo(Match match)

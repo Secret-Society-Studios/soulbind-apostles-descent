@@ -36,6 +36,22 @@ namespace SoulBind.Managers
 
         public BoardView BoardView => boardView;
 
+        // ---- Hand play state (read by the HUD) ----
+
+        /// <summary>True while an ATK card is selected and waiting for a target click.</summary>
+        public bool HasSelectedCard { get; private set; }
+
+        /// <summary>The selected card. Only meaningful while HasSelectedCard is true.</summary>
+        public ArcanaId SelectedCard { get; private set; }
+
+        /// <summary>True while a played card waits for the player to pick the Nocturne combo's target.</summary>
+        public bool IsChoosingComboTarget { get; private set; }
+
+        /// <summary>A one-line instruction for the player (empty when there is nothing special to do).</summary>
+        public string Hint { get; private set; } = string.Empty;
+
+        private ArcanaId _comboCard;
+
         // True while someone's turn is active and the match is still running.
         private bool CanAct => CurrentMatch != null && !CurrentMatch.IsOver && CurrentMatch.CurrentApostle != null;
 
@@ -84,7 +100,17 @@ namespace SoulBind.Managers
             if (!CanAct)
                 return;
 
+            Keyboard keyboard = Keyboard.current;
             Mouse mouse = Mouse.current;
+
+            // Esc or right-click cancels a selected card or a pending combo target.
+            if ((keyboard != null && keyboard.escapeKey.wasPressedThisFrame)
+                || (mouse != null && mouse.rightButton.wasPressedThisFrame))
+            {
+                if (HasSelectedCard || IsChoosingComboTarget)
+                    CancelSelection();
+            }
+
             if (mouse == null || !mouse.leftButton.wasPressedThisFrame)
                 return;
 
@@ -92,12 +118,150 @@ namespace SoulBind.Managers
             if (hud != null && hud.ContainsScreenPoint(screenPoint))
                 return;
 
-            // Clicks on UI that can be clicked (cards, buttons) are not board clicks.
+            // Clicks on UI that can be clicked (cards, buttons, portraits) are not board clicks.
             if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
                 return;
 
-            if (boardView.TryGetTileAtScreen(screenPoint, out HexCoord tile))
-                TryMove(tile);
+            if (!boardView.TryGetTileAtScreen(screenPoint, out HexCoord tile))
+                return;
+
+            ApostleState clicked = CurrentMatch.Battlefield.GetApostleAt(tile);
+
+            // A selected ATK card: clicking a red-ringed Apostle attacks it. Other clicks do nothing.
+            if (HasSelectedCard)
+            {
+                if (clicked != null && IsAttackTarget(clicked))
+                    PlayFromHand(SelectedCard, clicked.Id, 0);
+                return;
+            }
+
+            // Picking the Nocturne combo's target: clicking an opponent's disc works too.
+            if (IsChoosingComboTarget)
+            {
+                if (clicked != null && clicked != CurrentMatch.CurrentApostle)
+                    ChooseComboTarget(clicked.Id);
+                return;
+            }
+
+            TryMove(tile);
+        }
+
+        // ---- Playing cards from the hand (the real UI) ----
+
+        /// <summary>
+        /// Why this card cannot be played right now, or null if it can. Shown when hovering a dimmed card.
+        /// </summary>
+        public string GetUnplayableReason(ArcanaId card)
+        {
+            if (!CanAct)
+                return "Not your turn";
+            if (CurrentMatch.Engagement == EngagementState.Disengaged)
+                return "No more cards after Strike";
+            int cap = CardCatalog.Get(card).Cap;
+            if (cap > CurrentMatch.CurrentCapacity.Remaining)
+                return $"Needs {cap} Capacity";
+            return null;
+        }
+
+        /// <summary>
+        /// A card in the hand was clicked. ATK cards with enemies in reach are selected first, so the
+        /// player can click a target; everything else is played straight away.
+        /// </summary>
+        public void ClickCard(ArcanaId card)
+        {
+            if (!CanAct || IsChoosingComboTarget)
+                return;
+
+            string reason = GetUnplayableReason(card);
+            if (reason != null)
+            {
+                Debug.Log($"MatchController: {CardCatalog.Get(card).Name} can't be played: {reason}.");
+                return;
+            }
+
+            // Clicking the selected card again deselects it.
+            if (HasSelectedCard && SelectedCard == card)
+            {
+                CancelSelection();
+                return;
+            }
+
+            CardDefinition definition = CardCatalog.Get(card);
+            if (CurrentMatch.Engagement == EngagementState.Engaged || definition.Attack == 0)
+            {
+                PlayFromHand(card, 0, 0);
+                return;
+            }
+
+            CurrentMatch.GetAttackTargets(_attackTargets);
+            if (_attackTargets.Count == 0)
+            {
+                PlayFromHand(card, 0, 0);
+                return;
+            }
+
+            HasSelectedCard = true;
+            SelectedCard = card;
+            AfterStateChange();
+        }
+
+        /// <summary>Plays the selected ATK card for its DEF only (its ATK is lost).</summary>
+        public void PlaySelectedWithoutAttacking()
+        {
+            if (HasSelectedCard)
+                PlayFromHand(SelectedCard, 0, 0);
+        }
+
+        /// <summary>Cancels a selected card or a pending combo target. Nothing is spent.</summary>
+        public void CancelSelection()
+        {
+            HasSelectedCard = false;
+            IsChoosingComboTarget = false;
+            if (CurrentMatch != null)
+                AfterStateChange();
+        }
+
+        /// <summary>Finishes playing the card that was waiting for its Nocturne combo target.</summary>
+        public void ChooseComboTarget(int apostleId)
+        {
+            if (IsChoosingComboTarget)
+                PlayFromHand(_comboCard, 0, apostleId);
+        }
+
+        private bool IsAttackTarget(ApostleState apostle)
+        {
+            CurrentMatch.GetAttackTargets(_attackTargets);
+            return _attackTargets.Contains(apostle);
+        }
+
+        private void PlayFromHand(ArcanaId card, int targetId, int comboTargetId)
+        {
+            int playerId = CurrentMatch.CurrentApostle.Id;
+            CardPlayResult result = CurrentMatch.PlayCard(card, targetId, comboTargetId);
+
+            if (result == CardPlayResult.ComboTargetRequired)
+            {
+                // Ask the player who the Nocturne combo should hit, then play the card.
+                HasSelectedCard = false;
+                IsChoosingComboTarget = true;
+                _comboCard = card;
+                AfterStateChange();
+                return;
+            }
+
+            HasSelectedCard = false;
+            IsChoosingComboTarget = false;
+
+            if (result != CardPlayResult.Success)
+            {
+                Debug.Log($"MatchController: {CardCatalog.Get(card).Name} rejected ({result}).");
+                AfterStateChange();
+                return;
+            }
+
+            Debug.Log($"MatchController: Apostle {playerId} played {CardCatalog.Get(card).Name}.");
+            LogIfOver();
+            AfterStateChange();
         }
 
         public void TryMove(HexCoord destination)
@@ -179,6 +343,8 @@ namespace SoulBind.Managers
             if (CurrentMatch == null || CurrentMatch.IsOver || CurrentMatch.IsAwaitingPhaseStart)
                 return;
 
+            HasSelectedCard = false;
+            IsChoosingComboTarget = false;
             CurrentMatch.EndTurn();
             LogIfOver();
             AfterStateChange();
@@ -189,6 +355,8 @@ namespace SoulBind.Managers
             if (CurrentMatch == null || CurrentMatch.IsOver || !CurrentMatch.IsAwaitingPhaseStart)
                 return;
 
+            HasSelectedCard = false;
+            IsChoosingComboTarget = false;
             CurrentMatch.BeginNextPhase(direction);
             AfterStateChange();
         }
@@ -240,7 +408,26 @@ namespace SoulBind.Managers
             boardView.ShowAscensionTile(CurrentMatch.Ascension.HasAwakened, CurrentMatch.Ascension.Tile);
             RefreshHighlights();
             RefreshAttackMarks();
+            Hint = BuildHint();
             StateChanged?.Invoke();
+        }
+
+        private string BuildHint()
+        {
+            Match match = CurrentMatch;
+            if (match.IsOver)
+                return string.Empty;
+            if (match.IsAwaitingPhaseStart)
+                return $"Apostle {match.GetNextPhaseChooserId()}: choose the turn direction.";
+            if (IsChoosingComboTarget)
+                return "Nocturne combo: click an opponent's portrait or disc. Right-click to cancel.";
+            if (HasSelectedCard)
+                return "Click a red-ringed Apostle to attack, or play it without attacking.";
+            if (match.Engagement == EngagementState.Engaged)
+                return $"Engaged with Apostle {match.EngagedTargetId}: add cards, or Strike.";
+            if (match.Engagement == EngagementState.Disengaged)
+                return "Attack done: you can still move, or end your turn.";
+            return string.Empty;
         }
 
         private void SyncViews()
