@@ -19,8 +19,8 @@ namespace SoulBind.Core
         public int Corruption { get; private set; }
 
         /// <summary>
-        /// DEF shield from played cards. Each attack's damage is reduced by it, and hits do not use it up.
-        /// Shields stack, and the whole shield clears at the start of this Apostle's next turn.
+        /// DEF shield from played cards. It absorbs attacks and is used up by the ATK it absorbs.
+        /// Shields stack, and whatever is left clears at the start of this Apostle's next turn.
         /// </summary>
         public int Shield { get; private set; }
 
@@ -30,7 +30,7 @@ namespace SoulBind.Core
         /// <summary>Effects that last for a number of this Apostle's turns.</summary>
         public IReadOnlyList<TimedEffect> TimedEffects => _timedEffects;
 
-        /// <summary>The DEF an attack has to beat: the shield plus any timed DEF bonus.</summary>
+        /// <summary>The DEF an attack has to get through: the shield plus any timed DEF bonus.</summary>
         public int Defense => Shield + GetTimedTotal(TimedEffectKind.Defense);
 
         public bool IsEliminated => Vessel <= 0;
@@ -146,6 +146,46 @@ namespace SoulBind.Core
 
             int starts = TurnsStarted + delayTurns;
             _timedEffects.Add(new TimedEffect(kind, amount, starts, starts + ownTurns));
+        }
+
+        /// <summary>
+        /// Uses DEF to absorb an attack and returns the ATK that gets through (the damage).
+        /// The shield absorbs first, then timed DEF, the soonest-expiring first. DEF that absorbs
+        /// ATK is used up: 3 DEF hit by 2 ATK leaves 1 DEF and no damage.
+        /// </summary>
+        public int AbsorbAttack(int attack)
+        {
+            RequireNonNegative(attack, nameof(attack));
+
+            int fromShield = Math.Min(Shield, attack);
+            Shield -= fromShield;
+            int remaining = attack - fromShield;
+
+            while (remaining > 0)
+            {
+                // The active timed DEF that expires soonest.
+                int soonest = -1;
+                for (int i = 0; i < _timedEffects.Count; i++)
+                {
+                    TimedEffect effect = _timedEffects[i];
+                    if (effect.Kind != TimedEffectKind.Defense || effect.Amount == 0 || !effect.IsActiveOn(TurnsStarted))
+                        continue;
+                    if (soonest < 0 || effect.ExpiresOnTurn < _timedEffects[soonest].ExpiresOnTurn)
+                        soonest = i;
+                }
+                if (soonest < 0)
+                    break;
+
+                TimedEffect used = _timedEffects[soonest];
+                int absorbed = Math.Min(used.Amount, remaining);
+                remaining -= absorbed;
+                if (used.Amount == absorbed)
+                    _timedEffects.RemoveAt(soonest);
+                else
+                    _timedEffects[soonest] = new TimedEffect(used.Kind, used.Amount - absorbed, used.StartsOnTurn, used.ExpiresOnTurn);
+            }
+
+            return remaining;
         }
 
         /// <summary>The total amount of every timed effect of this kind that is active right now.</summary>

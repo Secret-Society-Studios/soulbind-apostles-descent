@@ -75,20 +75,6 @@ namespace SoulBind.Tests.EditMode
         }
 
         [Test]
-        public void Resolve_ShieldIsNotUsedUpByHits()
-        {
-            ApostleState attacker = Attacker();
-            ApostleState target = Target();
-            target.AddShield(4);
-
-            Combat.Resolve(attacker, target, 6);
-            Combat.Resolve(attacker, target, 6);
-
-            Assert.AreEqual(4, target.Shield);
-            Assert.AreEqual(46, target.Vessel);
-        }
-
-        [Test]
         public void Resolve_FailsToBreakDefense_ChangesNothing()
         {
             ApostleState attacker = Attacker();

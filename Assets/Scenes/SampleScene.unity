@@ -1444,6 +1444,10 @@ MonoBehaviour:
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
+    - rid: 857196054553034826
+      type: {class: 'Provider2DCache`1[[UnityEngine.Rendering.Universal.Light2DProvider, Unity.RenderPipelines.Universal.2D.Runtime]]', ns: UnityEngine.Rendering.Universal, asm: Unity.RenderPipelines.Universal.2D.Runtime}
+      data:
+        m_Cache: []
     - rid: 1367335331630678026
       type: {class: Light2DProviderSources, ns: UnityEngine.Rendering.Universal, asm: Unity.RenderPipelines.Universal.2D.Runtime}
       data:
@@ -1451,7 +1455,7 @@ MonoBehaviour:
         m_SelectedSource:
           rid: -2
         m_Provider2DCache:
-          rid: -2
+          rid: 857196054553034826
 --- !u!4 &619394802
 Transform:
   m_ObjectHideFlags: 0
@@ -1866,6 +1870,11 @@ MonoBehaviour:
   ascensionTileColor: {r: 1, g: 0.8, b: 0.2, a: 1}
   ascensionHighlightColor: {r: 1, g: 0.95, b: 0.6, a: 1}
   attackTargetColor: {r: 0.45, g: 0.08, b: 0.1, a: 1}
+  plainTileSprite: {fileID: 0}
+  edgeTileSprite: {fileID: 0}
+  healTileSprite: {fileID: 21300000, guid: 6c5b9f72dd08ca1499f4bd18861e8721, type: 3}
+  purifyTileSprite: {fileID: 21300000, guid: 5229c63e44548224186110c0cea67323, type: 3}
+  soulTileSprite: {fileID: 21300000, guid: 06959a0cf8b7983459626606e8ecfb0e, type: 3}
   fitCameraToBoard: 1
   cameraMargin: 1
   cameraTilt: 35

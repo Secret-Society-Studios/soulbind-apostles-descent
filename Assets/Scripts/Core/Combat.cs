@@ -9,7 +9,7 @@ namespace SoulBind.Core
     /// </summary>
     public static class Combat
     {
-        /// <summary>Damage = total ATK minus the target's DEF, minimum 0.</summary>
+        /// <summary>Damage = ATK minus DEF, minimum 0 (before any DEF is used up).</summary>
         public static int GetDamage(int totalAttack, int targetDefense) => Math.Max(0, totalAttack - targetDefense);
 
         /// <summary>
@@ -28,12 +28,13 @@ namespace SoulBind.Core
         }
 
         /// <summary>
-        /// One hit on one target, against its DEF (shield plus timed DEF). On a hit (damage above 0):
+        /// One hit on one target. The target's DEF (shield, then timed DEF) absorbs the ATK first and is
+        /// used up by what it absorbs; whatever gets through is the damage. On a hit (damage above 0):
         /// 1. the target takes the damage;
         /// 2. unless the attacker is Soullocked, 1 Soul moves from the target to the attacker.
         /// The attacker's +1 Corruption for attacking is NOT added here (see Resolve and Match.Strike).
         /// On a failed hit (0 damage) nothing happens, except that a target protected by The Moon
-        /// gives the attacker its Corruption (reported in CorruptionGained). DEF is never used up.
+        /// gives the attacker its Corruption (reported in CorruptionGained).
         /// </summary>
         public static AttackOutcome ResolveHit(ApostleState attacker, ApostleState target, int attack)
         {
@@ -50,7 +51,7 @@ namespace SoulBind.Core
             if (target.IsEliminated)
                 throw new InvalidOperationException("An eliminated Apostle cannot be attacked.");
 
-            int damage = GetDamage(attack, target.Defense);
+            int damage = target.AbsorbAttack(attack);
             if (damage == 0)
             {
                 int punishment = target.GetTimedTotal(TimedEffectKind.FailedAttackCorruption);
