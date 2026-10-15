@@ -25,6 +25,9 @@ namespace SoulBind.EditorTools
         private const float CardHeight = 252f;
         private const float ActionWidth = 350f;
         private const float PreviewScale = 1.6f;
+        private const float PreviewRaise = 90f;   // the preview sits a little above the middle of the right edge
+        private const float HintWidth = 560f;
+        private const float HintHeight = 80f;
 
         private static readonly Color FrameColor = new Color(0.62f, 0.48f, 0.24f);
         private static readonly Color CardInnerColor = new Color(0.12f, 0.11f, 0.18f);
@@ -109,8 +112,9 @@ namespace SoulBind.EditorTools
             column.childForceExpandWidth = true;
             column.childForceExpandHeight = false;
 
-            TMP_Text hintText = CreateText("HintText", actionArea, "", 18f, TextAlignmentOptions.BottomRight);
-            hintText.gameObject.AddComponent<LayoutElement>().preferredHeight = 54f;
+            // The hint sits in the bottom-left corner, away from the hands on the table.
+            TMP_Text hintText = CreateText("HintText", root, "", 20f, TextAlignmentOptions.BottomLeft);
+            Corner(hintText.rectTransform, Vector2.zero, new Vector2(EdgeMargin, EdgeMargin), new Vector2(HintWidth, HintHeight));
             Button forwardButton = CreateButton("ForwardButton", actionArea, "Turn direction: Forward", ButtonColor, out _);
             Button backwardButton = CreateButton("BackwardButton", actionArea, "Turn direction: Backward", ButtonColor, out _);
             Button strikeButton = CreateButton("StrikeButton", actionArea, "Strike", StrikeColor, out TMP_Text strikeLabel);
@@ -122,15 +126,13 @@ namespace SoulBind.EditorTools
             var previewObject = (GameObject)PrefabUtility.InstantiatePrefab(cardPrefab.gameObject, root);
             previewObject.name = "CardPreview";
             var previewRect = (RectTransform)previewObject.transform;
-            Corner(previewRect, new Vector2(1f, 0.5f),
-                new Vector2(-(EdgeMargin * 2f + ActionWidth), 60f), new Vector2(CardWidth, CardHeight));
-            previewRect.pivot = new Vector2(1f, 0.5f);
+            Corner(previewRect, new Vector2(1f, 0.5f), new Vector2(-EdgeMargin, PreviewRaise), new Vector2(CardWidth, CardHeight));
             previewRect.localScale = Vector3.one * PreviewScale;
             CardView preview = previewObject.GetComponent<CardView>();
 
             TMP_Text previewReason = CreateText("PreviewReason", root, "", 22f, TextAlignmentOptions.Center);
             Corner(previewReason.rectTransform, new Vector2(1f, 0.5f),
-                new Vector2(-(EdgeMargin * 2f + ActionWidth), 60f - CardHeight * PreviewScale / 2f - 10f),
+                new Vector2(-EdgeMargin, PreviewRaise - CardHeight * PreviewScale / 2f - 10f),
                 new Vector2(CardWidth * PreviewScale, 36f));
             previewReason.rectTransform.pivot = new Vector2(1f, 1f);
             previewReason.color = new Color(1f, 0.55f, 0.45f);
@@ -457,6 +459,74 @@ namespace SoulBind.EditorTools
             so.FindProperty("preview").objectReferenceValue = preview;
             so.FindProperty("previewReason").objectReferenceValue = previewReason;
             so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        /// <summary>
+        /// Moves the HUD pieces that covered the table: the large card preview goes to the right edge of the
+        /// screen (it was over the board) and the hint goes to the bottom-left corner (it was over the
+        /// bottom-right hand). Nothing is rebuilt.
+        /// </summary>
+        [MenuItem("SoulBind/Tidy HUD Layout")]
+        private static void TidyHudLayout()
+        {
+            Scene scene = SceneManager.GetActiveScene();
+            MatchHud hud = null;
+            foreach (GameObject sceneRoot in scene.GetRootGameObjects())
+            {
+                hud = sceneRoot.GetComponentInChildren<MatchHud>(true);
+                if (hud != null)
+                    break;
+            }
+            if (hud == null)
+            {
+                EditorUtility.DisplayDialog("Tidy HUD Layout", "Couldn't find the MatchHud in the open scene.", "OK");
+                return;
+            }
+            Transform root = hud.transform;
+
+            Transform hint = root.Find("ActionArea/HintText");
+            if (hint == null)
+                hint = root.Find("HintText");
+            if (hint != null)
+            {
+                if (hint.parent != root)
+                    Undo.SetTransformParent(hint, root, "Tidy HUD Layout");
+                LayoutElement layout = hint.GetComponent<LayoutElement>();
+                if (layout != null)
+                    Undo.DestroyObjectImmediate(layout);
+                var hintRect = (RectTransform)hint;
+                Undo.RecordObject(hintRect, "Tidy HUD Layout");
+                Corner(hintRect, Vector2.zero, new Vector2(EdgeMargin, EdgeMargin), new Vector2(HintWidth, HintHeight));
+                TMP_Text hintText = hint.GetComponent<TMP_Text>();
+                if (hintText != null)
+                {
+                    Undo.RecordObject(hintText, "Tidy HUD Layout");
+                    hintText.alignment = TextAlignmentOptions.BottomLeft;
+                    hintText.fontSize = 20f;
+                }
+            }
+
+            Transform preview = root.Find("CardPreview");
+            if (preview != null)
+            {
+                var previewRect = (RectTransform)preview;
+                Undo.RecordObject(previewRect, "Tidy HUD Layout");
+                Corner(previewRect, new Vector2(1f, 0.5f), new Vector2(-EdgeMargin, PreviewRaise), new Vector2(CardWidth, CardHeight));
+            }
+
+            Transform reason = root.Find("PreviewReason");
+            if (reason != null)
+            {
+                var reasonRect = (RectTransform)reason;
+                Undo.RecordObject(reasonRect, "Tidy HUD Layout");
+                Corner(reasonRect, new Vector2(1f, 0.5f),
+                    new Vector2(-EdgeMargin, PreviewRaise - CardHeight * PreviewScale / 2f - 10f),
+                    new Vector2(CardWidth * PreviewScale, 36f));
+                reasonRect.pivot = new Vector2(1f, 1f);
+            }
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            Debug.Log("MatchHudBuilder: moved the card preview to the right edge and the hint to the bottom-left. Save the scene.");
         }
 
         // A fixed-size box in the middle of the parent.

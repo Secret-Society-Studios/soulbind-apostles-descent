@@ -1,0 +1,70 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1805e81d75385f740b16d418217289f8, type: 3}
+  m_Name: CardArtLibrary
+  m_EditorClassIdentifier: Assembly-CSharp::SoulBind.UI.CardArtLibrary
+  cards:
+  - Card: 0
+    Front: {fileID: -3992758806321180441, guid: 0c3a26651a43c244aa27b47d153f6820, type: 3}
+  - Card: 1
+    Front: {fileID: 0}
+  - Card: 2
+    Front: {fileID: 0}
+  - Card: 3
+    Front: {fileID: 0}
+  - Card: 4
+    Front: {fileID: -6687292777056790244, guid: 825814040b65f914eb81a49e49f1a1ae, type: 3}
+  - Card: 5
+    Front: {fileID: -3213800471159119467, guid: 780e2ddfb109e9c498aac98dba3347de, type: 3}
+  - Card: 6
+    Front: {fileID: 0}
+  - Card: 7
+    Front: {fileID: 6844948494742506645, guid: 5e7fc95f6fa71d04fb7cc9c9a7b6b0a2, type: 3}
+  - Card: 8
+    Front: {fileID: -882413176719121340, guid: 6e5e06991e9e0c946ba535a9a4d67a93, type: 3}
+  - Card: 9
+    Front: {fileID: 0}
+  - Card: 10
+    Front: {fileID: 1335688807592803634, guid: 4afed777611c6444e89f655313ba9a21, type: 3}
+  - Card: 11
+    Front: {fileID: 2863098434423654983, guid: 8669045bd82cf994b8da3a8139e33e82, type: 3}
+  - Card: 12
+    Front: {fileID: 0}
+  - Card: 13
+    Front: {fileID: 0}
+  - Card: 14
+    Front: {fileID: 4444793221146693013, guid: 2df28eee1cbf141459dbc7c66041789a, type: 3}
+  - Card: 15
+    Front: {fileID: 0}
+  - Card: 16
+    Front: {fileID: 5409624603229534466, guid: 1fcc1d87f9b634c4b8a6ad2c0e276820, type: 3}
+  - Card: 17
+    Front: {fileID: -2966393928699838787, guid: 450104da7cee62a4cab9c752623f3a4a, type: 3}
+  - Card: 18
+    Front: {fileID: 0}
+  - Card: 19
+    Front: {fileID: 0}
+  - Card: 20
+    Front: {fileID: 0}
+  - Card: 21
+    Front: {fileID: 0}
+  radiance: {fileID: 6260608743904350398, guid: bc4f849816a8b214d93c82137a3e2d47, type: 3}
+  celeste: {fileID: 512221558520008520, guid: cbff794e6d5557f44a9fd255d6828979, type: 3}
+  crimson: {fileID: 4547201754921520971, guid: ab6f0d3deb8363649b4cba72535ca54e, type: 3}
+  nocturne: {fileID: -2933093236530103955, guid: be0789f453fe05f4a8e6569374c0ce5f, type: 3}
+  attackIcon: {fileID: -7008412969330441016, guid: 66bbca666a4409f468f64092bb53a2a3, type: 3}
+  defenseIcon: {fileID: 7116004456955076645, guid: 129bfe7246df08d45ba767b1a40a4633, type: 3}
+  capIcon: {fileID: -903516170810695451, guid: c871e10c25f160b49b878758b24cb9aa, type: 3}
+  frontIsComplete: 1
+  hidePlatesOverArt: 1
+  showNameOverArt: 1
+  textColorOverArt: {r: 0.12, g: 0.1, b: 0.08, a: 1}

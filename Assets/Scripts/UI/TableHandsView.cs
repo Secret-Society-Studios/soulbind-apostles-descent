@@ -25,7 +25,7 @@ namespace SoulBind.UI
     {
         private const float CardWidth = 180f;
         private const float CardHeight = 252f;
-        private const float LabelHeight = 44f;
+        private const float LabelHeight = 56f;
         private const int ArcanaSlots = 32;
 
         [SerializeField] private MatchController matchController;
@@ -42,7 +42,9 @@ namespace SoulBind.UI
         [Tooltip("Height of an opponent's card on the table, in world units (a hex tile is about 1).")]
         [SerializeField] private float cardWorldHeight = 1.4f;
         [Tooltip("Your own cards are this much bigger, so they are easier to read.")]
-        [SerializeField] private float yourCardScale = 1.25f;
+        [SerializeField] private float yourCardScale = 1.4f;
+        [Tooltip("Size of the names under the hands (\"A3  5 cards\").")]
+        [SerializeField] private float labelFontSize = 44f;
         [Tooltip("Gap between neighbouring cards, in canvas pixels. Cards overlap only when a hand is too long for its side.")]
         [SerializeField] private float cardGap = 10f;
         [SerializeField] private Color trayColor = new Color(0.04f, 0.04f, 0.07f, 0.8f);
@@ -268,7 +270,10 @@ namespace SoulBind.UI
                 labelRect.localRotation = Quaternion.Euler(0f, 0f, -rotation);
                 TextMeshProUGUI label = labelRect.gameObject.AddComponent<TextMeshProUGUI>();
                 label.alignment = TextAlignmentOptions.Center;
-                label.fontSize = 30f;
+                label.fontSize = labelFontSize;
+                label.enableAutoSizing = true;
+                label.fontSizeMin = 18f;
+                label.fontSizeMax = labelFontSize;
                 label.fontStyle = FontStyles.Bold;
                 label.color = ApostleColors.Get(apostle.Id);
                 label.raycastTarget = false;
