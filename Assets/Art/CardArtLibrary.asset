@@ -18,9 +18,9 @@ MonoBehaviour:
   - Card: 1
     Front: {fileID: 0}
   - Card: 2
-    Front: {fileID: 0}
+    Front: {fileID: -2257430869594077242, guid: 2ac35d00f722dd74892f65636dc42d0f, type: 3}
   - Card: 3
-    Front: {fileID: 0}
+    Front: {fileID: 7186141821913553885, guid: 8c998fb3b28b47b4a8a99c66f29f131e, type: 3}
   - Card: 4
     Front: {fileID: -6687292777056790244, guid: 825814040b65f914eb81a49e49f1a1ae, type: 3}
   - Card: 5
@@ -32,31 +32,31 @@ MonoBehaviour:
   - Card: 8
     Front: {fileID: -882413176719121340, guid: 6e5e06991e9e0c946ba535a9a4d67a93, type: 3}
   - Card: 9
-    Front: {fileID: 0}
+    Front: {fileID: 5754730943217366316, guid: cee0a4ff4992fef4f88358c9f020b242, type: 3}
   - Card: 10
     Front: {fileID: 1335688807592803634, guid: 4afed777611c6444e89f655313ba9a21, type: 3}
   - Card: 11
     Front: {fileID: 2863098434423654983, guid: 8669045bd82cf994b8da3a8139e33e82, type: 3}
   - Card: 12
-    Front: {fileID: 0}
+    Front: {fileID: 8354008295193314498, guid: bd237a370b4264344a343e05215edc4e, type: 3}
   - Card: 13
-    Front: {fileID: 0}
+    Front: {fileID: 2562441860924461356, guid: 3f3332c17f1e1ea4cafbfbf190a360d5, type: 3}
   - Card: 14
     Front: {fileID: 4444793221146693013, guid: 2df28eee1cbf141459dbc7c66041789a, type: 3}
   - Card: 15
-    Front: {fileID: 0}
+    Front: {fileID: 8318793707748606945, guid: 35b44f8080cb2a3458674f97bf70dcaf, type: 3}
   - Card: 16
     Front: {fileID: 5409624603229534466, guid: 1fcc1d87f9b634c4b8a6ad2c0e276820, type: 3}
   - Card: 17
     Front: {fileID: -2966393928699838787, guid: 450104da7cee62a4cab9c752623f3a4a, type: 3}
   - Card: 18
-    Front: {fileID: 0}
+    Front: {fileID: 8486423040945659499, guid: 7e4b09546bfcc4a4f83fc358a5e75db7, type: 3}
   - Card: 19
-    Front: {fileID: 0}
+    Front: {fileID: -8398731560629403699, guid: 3f66720ce28a27449af1a34e1e04bfee, type: 3}
   - Card: 20
     Front: {fileID: 0}
   - Card: 21
-    Front: {fileID: 0}
+    Front: {fileID: -6535494078595949869, guid: 31480c16bf7fcc5489a2e3e7cd029ab7, type: 3}
   radiance: {fileID: 6260608743904350398, guid: bc4f849816a8b214d93c82137a3e2d47, type: 3}
   celeste: {fileID: 512221558520008520, guid: cbff794e6d5557f44a9fd255d6828979, type: 3}
   crimson: {fileID: 4547201754921520971, guid: ab6f0d3deb8363649b4cba72535ca54e, type: 3}
