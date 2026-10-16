@@ -26,6 +26,7 @@ namespace SoulBind.UI
         [Tooltip("Where the current Apostle's portrait goes, in the bottom-right corner.")]
         [SerializeField] private RectTransform playerSlot;
         [SerializeField] private ApostlePanelView panelPrefab;
+        [SerializeField] private ApostleArtLibrary apostleArt;
         [SerializeField] private TMP_Text roundText;
         [SerializeField] private TMP_Text turnText;
         [SerializeField] private TMP_Text capacityText;
@@ -116,6 +117,8 @@ namespace SoulBind.UI
                 ApostlePanelView panel = Instantiate(panelPrefab, opponentRow);
                 panel.name = $"Apostle {apostle.Id} Portrait";
                 panel.Initialize(apostle.Id, ApostleColors.Get(apostle.Id));
+                if (apostleArt != null)
+                    panel.SetPortrait(apostleArt.GetPortrait(apostle.Id));
                 panel.Clicked += OnPortraitClicked;
                 _panels.Add(panel);
             }

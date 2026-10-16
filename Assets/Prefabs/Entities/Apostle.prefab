@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1502219227778891495}
   - component: {fileID: 3952641701883434345}
+  - component: {fileID: -4773956332542254409}
   m_Layer: 0
   m_Name: Apostle
   m_TagString: Untagged
@@ -92,3 +93,19 @@ SpriteRenderer:
   m_WasSpriteAssigned: 0
   m_SpriteSortPoint: 0
   m_BlendShapeWeights: []
+--- !u!114 &-4773956332542254409
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2518714460669325445}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 81451ce917865e646a7067abe6769b06, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SoulBind.Entities.ApostleView
+  art: {fileID: 11400000, guid: 4492b7fd86db9534b89edd87b4a670f0, type: 2}
+  pieceScale: 0.6
+  pieceLift: -0.05
+  pieceYaw: 0

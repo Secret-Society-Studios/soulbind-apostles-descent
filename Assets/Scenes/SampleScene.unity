@@ -554,6 +554,7 @@ MonoBehaviour:
   opponentRow: {fileID: 1568647723}
   playerSlot: {fileID: 97799973}
   panelPrefab: {fileID: 757708277475402109, guid: ef262cb691694b04da03de1e51bd7993, type: 3}
+  apostleArt: {fileID: 11400000, guid: 4492b7fd86db9534b89edd87b4a670f0, type: 2}
   roundText: {fileID: 104998600}
   turnText: {fileID: 1843671764}
   capacityText: {fileID: 1895934297}

@@ -1,3 +1,4 @@
+using SoulBind.UI;
 using UnityEngine;
 
 namespace SoulBind.Entities
@@ -7,9 +8,18 @@ namespace SoulBind.Entities
     {
         private const int SortingOrder = 10;
         private const int HaloSortingOrder = 9;
+        private const int PieceSortingOrder = 11;
         private const float ActiveTurnScale = 1.25f;
         private const float HaloScale = 1.45f;
         private static readonly Color HaloColor = new Color(1f, 0.97f, 0.80f);
+
+        [Header("Board piece (optional: empty keeps just the disc)")]
+        [SerializeField] private ApostleArtLibrary art;
+        [SerializeField] private float pieceScale = 0.6f;
+        [Tooltip("Negative Z lifts the piece toward the camera, above the tiles.")]
+        [SerializeField] private float pieceLift = -0.05f;
+        [Tooltip("Set to 180 if you see the back of the standee.")]
+        [SerializeField] private float pieceYaw = 0f;
 
         private SpriteRenderer _renderer;
         private SpriteRenderer _halo;
@@ -30,6 +40,8 @@ namespace SoulBind.Entities
             _renderer.sprite = sprite;
             _renderer.color = color;
             _renderer.sortingOrder = SortingOrder;
+
+            SpawnPiece(apostleId);
         }
 
         /// <summary>The Apostle whose turn it is is drawn larger.</summary>
@@ -50,6 +62,24 @@ namespace SoulBind.Entities
                     return;
             }
             _halo.enabled = isAwakened;
+        }
+
+        // Puts the Apostle's standee (or pawn) on top of its colored disc.
+        private void SpawnPiece(int apostleId)
+        {
+            GameObject prefab = art != null ? art.GetPiece(apostleId) : null;
+            if (prefab == null)
+                return;
+
+            GameObject piece = Instantiate(prefab, transform);
+            piece.name = "Piece";
+            piece.transform.localPosition = new Vector3(0f, 0f, pieceLift);
+            // The models stand along +Y; the board faces -Z, so tip them up toward the camera.
+            piece.transform.localRotation = Quaternion.Euler(-90f, 0f, 0f) * Quaternion.Euler(0f, pieceYaw, 0f);
+            piece.transform.localScale = Vector3.one * pieceScale;
+
+            foreach (Renderer r in piece.GetComponentsInChildren<Renderer>())
+                r.sortingOrder = PieceSortingOrder;
         }
 
         // Builds the halo once: the same disc sprite, larger, behind the Apostle.

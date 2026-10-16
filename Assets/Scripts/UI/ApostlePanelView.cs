@@ -38,6 +38,8 @@ namespace SoulBind.UI
         [SerializeField] private Color corruptedColor = new Color(0.85f, 0.15f, 0.30f);
         [SerializeField] private Color pickableBackground = new Color(0.55f, 0.20f, 0.45f, 0.95f);
 
+        private static readonly Color EliminatedPortrait = new Color(0.35f, 0.35f, 0.35f);
+        private bool _hasPortrait;
         public int ApostleId { get; private set; }
 
         /// <summary>Raised with the Apostle's id when the portrait is left-clicked.</summary>
@@ -57,6 +59,22 @@ namespace SoulBind.UI
             if (background != null)
                 background.raycastTarget = true;
         }
+        
+
+        /// <summary>Swaps the placeholder color square for the Apostle's portrait.</summary>
+        public void SetPortrait(Sprite portrait)
+        {
+            if (colorStripe == null || portrait == null)
+                return;
+
+            colorStripe.sprite = portrait;
+            colorStripe.color = Color.white;
+            colorStripe.preserveAspect = true;
+            _hasPortrait = true;
+
+            if (portraitText != null)
+                portraitText.gameObject.SetActive(false);
+        }
 
         /// <summary>
         /// Shows the Apostle's current numbers. Called whenever the match state changes.
@@ -64,6 +82,9 @@ namespace SoulBind.UI
         /// </summary>
         public void Show(ApostleState apostle, bool isCurrentTurn, bool isAwakened, bool isPickable = false)
         {
+            if (_hasPortrait && colorStripe != null)
+                colorStripe.color = apostle.IsEliminated ? EliminatedPortrait : Color.white;
+
             if (background != null)
             {
                 background.color = apostle.IsEliminated ? eliminatedBackground

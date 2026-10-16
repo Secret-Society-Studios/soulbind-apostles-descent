@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: edee6db6258e94a4792b033c4f83eeff, type: 3}
+  m_Name: ApostleArtLibrary
+  m_EditorClassIdentifier: Assembly-CSharp::SoulBind.UI.ApostleArtLibrary
+  apostles:
+  - portrait: {fileID: -3944978359277609599, guid: 18729140420ac2145a3e55666db1fe37, type: 3}
+    piece: {fileID: 919132149155446097, guid: ae11ac58860e6664ca54a652b9861011, type: 3}
+  - portrait: {fileID: 7236797190846531812, guid: ae0256a4de4ed4d4096b7f0fe468cf26, type: 3}
+    piece: {fileID: 919132149155446097, guid: 073969e52db219f4b89ebb8e5e48d46f, type: 3}
+  - portrait: {fileID: -3510118117063602149, guid: 2de5d085f1a5a9941b83715fb8497029, type: 3}
+    piece: {fileID: 919132149155446097, guid: a9a0ad2ca0d3c1545bfb42724f330b5a, type: 3}
+  - portrait: {fileID: 6621454074065480780, guid: 3ab36349db4778443ae2ea752b090add, type: 3}
+    piece: {fileID: 919132149155446097, guid: 248dff45ecfed9b4e92e57b8ecb0949e, type: 3}
+  - portrait: {fileID: -1670807264563916433, guid: 709f369ef0d26e44fa5afbd44112cb41, type: 3}
+    piece: {fileID: 919132149155446097, guid: e57f161b7c1ec1e4283b5387f600a0b3, type: 3}
+  - portrait: {fileID: 2732486205669804910, guid: a4f2506736bc8fb43a1372706b123f9b, type: 3}
+    piece: {fileID: 919132149155446097, guid: 0b858f0d876b80a408d3b8d01a5ed43c, type: 3}
