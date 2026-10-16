@@ -8,7 +8,7 @@ namespace SoulBind.Core
     /// Pure rules data: no Unity types. The UI and network layers call these methods and
     /// read the resulting state. They never change Apostle numbers on their own.
     /// </summary>
-    public sealed class Match
+    public sealed partial class Match
     {
         // Kept for decisions made during play (such as Ascension tile tie-breaks).
         private readonly Random _random;
@@ -127,6 +127,35 @@ namespace SoulBind.Core
             // The seat order must be the first use of the random source,
             // so the same seed always gives the same starting player.
             int[] seatOrder = TurnTracker.CreateRandomSeatOrder(playerCount, random);
+            return CreateSeated(playerCount, board, spawnTiles, seatOrder, random, deck);
+        }
+
+        /// <summary>
+        /// Creates a match with a turn order decided beforehand: the order the Apostles picked their
+        /// starting tiles in (see SpawnDraft). Apostle i+1 spawns on spawnTiles[i]; seatOrder[0] plays first.
+        /// Pass null as deck to shuffle a full deck as normal.
+        /// </summary>
+        public static Match Create(int playerCount, HexBoard board, IReadOnlyList<HexCoord> spawnTiles,
+            IReadOnlyList<int> seatOrder, Random random, Deck deck = null)
+        {
+            if (board == null)
+                throw new ArgumentNullException(nameof(board));
+            if (spawnTiles == null)
+                throw new ArgumentNullException(nameof(spawnTiles));
+            if (seatOrder == null)
+                throw new ArgumentNullException(nameof(seatOrder));
+            if (random == null)
+                throw new ArgumentNullException(nameof(random));
+            if (playerCount < GameConstants.MinPlayers || playerCount > GameConstants.MaxPlayers)
+                throw new ArgumentOutOfRangeException(nameof(playerCount), "Player count must be 2 to 6.");
+            if (spawnTiles.Count != playerCount || seatOrder.Count != playerCount)
+                throw new ArgumentException("There must be exactly one spawn tile and one seat per player.");
+            return CreateSeated(playerCount, board, spawnTiles, seatOrder, random, deck);
+        }
+
+        private static Match CreateSeated(int playerCount, HexBoard board, IReadOnlyList<HexCoord> spawnTiles,
+            IReadOnlyList<int> seatOrder, Random random, Deck deck)
+        {
             SpecialTiles specialTiles = SpecialTiles.CreateRandom(board, random);
             if (deck == null)
                 deck = Deck.CreateFull(random);

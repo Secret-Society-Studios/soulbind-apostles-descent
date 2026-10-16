@@ -98,6 +98,20 @@ namespace SoulBind.Core
             _discardPile.Add(card);
         }
 
+        /// <summary>The draw pile, bottom first. Only for snapshots: it is hidden from players.</summary>
+        internal IReadOnlyList<ArcanaId> DrawPileForSnapshot => _drawPile;
+
+        /// <summary>For snapshots (online play): replaces both piles.</summary>
+        internal void Restore(IReadOnlyList<ArcanaId> drawPile, IReadOnlyList<ArcanaId> discardPile)
+        {
+            _drawPile.Clear();
+            for (int i = 0; i < drawPile.Count; i++)
+                _drawPile.Add(drawPile[i]);
+            _discardPile.Clear();
+            for (int i = 0; i < discardPile.Count; i++)
+                _discardPile.Add(discardPile[i]);
+        }
+
         private void ReshuffleDiscardPile()
         {
             _drawPile.AddRange(_discardPile);

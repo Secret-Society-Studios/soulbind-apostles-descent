@@ -55,6 +55,13 @@ namespace SoulBind.Core
             }
         }
 
+        /// <summary>For snapshots (online play): sets who is Awakened and where the tile is.</summary>
+        internal void Restore(int awakenedId, HexCoord tile)
+        {
+            AwakenedId = awakenedId;
+            Tile = awakenedId != 0 ? tile : default;
+        }
+
         /// <summary>True when the living Awakened Apostle stands on the Ascension tile.</summary>
         public bool HasAscended(Battlefield battlefield)
         {

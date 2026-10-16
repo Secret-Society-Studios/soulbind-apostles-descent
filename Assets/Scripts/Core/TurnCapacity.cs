@@ -37,5 +37,8 @@ namespace SoulBind.Core
 
             Remaining -= amount;
         }
+
+        /// <summary>For snapshots (online play): sets what is left, as the host reported it.</summary>
+        internal void RestoreRemaining(int remaining) => Remaining = Math.Max(0, remaining);
     }
 }

@@ -161,6 +161,28 @@ namespace SoulBind.Core
             return bestId;
         }
 
+        // ---- Snapshots (online play) ----
+
+        internal IReadOnlyList<int> Seats => _seats;
+        internal int SequenceCount => _sequenceCount;
+        internal int SequenceIndex => _sequenceIndex;
+        internal int StartSeat => _startSeat;
+        internal int GetSequenceEntry(int index) => _sequence[index];
+
+        /// <summary>Sets where the turn order stands, as the host reported it.</summary>
+        internal void Restore(int roundNumber, TurnDirection direction, bool awaitingPhaseStart, int startSeat,
+            IReadOnlyList<int> sequence, int sequenceIndex)
+        {
+            RoundNumber = roundNumber;
+            Direction = direction;
+            IsAwaitingPhaseStart = awaitingPhaseStart;
+            _startSeat = startSeat;
+            _sequenceCount = Math.Min(sequence.Count, _sequence.Length);
+            for (int i = 0; i < _sequenceCount; i++)
+                _sequence[i] = sequence[i];
+            _sequenceIndex = sequenceIndex;
+        }
+
         private void BuildSequence(IReadOnlyList<ApostleState> apostles)
         {
             int step = Direction == TurnDirection.Forward ? 1 : _seats.Length - 1;

@@ -241,6 +241,21 @@ namespace SoulBind.Core
             return damage;
         }
 
+        /// <summary>For snapshots (online play): sets every number to what the host reported.</summary>
+        internal void Restore(HexCoord position, int vessel, int souls, int corruption, int shield, int turnsStarted,
+            IReadOnlyList<TimedEffect> timedEffects)
+        {
+            Position = position;
+            Vessel = vessel;
+            Souls = souls;
+            Corruption = corruption;
+            Shield = shield;
+            TurnsStarted = turnsStarted;
+            _timedEffects.Clear();
+            for (int i = 0; i < timedEffects.Count; i++)
+                _timedEffects.Add(timedEffects[i]);
+        }
+
         private static void RequireNonNegative(int value, string paramName)
         {
             if (value < 0)

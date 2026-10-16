@@ -15,6 +15,12 @@ namespace SoulBind.Managers
     /// The screen belongs to one Apostle (the local player): only their hand is shown face-up and only
     /// they can act on their turn. Until online play exists, bots play every other seat. With bots off,
     /// the screen follows whoever's turn it is, so one person can play every seat (hot-seat testing).
+    ///
+    /// Online (started from the menu's Host / Join): the host runs the real Match, plays the bots and
+    /// applies the commands other players send; after every change NetworkMatch sends each player a
+    /// snapshot of what they may see. A player who joined keeps a copy built from those snapshots and
+    /// sends every action to the host as a MatchCommand instead of applying it. All local actions go
+    /// through Submit, so the same buttons work in every mode.
     /// </summary>
     public sealed class MatchController : MonoBehaviour
     {
@@ -23,9 +29,12 @@ namespace SoulBind.Managers
         [Tooltip("Optional. Clicks on this panel are not treated as board clicks.")]
         [SerializeField] private DevTurnHud hud;
         [SerializeField, Range(2, 6)] private int playerCount = 4;
-        [Tooltip("0 means a different random match every time.")]
+        [Tooltip("0: a different match every time (the seed used is printed in the Console). Any other number: the same match every time, for repeating a bug.")]
         [SerializeField] private int seed;
         [SerializeField] private float apostleDiameter = 0.6f;
+
+        [Tooltip("On: before the first turn, each Apostle picks a starting edge tile (bots pick at random). Off: tiles are spread out automatically.")]
+        [SerializeField] private bool chooseSpawns = true;
 
         [Header("Players")]
         [Tooltip("The Apostle this screen belongs to.")]
@@ -55,6 +64,31 @@ namespace SoulBind.Managers
         /// <summary>Raised after anything that changes what the player should see.</summary>
         public event System.Action StateChanged;
 
+        /// <summary>Offline and on the host: raised after the match itself changed (NetworkMatch sends snapshots then).</summary>
+        public event System.Action MatchChanged;
+
+        /// <summary>On a player who joined online: an action to send to the host.</summary>
+        public event System.Action<MatchCommand> CommandSubmitted;
+
+        private enum OnlineRole { Offline, Waiting, Host, Client }
+        private OnlineRole _online = OnlineRole.Offline;
+        private readonly bool[] _remoteSeat = new bool[GameConstants.MaxPlayers + 1];
+        private int _lastSequence = -1;
+
+        // Messages from the host that arrived before Start ran (kept until then).
+        private int _pendingSeat;
+        private int _pendingSeats;
+        private byte[] _pendingSnapshot;
+
+        /// <summary>True in an online match (as host or as a player who joined).</summary>
+        public bool IsOnline => _online != OnlineRole.Offline;
+
+        /// <summary>True on a player who joined online: their match is a copy and the host decides everything.</summary>
+        public bool IsOnlineClient => _online == OnlineRole.Client;
+
+        /// <summary>True on the host until NetworkMatch has seated everyone and started the match.</summary>
+        public bool IsWaitingForOnlineStart => _online == OnlineRole.Waiting;
+
         public Match CurrentMatch { get; private set; }
 
         public BoardView BoardView => boardView;
@@ -82,6 +116,16 @@ namespace SoulBind.Managers
         private int _lastViewerId = 1;
         private const int MaxBotActionsPerTurn = 60;
         private string _lastBotAction = string.Empty;
+
+        // Picking starting tiles, before the match exists.
+        private System.Random _random;
+        private System.Random _botRandom;
+        private SpawnDraft _draft;
+        private int[] _seatOrder;
+        private Sprite _disc;
+
+        /// <summary>True while the Apostles are picking their starting tiles (before the first turn).</summary>
+        public bool IsChoosingSpawns => _draft != null;
 
         // Disc animation: each disc slides toward its tile; a Striking disc lunges at its target.
         private readonly List<Vector3> _discTargets = new List<Vector3>(GameConstants.MaxPlayers);
@@ -144,44 +188,250 @@ namespace SoulBind.Managers
                 return;
             }
 
+            // Started from the main menu: its choices replace the Inspector values.
+            if (MatchSettings.IsSet)
+            {
+                playerCount = MatchSettings.PlayerCount;
+                botsPlayOthers = MatchSettings.BotsPlayOthers;
+                localApostleId = MatchSettings.LocalApostleId;
+                chooseSpawns = MatchSettings.ChooseSpawns;
+            }
+            bool online = MatchSettings.IsSet && MatchSettings.IsOnline;
+
             localApostleId = Mathf.Clamp(localApostleId, 1, playerCount);
             _lastViewerId = localApostleId;
-            var random = seed == 0 ? new System.Random() : new System.Random(seed);
-            List<HexCoord> spawns = SpawnPlanner.PickSpread(boardView.Board, playerCount);
-            CurrentMatch = Match.Create(playerCount, boardView.Board, spawns, random);
-
-            Sprite disc = DiscSpriteFactory.Create(apostleDiameter);
-            IReadOnlyList<ApostleState> apostles = CurrentMatch.Battlefield.Apostles;
-            for (int i = 0; i < apostles.Count; i++)
-            {
-                ApostleState apostle = apostles[i];
-
-                GameObject instance = Instantiate(apostlePrefab, boardView.GetWorldPosition(apostle.Position),
-                    Quaternion.identity, transform);
-                instance.name = $"Apostle {apostle.Id}";
-
-                var view = instance.GetComponent<ApostleView>();
-                if (view == null)
-                    view = instance.AddComponent<ApostleView>();
-
-                view.Initialize(apostle.Id, disc, ApostleColors.Get(apostle.Id));
-                _views.Add(view);
-                Vector3 position = boardView.GetWorldPosition(apostle.Position);
-                _discTargets.Add(position);
-                _discPositions.Add(position);
-            }
-
+            // Seed 0 means a new match every time. The seed actually used is logged, so an interesting match
+            // can be played again by typing that number into Seed.
+            int usedSeed = seed != 0 ? seed : (System.Environment.TickCount & int.MaxValue) | 1;
+            _random = new System.Random(usedSeed);
+            _botRandom = new System.Random(usedSeed + 1);
+            Debug.Log(seed != 0
+                ? $"MatchController: fixed Seed {usedSeed}, so this match is the same every time. Set Seed to 0 for a new match each time."
+                : $"MatchController: seed {usedSeed}. To replay this exact match, type it into Seed on MatchController.");
+            _disc = DiscSpriteFactory.Create(apostleDiameter);
             if (showStatPopups)
                 _numbers = FloatingNumbers.Create(transform, 1.3f, 0.9f, popupFontSize);
 
+            if (online)
+            {
+                // NetworkMatch seats everyone, then calls StartOnlineHost or StartOnlineClient.
+                _online = OnlineRole.Waiting;
+                ShowOnlineMessage("Waiting for every player to arrive...");
+                if (_pendingSeat > 0)
+                    StartOnlineClient(_pendingSeat, _pendingSeats);
+                if (_pendingSnapshot != null)
+                    ReceiveSnapshot(_pendingSnapshot);
+                _pendingSnapshot = null;
+                return;
+            }
+
+            CreateViews();
+            if (chooseSpawns)
+            {
+                // The turn order is drawn first (as before), and the Apostles pick their tiles in that order.
+                _seatOrder = TurnTracker.CreateRandomSeatOrder(playerCount, _random);
+                _draft = new SpawnDraft(boardView.Board, _seatOrder);
+                _botWait = botTurnStartDelay + botActionDelay;
+                AfterDraftChange();
+            }
+            else
+            {
+                StartMatch(SpawnPlanner.PickSpread(boardView.Board, playerCount), null);
+            }
+        }
+
+        // One disc per Apostle, hidden until its starting tile is known.
+        private void CreateViews()
+        {
+            Vector3 center = boardView.transform.position;
+            for (int id = 1; id <= playerCount; id++)
+            {
+                GameObject instance = Instantiate(apostlePrefab, center, Quaternion.identity, transform);
+                instance.name = $"Apostle {id}";
+                var view = instance.GetComponent<ApostleView>();
+                if (view == null)
+                    view = instance.AddComponent<ApostleView>();
+                view.Initialize(id, _disc, ApostleColors.Get(id));
+                instance.SetActive(false);
+                _views.Add(view);
+                _discTargets.Add(center);
+                _discPositions.Add(center);
+            }
+        }
+
+        private void StartMatch(List<HexCoord> spawns, int[] seatOrder)
+        {
+            _draft = null;
+            CurrentMatch = seatOrder == null
+                ? Match.Create(playerCount, boardView.Board, spawns, _random)
+                : Match.Create(playerCount, boardView.Board, spawns, seatOrder, _random);
+
             Debug.Log($"MatchController: {playerCount} players. Apostle {CurrentMatch.CurrentApostle.Id} " +
                       $"plays first with {CurrentMatch.CurrentCapacity.Remaining} Capacity.");
+            AfterMatchChange();
+        }
+
+        // ---- Online (called by NetworkMatch) ----
+
+        /// <summary>
+        /// Host: starts the match. This screen is Apostle 1; remoteSeats are the players who joined;
+        /// bots play every other seat.
+        /// </summary>
+        public void StartOnlineHost(int seats, IReadOnlyList<int> remoteSeats)
+        {
+            if (_online != OnlineRole.Waiting)
+                return;
+
+            _online = OnlineRole.Host;
+            playerCount = Mathf.Clamp(seats, 2, GameConstants.MaxPlayers);
+            localApostleId = 1;
+            _lastViewerId = 1;
+            botsPlayOthers = true;
+            System.Array.Clear(_remoteSeat, 0, _remoteSeat.Length);
+            for (int i = 0; i < remoteSeats.Count; i++)
+                _remoteSeat[remoteSeats[i]] = true;
+
+            Debug.Log($"MatchController: hosting online. {remoteSeats.Count + 1} players and " +
+                      $"{playerCount - remoteSeats.Count - 1} bots.");
+            CreateViews();
+            StartMatch(SpawnPlanner.PickSpread(boardView.Board, playerCount), null);
+        }
+
+        /// <summary>Player who joined: this screen is Apostle seat. The match arrives with the host's first snapshot.</summary>
+        public void StartOnlineClient(int seat, int seats)
+        {
+            if (_online == OnlineRole.Offline)
+            {
+                _pendingSeat = seat; // Start hasn't run yet
+                _pendingSeats = seats;
+                return;
+            }
+            if (_online != OnlineRole.Waiting)
+                return;
+
+            _online = OnlineRole.Client;
+            playerCount = Mathf.Clamp(seats, 2, GameConstants.MaxPlayers);
+            localApostleId = Mathf.Clamp(seat, 1, playerCount);
+            _lastViewerId = localApostleId;
+            botsPlayOthers = true;
+            Debug.Log($"MatchController: joined online as Apostle {localApostleId} of {playerCount}.");
+            CreateViews();
+            ShowOnlineMessage("Waiting for the host...");
+        }
+
+        /// <summary>Player who joined: loads the host's latest snapshot. Older or damaged ones are ignored.</summary>
+        public void ReceiveSnapshot(byte[] bytes)
+        {
+            if (_online != OnlineRole.Client)
+            {
+                if (_online == OnlineRole.Offline)
+                    _pendingSnapshot = bytes; // Start hasn't run yet
+                return;
+            }
+
+            MatchSnapshot snapshot = MatchSnapshot.FromBytes(bytes);
+            if (snapshot == null)
+            {
+                Debug.LogWarning("MatchController: a snapshot from the host could not be read.");
+                return;
+            }
+            if (snapshot.Sequence <= _lastSequence)
+                return;
+            _lastSequence = snapshot.Sequence;
+
+            if (CurrentMatch == null)
+                CurrentMatch = Match.FromSnapshot(boardView.Board, snapshot);
+            else
+                CurrentMatch.ApplySnapshot(snapshot);
+
+            // A choice in progress ends when the turn moved on or the card left the hand.
+            if (!IsLocalTurn || (HasSelectedCard && !HandContains(SelectedCard))
+                || (IsChoosingComboTarget && !HandContains(_comboCard)))
+            {
+                HasSelectedCard = false;
+                IsChoosingComboTarget = false;
+            }
             AfterStateChange();
+        }
+
+        /// <summary>Host: applies an action sent by the player in this seat (the seat comes from the connection, never from the message).</summary>
+        public CommandResult ApplyRemoteCommand(int seat, byte[] bytes)
+        {
+            if (_online != OnlineRole.Host || CurrentMatch == null)
+                return CommandResult.Refused;
+            if (!MatchCommand.TryDecode(bytes, 0, out MatchCommand command))
+                return CommandResult.Malformed;
+
+            CommandResult result = MatchCommands.Apply(CurrentMatch, seat, command);
+            if (result == CommandResult.Applied)
+            {
+                Debug.Log($"MatchController: Apostle {seat} (online): {command}.");
+                LogIfOver();
+                AfterMatchChange();
+            }
+            return result;
+        }
+
+        /// <summary>Host: the player in this seat left, so a bot plays it from now on.</summary>
+        public void ReleaseSeat(int seat)
+        {
+            if (seat <= 0 || seat >= _remoteSeat.Length || !_remoteSeat[seat])
+                return;
+            _remoteSeat[seat] = false;
+            _botTurnOwner = -1;
+            Debug.Log($"MatchController: Apostle {seat}'s player left. A bot plays that seat now.");
+        }
+
+        /// <summary>Shows a line in the hint area while there is no match to describe.</summary>
+        public void ShowOnlineMessage(string message)
+        {
+            Hint = message;
+            StateChanged?.Invoke();
+        }
+
+        private bool IsRemoteSeat(int apostleId) =>
+            _online == OnlineRole.Host && apostleId > 0 && apostleId < _remoteSeat.Length && _remoteSeat[apostleId];
+
+        private bool HandContains(ArcanaId card)
+        {
+            IReadOnlyList<ArcanaId> hand = CurrentMatch.GetHand(localApostleId);
+            for (int i = 0; i < hand.Count; i++)
+            {
+                if (hand[i] == card)
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Every action of this screen's player goes through here. Offline and on the host it is applied
+        /// at once; on a player who joined it is sent to the host, and the next snapshot shows the result.
+        /// </summary>
+        private CommandResult Submit(MatchCommand command)
+        {
+            if (_online == OnlineRole.Client)
+            {
+                CommandSubmitted?.Invoke(command);
+                return CommandResult.Applied;
+            }
+
+            CommandResult result = MatchCommands.Apply(CurrentMatch, MatchCommands.GetActorId(CurrentMatch), command);
+            if (result == CommandResult.Applied)
+            {
+                LogIfOver();
+                AfterMatchChange();
+            }
+            return result;
         }
 
         private void Update()
         {
             AnimateDiscs();
+            if (_draft != null)
+            {
+                UpdateSpawnDraft();
+                return;
+            }
             RunBots();
             if (!IsLocalTurn)
                 return;
@@ -363,9 +613,8 @@ namespace SoulBind.Managers
         private void PlayFromHand(ArcanaId card, int targetId, int comboTargetId)
         {
             int playerId = CurrentMatch.CurrentApostle.Id;
-            CardPlayResult result = CurrentMatch.PlayCard(card, targetId, comboTargetId);
 
-            if (result == CardPlayResult.ComboTargetRequired)
+            if (comboTargetId == 0 && CurrentMatch.NeedsComboTarget(card, targetId))
             {
                 // Ask the player who the Nocturne combo should hit, then play the card.
                 HasSelectedCard = false;
@@ -378,16 +627,18 @@ namespace SoulBind.Managers
             HasSelectedCard = false;
             IsChoosingComboTarget = false;
 
-            if (result != CardPlayResult.Success)
+            CommandResult result = Submit(MatchCommand.PlayCard(card, targetId, comboTargetId));
+            if (result != CommandResult.Applied)
             {
                 Debug.Log($"MatchController: {CardCatalog.Get(card).Name} rejected ({result}).");
                 AfterStateChange();
                 return;
             }
 
-            Debug.Log($"MatchController: Apostle {playerId} played {CardCatalog.Get(card).Name}.");
-            LogIfOver();
-            AfterStateChange();
+            if (IsOnlineClient)
+                AfterStateChange(); // the selection marks go now; the card moves when the host answers
+            else
+                Debug.Log($"MatchController: Apostle {playerId} played {CardCatalog.Get(card).Name}.");
         }
 
         public void TryMove(HexCoord destination)
@@ -395,15 +646,13 @@ namespace SoulBind.Managers
             if (!IsLocalTurn)
                 return;
 
-            MoveResult result = CurrentMatch.Move(destination);
-            if (result != MoveResult.Success)
-            {
-                Debug.Log($"MatchController: move to {destination} rejected ({result}).");
+            // A copy checks the highlighted tiles first, so a click elsewhere sends nothing.
+            if (IsOnlineClient && !_legalDestinations.Contains(destination))
                 return;
-            }
 
-            LogIfOver();
-            AfterStateChange();
+            CommandResult result = Submit(MatchCommand.Move(destination));
+            if (result != CommandResult.Applied)
+                Debug.Log($"MatchController: move to {destination} rejected ({result}).");
         }
 
         /// <summary>
@@ -427,17 +676,16 @@ namespace SoulBind.Managers
 
             // Read before playing: some cards (Temperance) end the turn, so CurrentApostle changes.
             int playerId = CurrentMatch.CurrentApostle.Id;
-            CardPlayResult result = CurrentMatch.PlayCard(card, targetId, comboTargetId);
-            if (result != CardPlayResult.Success)
+            CommandResult result = Submit(MatchCommand.PlayCard(card, targetId, comboTargetId));
+            if (result != CommandResult.Applied)
             {
                 Debug.Log($"MatchController: {CardCatalog.Get(card).Name} rejected ({result}).");
                 return;
             }
 
-            Debug.Log($"MatchController: Apostle {playerId} played {CardCatalog.Get(card).Name}. " +
-                      $"State {CurrentMatch.Engagement}, pending ATK {CurrentMatch.PendingAttack}.");
-            LogIfOver();
-            AfterStateChange();
+            if (!IsOnlineClient)
+                Debug.Log($"MatchController: Apostle {playerId} played {CardCatalog.Get(card).Name}. " +
+                          $"State {CurrentMatch.Engagement}, pending ATK {CurrentMatch.PendingAttack}.");
         }
 
         /// <summary>Resolves the built-up attack and disengages.</summary>
@@ -445,26 +693,26 @@ namespace SoulBind.Managers
         {
             if (!IsLocalTurn)
                 return;
-
-            int attackerId = CurrentMatch.CurrentApostle.Id;
-            if (!CurrentMatch.Strike(out AttackOutcome outcome))
+            if (CurrentMatch.Engagement != EngagementState.Engaged)
             {
                 Debug.Log("MatchController: not engaged, so there is nothing to strike.");
                 return;
             }
 
+            ApostleState attacker = CurrentMatch.CurrentApostle;
+            int corruptionBefore = attacker.Corruption;
+            if (Submit(MatchCommand.Strike()) != CommandResult.Applied || IsOnlineClient)
+                return;
+
             foreach (StrikeHit hit in CurrentMatch.LastStrikeHits)
             {
                 if (hit.BrokeDefense)
-                    Debug.Log($"MatchController: Apostle {attackerId} hit Apostle {hit.TargetId} with {hit.Attack} ATK " +
+                    Debug.Log($"MatchController: Apostle {attacker.Id} hit Apostle {hit.TargetId} with {hit.Attack} ATK " +
                               $"for {hit.Damage} damage (stole {hit.SoulsStolen} Soul).");
                 else
                     Debug.Log($"MatchController: {hit.Attack} ATK failed to break Apostle {hit.TargetId}'s DEF.");
             }
-            Debug.Log($"MatchController: Apostle {attackerId} gained {outcome.CorruptionGained} Corruption from the attack.");
-
-            LogIfOver();
-            AfterStateChange();
+            Debug.Log($"MatchController: Apostle {attacker.Id} gained {attacker.Corruption - corruptionBefore} Corruption from the attack.");
         }
 
         public void EndTurn()
@@ -474,9 +722,9 @@ namespace SoulBind.Managers
 
             HasSelectedCard = false;
             IsChoosingComboTarget = false;
-            CurrentMatch.EndTurn();
-            LogIfOver();
-            AfterStateChange();
+            Submit(MatchCommand.EndTurn());
+            if (IsOnlineClient)
+                AfterStateChange();
         }
 
         public void BeginNextPhase(TurnDirection direction)
@@ -486,8 +734,9 @@ namespace SoulBind.Managers
 
             HasSelectedCard = false;
             IsChoosingComboTarget = false;
-            CurrentMatch.BeginNextPhase(direction);
-            AfterStateChange();
+            Submit(MatchCommand.ChooseDirection(direction));
+            if (IsOnlineClient)
+                AfterStateChange();
         }
 
 #if UNITY_EDITOR
@@ -497,7 +746,7 @@ namespace SoulBind.Managers
         /// <summary>DEV ONLY: changes the current Apostle's Souls to test Awakening.</summary>
         public void DevChangeCurrentSouls(int delta)
         {
-            if (!CanAct)
+            if (!CanAct || IsOnlineClient)
                 return;
 
             ApostleState apostle = CurrentMatch.CurrentApostle;
@@ -507,19 +756,102 @@ namespace SoulBind.Managers
                 apostle.LoseSouls(-delta);
 
             CurrentMatch.RefreshGameState();
-            AfterStateChange();
+            AfterMatchChange();
         }
 
         /// <summary>DEV ONLY: gives the current Apostle extra shield.</summary>
         public void DevAddShieldToCurrent(int amount)
         {
-            if (!CanAct)
+            if (!CanAct || IsOnlineClient)
                 return;
 
             CurrentMatch.CurrentApostle.AddShield(amount);
-            AfterStateChange();
+            AfterMatchChange();
         }
 #endif
+
+        // ---- Picking starting tiles ----
+
+        // Whoever picks now: a person clicks a highlighted edge tile; a bot picks a random one after a pause.
+        private void UpdateSpawnDraft()
+        {
+            int picker = _draft.CurrentPickerId;
+            if (picker == 0)
+                return;
+
+            if (botsPlayOthers && picker != localApostleId)
+            {
+                _botWait -= Time.deltaTime;
+                if (_botWait > 0f)
+                    return;
+                _botWait = botActionDelay;
+                PickSpawn(_draft.ChooseRandomTile(_botRandom));
+                return;
+            }
+
+            Mouse mouse = Mouse.current;
+            if (mouse == null || !mouse.leftButton.wasPressedThisFrame)
+                return;
+            Vector2 screenPoint = mouse.position.ReadValue();
+            if (hud != null && hud.ContainsScreenPoint(screenPoint))
+                return;
+            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+                return;
+            if (boardView.TryGetTileAtScreen(screenPoint, out HexCoord tile) && _draft.CanPick(tile))
+                PickSpawn(tile);
+        }
+
+        private void PickSpawn(HexCoord tile)
+        {
+            int picker = _draft.CurrentPickerId;
+            if (!_draft.TryPick(tile))
+                return;
+
+            // The disc appears on its tile straight away.
+            int index = picker - 1;
+            Vector3 position = boardView.GetWorldPosition(tile);
+            _discTargets[index] = position;
+            _discPositions[index] = position;
+            _views[index].transform.position = position;
+            _views[index].gameObject.SetActive(true);
+            Debug.Log($"MatchController: Apostle {picker} starts at ({tile.Q},{tile.R}).");
+
+            if (_draft.IsComplete)
+            {
+                boardView.ClearHighlights();
+                // The discs are already in place: the match starts from the same tiles.
+                for (int i = 0; i < _views.Count; i++)
+                    _views[i].gameObject.SetActive(false);
+                StartMatch(_draft.GetSpawnTiles(), _seatOrder);
+                return;
+            }
+            _botWait = botActionDelay;
+            AfterDraftChange();
+        }
+
+        // Highlights the tiles the person picking may choose, and says whose pick it is.
+        private void AfterDraftChange()
+        {
+            int picker = _draft.CurrentPickerId;
+            bool person = !botsPlayOthers || picker == localApostleId;
+            if (!botsPlayOthers)
+                _lastViewerId = picker;
+
+            if (person)
+            {
+                _draft.GetLegalTiles(_legalDestinations);
+                boardView.SetHighlights(_legalDestinations);
+                Hint = botsPlayOthers
+                    ? "Choose your starting tile: click a highlighted tile on the edge of the board."
+                    : $"Apostle {picker}: choose your starting tile on the edge of the board.";
+            }
+            else
+            {
+                boardView.ClearHighlights();
+                Hint = $"Apostle {picker} is choosing a starting tile...";
+            }
+            StateChanged?.Invoke();
+        }
 
         // ---- Bots ----
 
@@ -528,16 +860,17 @@ namespace SoulBind.Managers
         // can never get stuck.
         private void RunBots()
         {
-            if (!botsPlayOthers || CurrentMatch == null || CurrentMatch.IsOver)
+            // Only the host (or an offline game) runs bots; a player who joined just shows the host's snapshots.
+            if (!botsPlayOthers || CurrentMatch == null || CurrentMatch.IsOver || _online == OnlineRole.Client)
                 return;
 
             int actorId = CurrentMatch.IsAwaitingPhaseStart
                 ? CurrentMatch.GetNextPhaseChooserId()
                 : CurrentMatch.CurrentApostle != null ? CurrentMatch.CurrentApostle.Id : 0;
-            if (actorId == 0 || actorId == localApostleId)
+            if (actorId == 0)
                 return;
 
-            // A new bot turn starts with a longer pause.
+            // A new turn: the last bot's action is no longer news, and a bot starts with a longer pause.
             int turnKey = CurrentMatch.IsAwaitingPhaseStart ? -actorId : actorId;
             if (turnKey != _botTurnOwner)
             {
@@ -546,6 +879,10 @@ namespace SoulBind.Managers
                 _lastBotAction = string.Empty;
                 _botWait = botTurnStartDelay + botActionDelay;
             }
+
+            // People play their own seats: this screen's player, and online, the players who joined.
+            if (actorId == localApostleId || IsRemoteSeat(actorId))
+                return;
 
             _botWait -= Time.deltaTime;
             if (_botWait > 0f)
@@ -573,13 +910,15 @@ namespace SoulBind.Managers
                 _botTurnOwner = -1;
 
             LogIfOver();
-            AfterStateChange();
+            AfterMatchChange();
         }
 
 #if UNITY_EDITOR
         /// <summary>DEV ONLY: switches bots on or off for the other seats.</summary>
         public void DevSetBots(bool on)
         {
+            if (IsOnline)
+                return; // online, bots always play the seats nobody joined for
             botsPlayOthers = on;
             _botTurnOwner = -1;
             CancelSelection();
@@ -588,8 +927,8 @@ namespace SoulBind.Managers
         /// <summary>DEV ONLY: makes this screen belong to the next Apostle (with bots on).</summary>
         public void DevCycleLocalApostle()
         {
-            if (CurrentMatch == null)
-                return;
+            if (CurrentMatch == null || IsOnline)
+                return; // online, each screen keeps its own seat
             int count = CurrentMatch.Battlefield.Apostles.Count;
             localApostleId = localApostleId % count + 1;
             _botTurnOwner = -1;
@@ -718,6 +1057,13 @@ namespace SoulBind.Managers
         {
             if (CurrentMatch.IsOver)
                 Debug.Log($"MatchController: match over. Winner {CurrentMatch.WinnerId} ({CurrentMatch.EndReason}).");
+        }
+
+        // The match itself changed: online, the host sends everyone a snapshot; then the screen updates.
+        private void AfterMatchChange()
+        {
+            MatchChanged?.Invoke();
+            AfterStateChange();
         }
 
         // The order matters: clear the attack marks first and set them last,

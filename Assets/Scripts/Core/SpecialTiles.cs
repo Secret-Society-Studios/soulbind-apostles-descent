@@ -34,6 +34,14 @@ namespace SoulBind.Core
             return count;
         }
 
+        /// <summary>For snapshots (online play): replaces every unused special tile.</summary>
+        internal void Restore(IReadOnlyList<HexCoord> tiles, IReadOnlyList<SpecialTileType> types)
+        {
+            _active.Clear();
+            for (int i = 0; i < tiles.Count; i++)
+                _active[tiles[i]] = types[i];
+        }
+
         /// <summary>
         /// Places countPerType tiles of each type on random interior (non-edge) tiles.
         /// The same seed always gives the same placement.

@@ -17,7 +17,8 @@ namespace SoulBind.UI
     /// Your cards: hover to lift one and see it large on screen (with the reason if it can't be played),
     /// click to play it, or drag it to the discard pile (play) or onto a red-ringed enemy (attack).
     /// Played cards fly to the discard pile (opponents' cards turn face-up as they land); drawn cards fly
-    /// in face-down from the draw pile (yours turn face-up as they arrive).
+    /// in face-down from the draw pile (yours turn face-up as they arrive). Online, other hands arrive as
+    /// blank cards (MatchSnapshot.HiddenCard), so their played cards are found from the discard pile.
     ///
     /// Display and input only: every action goes through MatchController. Card views are pooled.
     /// </summary>
@@ -321,6 +322,7 @@ namespace SoulBind.UI
                 for (int i = 0; i < hand.Count; i++)
                     _cardCounts[(int)hand[i]]++;
                 int kept = 0;
+                int unexplained = 0;
                 for (int i = 0; i < seat.Shown.Count; i++)
                 {
                     int id = (int)seat.Shown[i];
@@ -332,9 +334,24 @@ namespace SoulBind.UI
                     else if (_newDiscards[id] > 0)
                     {
                         _newDiscards[id]--;
-                        if (FlyToDiscardPile(seat, i))
+                        if (FlyToDiscardPile(seat, i, seat.Shown[i]))
                             toPile++;
                     }
+                    else if (!seat.IsYours && matchController.IsOnlineClient)
+                    {
+                        unexplained++;
+                    }
+                }
+
+                // Online, an opponent's hand arrives as blank cards, so a played card can't be matched by
+                // name. A face-down card that left the hand takes one of the new discards it could be.
+                for (int n = 0; n < unexplained; n++)
+                {
+                    int claimed = TakeAnyNewDiscard();
+                    if (claimed < 0)
+                        break;
+                    if (FlyToDiscardPile(seat, -1, (ArcanaId)claimed))
+                        toPile++;
                 }
 
                 // Cards that arrived: the drawn ones fly in and appear when they land.
@@ -634,8 +651,23 @@ namespace SoulBind.UI
 
         // ---- Flying cards ----
 
+        // A new discard no hand has claimed yet, or -1.
+        private int TakeAnyNewDiscard()
+        {
+            for (int id = 0; id < ArcanaSlots; id++)
+            {
+                if (_newDiscards[id] > 0)
+                {
+                    _newDiscards[id]--;
+                    return id;
+                }
+            }
+            return -1;
+        }
+
         // From where the card was in the hand to the discard pile. Opponents' cards turn face-up on the way.
-        private bool FlyToDiscardPile(Seat seat, int handIndex)
+        // handIndex is only needed for your own hand (an opponent's card leaves from the end of the row).
+        private bool FlyToDiscardPile(Seat seat, int handIndex, ArcanaId card)
         {
             if (_flights == null || discardPile == null
                 || !discardPile.TryGetScreenSpot(out Vector2 to, out float toPixels))
@@ -644,7 +676,7 @@ namespace SoulBind.UI
             RectTransform from = null;
             if (seat.IsYours)
             {
-                if (handIndex < seat.Faces.Count && seat.Faces[handIndex].gameObject.activeSelf)
+                if (handIndex >= 0 && handIndex < seat.Faces.Count && seat.Faces[handIndex].gameObject.activeSelf)
                     from = seat.Faces[handIndex].Rect;
             }
             else
@@ -659,7 +691,6 @@ namespace SoulBind.UI
                     out float startAngle))
                 return false;
 
-            ArcanaId card = seat.Shown[handIndex];
             _flights.Fly(card, start, startAngle, _flights.ScaleForPixels(startPixels), to, 0f,
                 _flights.ScaleForPixels(toPixels), !seat.IsYours, false, playFlightTime, discardPile.ReleaseOne);
             return true;

@@ -42,5 +42,13 @@ namespace SoulBind.Core
                 deck.Discard(_cards[i]);
             _cards.Clear();
         }
+
+        /// <summary>For snapshots (online play): replaces the whole hand.</summary>
+        internal void Restore(IReadOnlyList<ArcanaId> cards)
+        {
+            _cards.Clear();
+            for (int i = 0; i < cards.Count; i++)
+                _cards.Add(cards[i]);
+        }
     }
 }

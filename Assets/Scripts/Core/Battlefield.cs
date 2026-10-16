@@ -63,6 +63,17 @@ namespace SoulBind.Core
         }
 
         /// <summary>
+        /// For snapshots (online play): registers an Apostle wherever it stands now, mid-match,
+        /// without the spawn rules.
+        /// </summary>
+        internal void AddApostleFromSnapshot(ApostleState apostle)
+        {
+            if (apostle == null)
+                throw new ArgumentNullException(nameof(apostle));
+            _apostles.Add(apostle);
+        }
+
+        /// <summary>
         /// Moves an Apostle one tile and spends Capacity, or explains why it cannot.
         /// Nothing changes unless the result is Success. A successful move onto a
         /// special tile triggers it.

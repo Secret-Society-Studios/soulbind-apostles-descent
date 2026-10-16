@@ -59,6 +59,8 @@ namespace SoulBind.UI
         {
             if (matchController == null)
                 Debug.LogError("MatchHud: assign the Match Controller in the Inspector.", this);
+            else if (_canvas != null)
+                MatchOverlay.Create(_canvas.rootCanvas, matchController); // banners and the end-of-match screen
             Refresh();
         }
 
