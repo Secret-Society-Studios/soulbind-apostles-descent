@@ -45,6 +45,12 @@ namespace SoulBind.UI
         [SerializeField] private float matPadding = 0.6f;
         [Tooltip("Width of the lighter rim around the hexagonal mat, in world units.")]
         [SerializeField] private float matRimWidth = 0.15f;
+        [Tooltip("How steep the mat's four slanted sides are, in degrees from flat. 60 = a regular hexagon; " +
+                 "lower makes a wider mat with longer top and bottom sides.")]
+        [SerializeField, Range(30f, 60f)] private float matSideAngle = 45f;
+        [Tooltip("Extra room above and below the board, in world units (added to both the top and the bottom). " +
+                 "The slanted sides move out with it, so the top and bottom sides keep their length.")]
+        [SerializeField, Min(0f)] private float matExtraHeight = 1f;
 
         [Header("Piles (on the mat, in its left and right corners)")]
         [Tooltip("Height of a pile's card, in world units. The mat grows if the piles need more room.")]
@@ -70,13 +76,13 @@ namespace SoulBind.UI
         private float _centerY;
         private float _boardWidth;
         private float _boardHeight;
-        private float _matRadius;
+        private float _matRadius;     // center to the left and right corners
+        private float _matHalfHeight; // center to the flat top and bottom sides
+        private float _matHalfTop;    // half the length of the top and bottom sides
         private float _pileOffsetX;
         private const float PileCardAspect = 180f / 252f; // width / height
         private const float PileCountRoom = 0.35f;         // the card count under a pile, in world units
 
-        // The six sides, counter-clockwise from the bottom: the direction pointing out of each side.
-        private static readonly float[] SideNormalDegrees = { 270f, 330f, 30f, 90f, 150f, 210f };
         private const float Sqrt3 = 1.7320508f;
         private float _reservedLeft;
         private float _reservedTop;
@@ -217,27 +223,48 @@ namespace SoulBind.UI
         /// <summary>Where the discard pile lies: on the mat, in its right corner, beside the board.</summary>
         public Vector3 DiscardPileSpot => transform.position + new Vector3(_pileOffsetX, 0f, 0f);
 
-        /// <summary>The hexagonal mat's radius (center to corner), in world units. Its corners point left and right.</summary>
+        /// <summary>The mat's half-width (center to its left and right corners), in world units.</summary>
         public float MatRadius => _matRadius;
 
-        /// <summary>The radius of the hexagon that encloses the mat and the hands lying around it.</summary>
-        public float SeatRingRadius => _matRadius + (seatGap + seatDepth) * 2f / Sqrt3;
+        /// <summary>The radius of a circle that encloses the mat and the hands lying around it.</summary>
+        public float SeatRingRadius => Mathf.Max(_matRadius, _matHalfHeight) + seatGap + seatDepth;
 
         /// <summary>
         /// One of the mat's six sides, counter-clockwise from the bottom (0 bottom, 1 bottom-right,
         /// 2 top-right, 3 top, 4 top-left, 5 bottom-left): the middle of the place where a hand lies along it,
         /// how far its cards are turned so their tops face the board (degrees), the side's length and the
-        /// place's depth, all in world units on the board's plane.
+        /// place's depth, all in world units on the board's plane. The mat is a hexagon stretched sideways:
+        /// the top and bottom sides are longer than the four slanted ones.
         /// </summary>
         public void GetSeat(int side, out Vector3 center, out float rotation, out float length, out float depth)
         {
-            side = ((side % 6) + 6) % 6;
-            float angle = SideNormalDegrees[side] * Mathf.Deg2Rad;
-            float distance = _matRadius * Sqrt3 / 2f + seatGap + seatDepth / 2f;
-            center = transform.position + new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f) * distance;
-            rotation = 60f * side;
-            length = _matRadius;
+            GetSide(side, out Vector2 middle, out Vector2 normal, out length, out float normalDegrees);
+            Vector2 place = middle + normal * (seatGap + seatDepth / 2f);
+            center = transform.position + new Vector3(place.x, place.y, 0f);
+            rotation = normalDegrees + 90f;
             depth = seatDepth;
+        }
+
+        // One side of the mat, relative to its center: its middle point, the direction pointing out of it
+        // (and that direction's angle, in degrees), and its length.
+        private void GetSide(int side, out Vector2 middle, out Vector2 normal, out float length, out float normalDegrees)
+        {
+            side = ((side % 6) + 6) % 6;
+            float slant = matSideAngle;
+            float slantLength = _matHalfHeight / Mathf.Sin(slant * Mathf.Deg2Rad);
+            float slantX = (_matHalfTop + _matRadius) / 2f;
+            float halfY = _matHalfHeight / 2f;
+            switch (side)
+            {
+                case 0: middle = new Vector2(0f, -_matHalfHeight); normalDegrees = 270f; length = 2f * _matHalfTop; break;
+                case 1: middle = new Vector2(slantX, -halfY); normalDegrees = 270f + slant; length = slantLength; break;
+                case 2: middle = new Vector2(slantX, halfY); normalDegrees = 90f - slant; length = slantLength; break;
+                case 3: middle = new Vector2(0f, _matHalfHeight); normalDegrees = 90f; length = 2f * _matHalfTop; break;
+                case 4: middle = new Vector2(-slantX, halfY); normalDegrees = 90f + slant; length = slantLength; break;
+                default: middle = new Vector2(-slantX, -halfY); normalDegrees = 270f - slant; length = slantLength; break;
+            }
+            float radians = normalDegrees * Mathf.Deg2Rad;
+            normal = new Vector2(Mathf.Cos(radians), Mathf.Sin(radians));
         }
 
         /// <summary>The share of the screen height kept clear at the bottom (for the player's strip and hand).</summary>
@@ -349,19 +376,19 @@ namespace SoulBind.UI
             min = new Vector2(float.MaxValue, float.MaxValue);
             max = new Vector2(float.MinValue, float.MinValue);
 
-            float inner = _matRadius * Sqrt3 / 2f;            // center to the mat's edge
-            float outer = inner + seatGap + seatDepth + cameraMargin;
-            float halfLength = _matRadius / 2f + cameraMargin;
+            float outer = seatGap + seatDepth + cameraMargin;
             for (int side = 0; side < 6; side++)
             {
-                float angle = SideNormalDegrees[side] * Mathf.Deg2Rad;
-                var normal = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f);
+                GetSide(side, out Vector2 middle, out Vector2 normal2, out float length, out _);
+                var normal = new Vector3(normal2.x, normal2.y, 0f);
                 var along = new Vector3(-normal.y, normal.x, 0f);
+                var start = new Vector3(middle.x, middle.y, 0f);
+                float halfLength = length / 2f + cameraMargin;
                 for (int corner = 0; corner < 4; corner++)
                 {
-                    float distance = (corner & 1) == 0 ? inner : outer;
+                    float distance = (corner & 1) == 0 ? 0f : outer;
                     float offset = (corner & 2) == 0 ? -halfLength : halfLength;
-                    if (!AddToBounds(cam, normal * distance + along * offset, ref min, ref max))
+                    if (!AddToBounds(cam, start + normal * distance + along * offset, ref min, ref max))
                         return;
                 }
             }
@@ -394,9 +421,13 @@ namespace SoulBind.UI
             CreateFlat("Table", square, tableColor, -20,
                 new Vector3(_boardWidth * 6f, _boardHeight * 6f, 1f));
 
-            // The smallest hexagon (corners left and right, flat edges at the top and bottom) around every
-            // tile. The flat bottom edge faces the player, whose hand lies along it.
-            float radius = 0f;
+            // A hexagon stretched sideways: flat top and bottom sides, corners pointing left and right,
+            // and four slanted sides at matSideAngle. The flat bottom side faces the player, whose hand
+            // lies along it. First the smallest such hexagon around every tile, matPadding away from them.
+            float slant = matSideAngle * Mathf.Deg2Rad;
+            float invTan = 1f / Mathf.Tan(slant);
+            float reachY = 0f;
+            float reachSlant = 0f; // the largest x + y / tan(slant) of any tile corner
             foreach (HexCoord tile in Board.Tiles)
             {
                 tile.ToPlane(hexSize, out float cx, out float cy);
@@ -408,12 +439,12 @@ namespace SoulBind.UI
                     float angle = (30f + 60f * corner) * Mathf.Deg2Rad;
                     float x = Mathf.Abs(cx + hexSize * Mathf.Cos(angle));
                     float y = Mathf.Abs(cy + hexSize * Mathf.Sin(angle));
-                    radius = Mathf.Max(radius, Mathf.Max(x + y / Sqrt3, 2f * y / Sqrt3));
+                    reachY = Mathf.Max(reachY, y);
+                    reachSlant = Mathf.Max(reachSlant, x + y * invTan);
                 }
             }
-
-            // matPadding is the gap between the outermost tiles and the mat's edge.
-            _matRadius = radius + matPadding * 2f / Sqrt3;
+            _matHalfHeight = reachY + matPadding;
+            _matRadius = reachSlant + matPadding / Mathf.Sin(slant);
 
             // The piles lie in the mat's left and right corners, beside the board, at mid-height.
             // Find how far the tiles reach sideways in that band, then grow the mat if a pile would not fit.
@@ -434,20 +465,34 @@ namespace SoulBind.UI
                 }
             }
             _pileOffsetX = tilesReach + pileGap + pileHalfWidth;
-            float pileNeeds = _pileOffsetX + pileHalfWidth + pileHalfHeight / Sqrt3 + matRimWidth + 0.1f;
+            float pileNeeds = _pileOffsetX + pileHalfWidth + pileHalfHeight * invTan + (matRimWidth + 0.1f) / Mathf.Sin(slant);
             _matRadius = Mathf.Max(_matRadius, pileNeeds);
-            Sprite hexagon = CreateHexagonSprite(_matRadius, matColor, Color.Lerp(matColor, Color.white, 0.25f), matRimWidth);
+            _matHalfHeight = Mathf.Max(_matHalfHeight, pileHalfHeight + matRimWidth + 0.1f);
+            // Extra height above and below the board; the slanted sides move out to match.
+            _matHalfHeight += matExtraHeight;
+            _matRadius += matExtraHeight * invTan;
+
+            // The top and bottom sides must keep some length, or the hexagon turns into a diamond.
+            _matRadius = Mathf.Max(_matRadius, _matHalfHeight * invTan + 0.5f);
+            _matHalfTop = _matRadius - _matHalfHeight * invTan;
+
+            Sprite hexagon = CreateHexagonSprite(_matRadius, _matHalfHeight, matSideAngle, matColor,
+                Color.Lerp(matColor, Color.white, 0.25f), matRimWidth);
             CreateFlat("Mat", hexagon, Color.white, -10, Vector3.one);
         }
 
-        // Draws a hexagon (with a soft edge and a lighter rim) into a texture, sized in world units.
-        // Made once when the board is built.
-        private static Sprite CreateHexagonSprite(float radius, Color fill, Color rim, float rimWidth)
+        // Draws the stretched hexagon (with a soft edge and a lighter rim) into a texture, sized in world
+        // units: halfWidth to the left and right corners, halfHeight to the flat top and bottom, slanted
+        // sides at sideAngle degrees. Made once when the board is built.
+        private static Sprite CreateHexagonSprite(float halfWidth, float halfHeight, float sideAngle, Color fill,
+            Color rim, float rimWidth)
         {
-            const int LongSide = 768;
-            int width = LongSide;
-            int height = Mathf.CeilToInt(LongSide * Sqrt3 / 2f);
-            float pixelsPerUnit = LongSide / (2f * radius);
+            const int LongSide = 1024;
+            float pixelsPerUnit = LongSide / (2f * Mathf.Max(halfWidth, halfHeight));
+            int width = Mathf.CeilToInt(2f * halfWidth * pixelsPerUnit);
+            int height = Mathf.CeilToInt(2f * halfHeight * pixelsPerUnit);
+            float sin = Mathf.Sin(sideAngle * Mathf.Deg2Rad);
+            float invTan = 1f / Mathf.Tan(sideAngle * Mathf.Deg2Rad);
 
             var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
             {
@@ -462,12 +507,13 @@ namespace SoulBind.UI
             {
                 for (int px = 0; px < width; px++)
                 {
-                    // Position relative to the center, in units of the hexagon's radius.
-                    float x = Mathf.Abs((px + 0.5f - width / 2f) / (pixelsPerUnit * radius));
-                    float y = Mathf.Abs((py + 0.5f - height / 2f) / (pixelsPerUnit * radius));
+                    // Position relative to the center, in world units.
+                    float x = Mathf.Abs((px + 0.5f - width / 2f) / pixelsPerUnit);
+                    float y = Mathf.Abs((py + 0.5f - height / 2f) / pixelsPerUnit);
 
-                    // Distance outside the hexagon (negative inside), in pixels.
-                    float outside = Mathf.Max(y - Sqrt3 / 2f, (Sqrt3 * x + y - Sqrt3) / 2f) * pixelsPerUnit * radius;
+                    // Distance outside the hexagon (negative inside), in pixels: past the flat top or
+                    // bottom, or past a slanted side.
+                    float outside = Mathf.Max(y - halfHeight, (x + y * invTan - halfWidth) * sin) * pixelsPerUnit;
                     float alpha = Mathf.Clamp01(0.5f - outside);
                     if (alpha <= 0f)
                     {

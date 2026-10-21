@@ -50,7 +50,7 @@ namespace SoulBind.UI
         [SerializeField] private float cardGap = 10f;
         [SerializeField] private Color trayColor = new Color(0.04f, 0.04f, 0.07f, 0.8f);
         [SerializeField] private float trayPadding = 12f;
-        [Tooltip("Hands bigger than this show this many cards (the label still gives the real count).")]
+        [Tooltip("Opponents' hands bigger than this show this many face-down cards (the label still gives the real count). Your own hand always shows every card.")]
         [SerializeField, Range(1, 15)] private int maxCardsShown = 10;
 
         [Header("Your hand")]
@@ -79,7 +79,9 @@ namespace SoulBind.UI
             public readonly List<ArcanaId> Shown = new List<ArcanaId>(12);
             public int Arriving;
 
-            public int SlotCount(int max) => Mathf.Min(Shown.Count, max);
+            // Your own hand always shows every card; opponents' face-down hands are capped at max
+            // (their label still gives the real count).
+            public int SlotCount(int max) => IsYours ? Shown.Count : Mathf.Min(Shown.Count, max);
         }
 
         // Which sides are used for each player count, counter-clockwise from the bottom (yours).

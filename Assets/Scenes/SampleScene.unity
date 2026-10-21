@@ -1894,17 +1894,19 @@ MonoBehaviour:
   purifyTileSprite: {fileID: 21300000, guid: 99138121ea46a7845ac19f27daccca2c, type: 3}
   soulTileSprite: {fileID: 21300000, guid: 060bb6d97d0b5d84ab2115fa475fa836, type: 3}
   fitCameraToBoard: 1
-  cameraMargin: 1
-  cameraTilt: 35
-  fieldOfView: 35
+  cameraMargin: -0.3
+  cameraTilt: 41
+  fieldOfView: 61
   tableColor: {r: 0.32, g: 0.21, b: 0.13, a: 1}
   matColor: {r: 0.16, g: 0.14, b: 0.2, a: 1}
-  matPadding: 0.6
-  matRimWidth: 0.15
+  matPadding: 0.18
+  matRimWidth: 0.1
+  matSideAngle: 45
+  matExtraHeight: 1
   pileCardHeight: 2.4
   pileGap: 0.3
   seatGap: 0.15
-  seatDepth: 2.3
+  seatDepth: 1
 --- !u!1 &980034796
 GameObject:
   m_ObjectHideFlags: 0
@@ -2300,7 +2302,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SoulBind.Managers.MatchController
   boardView: {fileID: 844109290}
   apostlePrefab: {fileID: 2518714460669325445, guid: fa75c4a0ccf4c624fbf30d671313b655, type: 3}
-  hud: {fileID: 1090074782}
+  hud: {fileID: 0}
   playerCount: 6
   seed: 0
   apostleDiameter: 0.6
@@ -2321,52 +2323,6 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1066798566}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 1280, y: 720, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1090074781
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1090074783}
-  - component: {fileID: 1090074782}
-  m_Layer: 0
-  m_Name: DevTurnHud
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1090074782
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1090074781}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2ab4f31a5d38c70489833cd2abfefa15, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SoulBind.UI.DevTurnHud
-  matchController: {fileID: 1066798567}
-  boardView: {fileID: 0}
---- !u!4 &1090074783
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1090074781}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 1280, y: 720, z: 0}
@@ -3953,11 +3909,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3929577947380794319, guid: 8736e988818637c44868eaa552be909e, type: 3}
       propertyPath: m_LocalScale.x
-      value: 1.6
+      value: 2.4
       objectReference: {fileID: 0}
     - target: {fileID: 3929577947380794319, guid: 8736e988818637c44868eaa552be909e, type: 3}
       propertyPath: m_LocalScale.y
-      value: 1.6
+      value: 2.4
       objectReference: {fileID: 0}
     - target: {fileID: 3929577947380794319, guid: 8736e988818637c44868eaa552be909e, type: 3}
       propertyPath: m_LocalScale.z
@@ -5293,7 +5249,6 @@ SceneRoots:
   - {fileID: 536090344}
   - {fileID: 844109289}
   - {fileID: 1066798568}
-  - {fileID: 1090074783}
   - {fileID: 1098083873}
   - {fileID: 2141627600}
   - {fileID: 549267693}
