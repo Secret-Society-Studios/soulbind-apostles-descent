@@ -24,8 +24,12 @@ namespace SoulBind.UI
     /// </summary>
     public sealed class MatchOverlay : MonoBehaviour
     {
-        private const float BannerTime = 2.8f;
-        private const float FadeTime = 0.25f;
+        private const float BannerTime = 3.6f;  // at normal animation speed
+        private const float BandOpenTime = 0.45f;
+        private const float LetterSettleTime = 0.9f;
+        private const float FadeTime = 0.6f;
+        private const float WideSpacing = 40f;   // the gold letters start spread out and draw together
+        private const float RestSpacing = 6f;
         private const float EndScreenDelay = 1.2f;   // lets the last animations finish first
 
         private static readonly Color PanelColor = new Color(0.07f, 0.06f, 0.10f, 0.92f);
@@ -38,6 +42,15 @@ namespace SoulBind.UI
         // Banners
         private CanvasGroup _bannerGroup;
         private TMP_Text _bannerText;
+        private RectTransform _bannerBand;
+        private float _bannerLength;
+
+        // The guide shown while Apostles pick their starting tiles.
+        private CanvasGroup _guideGroup;
+        private TMP_Text _guideTitle;
+        private TMP_Text _guideText;
+        private float _guideTime;
+        private bool _guideWanted;
         private readonly Queue<string> _bannerQueue = new Queue<string>();
         private float _bannerTimer;
 
@@ -84,6 +97,7 @@ namespace SoulBind.UI
 
         private void Refresh()
         {
+            RefreshGuide();
             Match match = _controller != null ? _controller.CurrentMatch : null;
             if (match == null)
                 return;
@@ -132,6 +146,7 @@ namespace SoulBind.UI
         private void Update()
         {
             UpdateBanner(Time.unscaledDeltaTime);
+            UpdateGuide(Time.unscaledDeltaTime);
 
             if (_endScreenTimer >= 0f)
             {
@@ -139,6 +154,46 @@ namespace SoulBind.UI
                 if (_endScreenTimer < 0f)
                     ShowEndScreen();
             }
+        }
+
+        // ---- Starting tile guide ----
+
+        // Before the first turn: tells the player to pick an edge tile, or who is picking now.
+        private void RefreshGuide()
+        {
+            if (_controller == null || _guideGroup == null)
+                return;
+            _guideWanted = _controller.IsChoosingSpawns && _controller.SpawnPickerId != 0;
+            if (!_guideWanted)
+                return;
+
+            int picker = _controller.SpawnPickerId;
+            if (_controller.IsLocalSpawnPick)
+            {
+                _guideTitle.text = _controller.BotsPlayOthers ? "Pick an edge tile" : $"Apostle {picker}: pick an edge tile";
+                _guideText.text = "Click a highlighted tile on the edge of the board to choose where you start.";
+            }
+            else
+            {
+                _guideTitle.text = $"Apostle {picker} is choosing";
+                _guideText.text = "Each Apostle picks a starting tile on the edge, in turn order.";
+            }
+        }
+
+        // Fades in and out, and breathes gently while it waits for a pick.
+        private void UpdateGuide(float delta)
+        {
+            if (_guideGroup == null)
+                return;
+            float target = _guideWanted ? 1f : 0f;
+            float speed = delta / MotionStyle.Seconds(0.4f);
+            _guideGroup.alpha = Mathf.MoveTowards(_guideGroup.alpha, target, speed);
+            _guideGroup.gameObject.SetActive(_guideGroup.alpha > 0f || _guideWanted);
+            if (!_guideWanted)
+                return;
+            _guideTime += delta * Mathf.Max(0.1f, MotionStyle.Speed);
+            float wave = (Mathf.Sin(_guideTime * Mathf.PI * 2f / 2.4f) + 1f) / 2f;
+            _guideTitle.alpha = Mathf.Lerp(0.75f, 1f, wave);
         }
 
         // ---- Banners ----
@@ -158,12 +213,23 @@ namespace SoulBind.UI
                     return;
                 }
                 _bannerText.text = _bannerQueue.Dequeue();
-                _bannerTimer = BannerTime;
+                _bannerLength = MotionStyle.Seconds(BannerTime);
+                _bannerTimer = _bannerLength;
             }
 
             _bannerTimer -= delta;
-            float shown = BannerTime - _bannerTimer;
-            _bannerGroup.alpha = Mathf.Clamp01(Mathf.Min(shown, _bannerTimer) / FadeTime);
+            float speed = Mathf.Max(0.1f, MotionStyle.Speed);
+            float shown = (_bannerLength - _bannerTimer) * speed;   // in seconds at normal speed
+            float left = Mathf.Max(0f, _bannerTimer) * speed;
+
+            // The dark band opens from the middle, the gold letters fade in spread wide and draw
+            // together, and at the end everything fades slowly.
+            float open = MotionStyle.Out(shown / BandOpenTime);
+            _bannerBand.localScale = new Vector3(open, 1f, 1f);
+            _bannerText.characterSpacing = Mathf.Lerp(WideSpacing, RestSpacing, MotionStyle.Out(shown / LetterSettleTime));
+            float textIn = Mathf.Clamp01((shown - BandOpenTime * 0.5f) / BandOpenTime);
+            _bannerText.alpha = textIn;
+            _bannerGroup.alpha = left < FadeTime ? MotionStyle.InOut(left / FadeTime) : 1f;
         }
 
         // ---- End screen ----
@@ -283,14 +349,65 @@ namespace SoulBind.UI
             banner.anchorMin = banner.anchorMax = new Vector2(0.5f, 1f);
             banner.pivot = new Vector2(0.5f, 1f);
             banner.anchoredPosition = new Vector2(0f, -150f);
-            banner.sizeDelta = new Vector2(900f, 64f);
-            AddImage(banner, PanelColor, false);
+            banner.sizeDelta = new Vector2(1100f, 76f);
             _bannerGroup = banner.gameObject.AddComponent<CanvasGroup>();
             _bannerGroup.alpha = 0f;
             _bannerGroup.blocksRaycasts = false;
-            _bannerText = CreateText("Text", banner, 30f, FontStyles.Bold);
+
+            // The band (which opens sideways), with a thin gold line along its top and bottom edges.
+            _bannerBand = CreateRect("Band", banner);
+            Stretch(_bannerBand);
+            AddImage(_bannerBand, new Color(0.03f, 0.02f, 0.05f, 0.9f), false);
+            for (int lineIndex = 0; lineIndex < 2; lineIndex++)
+            {
+                RectTransform line = CreateRect(lineIndex == 0 ? "TopLine" : "BottomLine", _bannerBand);
+                line.anchorMin = new Vector2(0f, lineIndex == 0 ? 1f : 0f);
+                line.anchorMax = new Vector2(1f, lineIndex == 0 ? 1f : 0f);
+                line.pivot = new Vector2(0.5f, lineIndex == 0 ? 1f : 0f);
+                line.sizeDelta = new Vector2(0f, 2f);
+                line.anchoredPosition = Vector2.zero;
+                AddImage(line, new Color(GoldColor.r, GoldColor.g, GoldColor.b, 0.7f), false);
+            }
+
+            _bannerText = CreateText("Text", banner, 32f, FontStyles.Bold | FontStyles.UpperCase);
             Stretch(_bannerText.rectTransform);
             _bannerText.color = GoldColor;
+
+            // The starting tile guide: the same dark band, with a line of help under the title.
+            RectTransform guide = CreateRect("SpawnGuide", root);
+            guide.anchorMin = guide.anchorMax = new Vector2(0.5f, 1f);
+            guide.pivot = new Vector2(0.5f, 1f);
+            // Near the top edge: the portraits only appear once the match starts, so the space is free.
+            guide.anchoredPosition = new Vector2(0f, -20f);
+            guide.sizeDelta = new Vector2(1100f, 96f);
+            AddImage(guide, new Color(0.03f, 0.02f, 0.05f, 0.9f), false);
+            for (int lineIndex = 0; lineIndex < 2; lineIndex++)
+            {
+                RectTransform line = CreateRect(lineIndex == 0 ? "TopLine" : "BottomLine", guide);
+                line.anchorMin = new Vector2(0f, lineIndex == 0 ? 1f : 0f);
+                line.anchorMax = new Vector2(1f, lineIndex == 0 ? 1f : 0f);
+                line.pivot = new Vector2(0.5f, lineIndex == 0 ? 1f : 0f);
+                line.sizeDelta = new Vector2(0f, 2f);
+                line.anchoredPosition = Vector2.zero;
+                AddImage(line, new Color(GoldColor.r, GoldColor.g, GoldColor.b, 0.7f), false);
+            }
+            _guideGroup = guide.gameObject.AddComponent<CanvasGroup>();
+            _guideGroup.alpha = 0f;
+            _guideGroup.blocksRaycasts = false;
+            _guideTitle = CreateText("Title", guide, 32f, FontStyles.Bold | FontStyles.UpperCase);
+            _guideTitle.rectTransform.anchorMin = new Vector2(0f, 0.42f);
+            _guideTitle.rectTransform.anchorMax = new Vector2(1f, 1f);
+            _guideTitle.rectTransform.offsetMin = Vector2.zero;
+            _guideTitle.rectTransform.offsetMax = Vector2.zero;
+            _guideTitle.color = GoldColor;
+            _guideTitle.characterSpacing = RestSpacing;
+            _guideText = CreateText("Help", guide, 20f, FontStyles.Normal);
+            _guideText.rectTransform.anchorMin = new Vector2(0f, 0f);
+            _guideText.rectTransform.anchorMax = new Vector2(1f, 0.45f);
+            _guideText.rectTransform.offsetMin = Vector2.zero;
+            _guideText.rectTransform.offsetMax = Vector2.zero;
+            _guideText.color = new Color(1f, 1f, 1f, 0.75f);
+            guide.gameObject.SetActive(false);
 
             // End screen: dims everything and blocks clicks.
             RectTransform end = CreateRect("EndScreen", root);

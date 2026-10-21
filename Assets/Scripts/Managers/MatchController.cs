@@ -47,10 +47,15 @@ namespace SoulBind.Managers
         [SerializeField] private float botTurnStartDelay = 0.6f;
 
         [Header("Animation")]
-        [Tooltip("How fast Apostle discs slide from tile to tile, in world units per second.")]
+        [Tooltip("Speed of every animation: 1 = normal, 2 = twice as fast, 0.5 = half speed.")]
+        [SerializeField, Range(0.5f, 2f)] private float animationSpeed = 1f;
+        [Tooltip("A short, subtle camera shake when a Strike lands.")]
+        [SerializeField] private bool screenShake = true;
+        [Tooltip("How fast pieces glide from tile to tile, in world units per second (before easing in and out).")]
         [SerializeField] private float discMoveSpeed = 7f;
-        [Tooltip("How far an attacker's disc lunges toward its target when it Strikes.")]
+        [Tooltip("How far an attacker's piece lunges toward its target when it Strikes.")]
         [SerializeField] private float lungeDistance = 0.4f;
+        [Tooltip("Length of the Strike's quickest part. The whole Strike (wind-up, strike, recovery) takes about three times this.")]
         [SerializeField] private float lungeTime = 0.3f;
         [Tooltip("Rising numbers above Apostles for damage, healing, Souls and Corruption.")]
         [SerializeField] private bool showStatPopups = true;
@@ -127,12 +132,37 @@ namespace SoulBind.Managers
         /// <summary>True while the Apostles are picking their starting tiles (before the first turn).</summary>
         public bool IsChoosingSpawns => _draft != null;
 
+        /// <summary>Who picks a starting tile now (0 when nobody is picking).</summary>
+        public int SpawnPickerId => _draft != null ? _draft.CurrentPickerId : 0;
+
+        /// <summary>True when the Apostle picking a starting tile now is played on this screen.</summary>
+        public bool IsLocalSpawnPick => _draft != null && _draft.CurrentPickerId != 0
+                                        && (!botsPlayOthers || _draft.CurrentPickerId == localApostleId);
+
         // Disc animation: each disc slides toward its tile; a Striking disc lunges at its target.
         private readonly List<Vector3> _discTargets = new List<Vector3>(GameConstants.MaxPlayers);
         private readonly List<Vector3> _discPositions = new List<Vector3>(GameConstants.MaxPlayers);
         private int _lungeIndex = -1;
         private Vector3 _lungeDirection;
         private float _lungeElapsed;
+        private float _lungeDuration;
+        private bool _impactDone;
+        private bool _strikeStartedNow;
+        private readonly List<Vector3> _impactTargets = new List<Vector3>(GameConstants.MaxPlayers);
+
+        // Gliding pieces: each move eases in and out, leaving a little smoke behind.
+        private readonly Vector3[] _moveFrom = new Vector3[GameConstants.MaxPlayers];
+        private readonly Vector3[] _moveTo = new Vector3[GameConstants.MaxPlayers];
+        private readonly float[] _moveElapsed = new float[GameConstants.MaxPlayers];
+        private readonly float[] _moveDuration = new float[GameConstants.MaxPlayers];
+        private readonly float[] _smokeTimer = new float[GameConstants.MaxPlayers];
+        private TableEffects _effects;
+        private int _auraIndex = -1;
+
+        // A Strike, as shares of its time: wind-up (pull back), strike (impact at the end), recovery.
+        private const float WindUpEnd = 0.4f;
+        private const float ImpactAt = 0.55f;
+        private float StrikeDesignedSeconds => Mathf.Max(0.15f, lungeTime) * 3.2f;
         private bool _wasEngaged;
         private int _engagedAttackerId;
 
@@ -209,6 +239,9 @@ namespace SoulBind.Managers
                 ? $"MatchController: fixed Seed {usedSeed}, so this match is the same every time. Set Seed to 0 for a new match each time."
                 : $"MatchController: seed {usedSeed}. To replay this exact match, type it into Seed on MatchController.");
             _disc = DiscSpriteFactory.Create(apostleDiameter);
+            MotionStyle.Speed = animationSpeed;
+            MotionStyle.ScreenShake = screenShake;
+            _effects = TableEffects.Create(transform);
             if (showStatPopups)
                 _numbers = FloatingNumbers.Create(transform, 1.3f, 0.9f, popupFontSize);
 
@@ -256,6 +289,7 @@ namespace SoulBind.Managers
                 _views.Add(view);
                 _discTargets.Add(center);
                 _discPositions.Add(center);
+                _moveTo[id - 1] = center;
             }
         }
 
@@ -422,6 +456,13 @@ namespace SoulBind.Managers
                 AfterMatchChange();
             }
             return result;
+        }
+
+        // Changing the speed or shake in the Inspector during Play takes effect straight away.
+        private void OnValidate()
+        {
+            MotionStyle.Speed = animationSpeed;
+            MotionStyle.ScreenShake = screenShake;
         }
 
         private void Update()
@@ -959,32 +1000,99 @@ namespace SoulBind.Managers
             }
         }
 
-        // Slides each disc toward its tile, and plays the attacker's lunge.
+        // Glides each piece to its tile (easing in and out, trailing smoke), plays the attacker's Strike,
+        // and keeps the aura under the Apostle whose turn it is.
         private void AnimateDiscs()
         {
             if (_views.Count == 0)
                 return;
 
-            float step = discMoveSpeed * Time.deltaTime;
+            float delta = Time.deltaTime;
             float lunge = 0f;
             if (_lungeIndex >= 0)
             {
-                _lungeElapsed += Time.deltaTime;
-                float t = _lungeElapsed / Mathf.Max(0.05f, lungeTime);
+                _lungeElapsed += delta;
+                float t = _lungeElapsed / _lungeDuration;
                 if (t >= 1f)
+                {
                     _lungeIndex = -1;
+                }
                 else
-                    lunge = Mathf.Sin(t * Mathf.PI) * lungeDistance;
+                {
+                    lunge = StrikeOffset(t);
+                    if (!_impactDone && t >= ImpactAt)
+                    {
+                        _impactDone = true;
+                        Impact();
+                    }
+                }
             }
 
             for (int i = 0; i < _views.Count; i++)
             {
-                _discPositions[i] = Vector3.MoveTowards(_discPositions[i], _discTargets[i], step);
+                // A new destination: start a move from wherever the piece is now.
+                if (_discTargets[i] != _moveTo[i])
+                {
+                    _moveTo[i] = _discTargets[i];
+                    _moveFrom[i] = _discPositions[i];
+                    _moveElapsed[i] = 0f;
+                    float distance = Vector3.Distance(_moveFrom[i], _moveTo[i]);
+                    _moveDuration[i] = distance < 0.001f ? 0f
+                        : MotionStyle.Seconds(Mathf.Clamp(distance / Mathf.Max(0.1f, discMoveSpeed) * 1.6f, 0.35f, 1.1f));
+                    _smokeTimer[i] = 0f;
+                }
+
+                if (_moveElapsed[i] < _moveDuration[i])
+                {
+                    _moveElapsed[i] += delta;
+                    float u = Mathf.Clamp01(_moveElapsed[i] / _moveDuration[i]);
+                    _discPositions[i] = Vector3.Lerp(_moveFrom[i], _moveTo[i], MotionStyle.InOut(u));
+                    _smokeTimer[i] -= delta;
+                    if (_effects != null && _smokeTimer[i] <= 0f && u > 0.05f && u < 0.95f)
+                    {
+                        _smokeTimer[i] = MotionStyle.Seconds(0.07f);
+                        _effects.Smoke(_discPositions[i], apostleDiameter);
+                    }
+                }
+                else
+                {
+                    _discPositions[i] = _discTargets[i];
+                }
+
                 Vector3 position = _discPositions[i];
                 if (i == _lungeIndex)
                     position += _lungeDirection * lunge;
                 _views[i].transform.position = position;
             }
+
+            if (_effects != null)
+            {
+                bool aura = _auraIndex >= 0 && _auraIndex < _views.Count && _views[_auraIndex].gameObject.activeSelf;
+                _effects.SetAura(aura, aura ? _views[_auraIndex].transform.position : Vector3.zero,
+                    aura ? ApostleColors.Get(_auraIndex + 1) : Color.clear, apostleDiameter * 2f);
+            }
+        }
+
+        // The attacker's offset along the line of attack: it draws back, holds for a breath, strikes fast,
+        // then returns slowly. No bounce.
+        private float StrikeOffset(float t)
+        {
+            if (t < WindUpEnd)
+                return -0.35f * lungeDistance * MotionStyle.Out(t / WindUpEnd);
+            if (t < ImpactAt)
+                return Mathf.Lerp(-0.35f * lungeDistance, lungeDistance, MotionStyle.In((t - WindUpEnd) / (ImpactAt - WindUpEnd)));
+            return lungeDistance * (1f - MotionStyle.InOut((t - ImpactAt) / (1f - ImpactAt)));
+        }
+
+        // The Strike lands: a slash on every Apostle hit, a shudder and a dark pulse at the screen's edges.
+        private void Impact()
+        {
+            if (_effects == null)
+                return;
+            for (int i = 0; i < _impactTargets.Count; i++)
+                _effects.Strike(_impactTargets[i], _lungeDirection, apostleDiameter * 1.4f);
+            _effects.Shake(0.12f, 0.35f);
+            _effects.DarkPulse(0.6f);
         }
 
         // A Strike just happened (by a button, a bot, or automatically at End Turn): the attacker lunges.
@@ -1002,6 +1110,16 @@ namespace SoulBind.Managers
                     _lungeDirection = direction.sqrMagnitude > 0f ? direction.normalized : Vector3.zero;
                     _lungeIndex = attacker;
                     _lungeElapsed = 0f;
+                    _lungeDuration = MotionStyle.Seconds(StrikeDesignedSeconds);
+                    _impactDone = false;
+                    _strikeStartedNow = true; // the damage numbers wait for the impact
+                    _impactTargets.Clear();
+                    for (int h = 0; h < hits.Count; h++)
+                    {
+                        int hit = IndexOfApostle(hits[h].TargetId);
+                        if (hit >= 0)
+                            _impactTargets.Add(_discTargets[hit]);
+                    }
                 }
             }
 
@@ -1021,30 +1139,32 @@ namespace SoulBind.Managers
             return -1;
         }
 
-        // Rising numbers for whatever changed since the last update: red damage, green healing,
-        // gold Souls and purple Corruption.
+        // Rising numbers for whatever changed since the last update: crimson damage, green healing,
+        // gold Souls and violet Corruption. After a Strike they wait for its impact.
         private void ShowStatChanges()
         {
+            float delay = _strikeStartedNow ? StrikeDesignedSeconds * ImpactAt : 0f;
+            _strikeStartedNow = false;
             IReadOnlyList<ApostleState> apostles = CurrentMatch.Battlefield.Apostles;
             for (int i = 0; i < apostles.Count && i < _lastVessel.Length; i++)
             {
                 ApostleState apostle = apostles[i];
                 if (_statsTaken && _numbers != null)
                 {
-                    Vector3 above = _discTargets[i] + new Vector3(0f, 0.45f, -0.1f);
+                    Vector3 above = _discTargets[i] + new Vector3(0f, 0.45f, -2f); // in front of the standing pieces
                     int line = 0;
                     int vessel = apostle.Vessel - _lastVessel[i];
                     if (vessel != 0)
                         _numbers.Show(above + Vector3.up * (0.4f * line++), vessel > 0 ? $"+{vessel}" : vessel.ToString(),
-                            vessel > 0 ? new Color(0.45f, 1f, 0.5f) : new Color(1f, 0.35f, 0.3f));
+                            vessel > 0 ? new Color(0.50f, 0.85f, 0.60f) : new Color(0.90f, 0.14f, 0.18f), delay);
                     int souls = apostle.Souls - _lastSouls[i];
                     if (souls != 0)
                         _numbers.Show(above + Vector3.up * (0.4f * line++), souls > 0 ? $"+{souls} Soul" : $"{souls} Soul",
-                            new Color(1f, 0.85f, 0.3f));
+                            new Color(0.95f, 0.78f, 0.35f), delay);
                     int corruption = apostle.Corruption - _lastCorruption[i];
                     if (corruption != 0)
                         _numbers.Show(above + Vector3.up * (0.4f * line), corruption > 0 ? $"+{corruption} Corr" : $"{corruption} Corr",
-                            new Color(0.8f, 0.5f, 1f));
+                            new Color(0.68f, 0.42f, 0.95f), delay);
                 }
                 _lastVessel[i] = apostle.Vessel;
                 _lastSouls[i] = apostle.Souls;
@@ -1112,6 +1232,7 @@ namespace SoulBind.Managers
 
         private void SyncViews()
         {
+            _auraIndex = -1;
             AscensionTracker ascension = CurrentMatch.Ascension;
             IReadOnlyList<ApostleState> apostles = CurrentMatch.Battlefield.Apostles;
             for (int i = 0; i < apostles.Count; i++)
@@ -1128,7 +1249,10 @@ namespace SoulBind.Managers
                     _discPositions[i] = _discTargets[i];
                     view.transform.position = _discTargets[i];
                 }
-                view.SetActiveTurn(apostle == CurrentMatch.CurrentApostle);
+                // No size pop for the Apostle whose turn it is: a slow aura under its piece instead.
+                view.SetActiveTurn(false);
+                if (apostle == CurrentMatch.CurrentApostle && !CurrentMatch.IsOver)
+                    _auraIndex = i;
                 view.SetAwakened(ascension.HasAwakened && apostle.Id == ascension.AwakenedId);
             }
         }

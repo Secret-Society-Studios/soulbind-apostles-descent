@@ -10,6 +10,10 @@ namespace SoulBind.UI
     /// draw pile to a hand when drawn. Opponents' cards fly face-down, and turn face-up only when they
     /// land on the (public) discard pile. A flight is only a picture on top of everything: the rules have
     /// already moved the card, and the piles and hand hide it until it lands.
+    ///
+    /// Motion (see MotionStyle): drawn cards glide smoothly. A played card is the big moment: it lifts
+    /// off the hand, hangs for a beat (an opponent's card is revealed there), then drops onto the
+    /// discard pile and lands with a glow in its element's colour.
     /// HandView creates this layer at runtime as the last child of the Canvas, so it needs no setup.
     /// </summary>
     public sealed class CardFlightLayer : MonoBehaviour
@@ -31,7 +35,28 @@ namespace SoulBind.UI
             public bool EndFaceDown;
             public Action Landed;
             public bool Active;
+            public bool IsPlay;
+            public Vector3 Hang;
+            public float HangScale;
+            public Color Element;
         }
+
+        private sealed class Ember
+        {
+            public UnityEngine.UI.Image Image;
+            public float Age;
+            public float Duration;
+            public float Size;
+            public Color Color;
+            public bool Active;
+        }
+
+        private readonly List<Ember> _embers = new List<Ember>(4);
+
+        // A played card's path, as shares of its flight: lift, hang (and turn over), drop.
+        private const float LiftEnd = 0.32f;
+        private const float HangEnd = 0.5f;
+        private const float LiftPixels = 130f;
 
         private readonly List<Flight> _flights = new List<Flight>(8);
         private CardView _cardPrefab;
@@ -115,8 +140,9 @@ namespace SoulBind.UI
         /// As above, also turning from one on-screen angle to another (degrees, 0 = upright), for cards
         /// that lie turned along the sides of the mat.
         /// </summary>
+        /// isPlay: a card being played (lift, hang, drop, glow) rather than drawn.
         public void Fly(ArcanaId card, Vector3 from, float fromAngle, float fromScale, Vector3 to, float toAngle,
-            float toScale, bool startFaceDown, bool endFaceDown, float duration, Action landed)
+            float toScale, bool startFaceDown, bool endFaceDown, float duration, Action landed, bool isPlay = false)
         {
             if ((startFaceDown || endFaceDown) && _backTemplate == null)
             {
@@ -129,6 +155,14 @@ namespace SoulBind.UI
             flight.ToScale = toScale;
             flight.ToRotation = Quaternion.Euler(0f, 0f, toAngle);
             flight.Follow = null;
+            flight.IsPlay = isPlay;
+            if (isPlay)
+            {
+                // It rises a little toward the pile, and is shown larger while it hangs there.
+                flight.Hang = Vector3.Lerp(from, to, 0.2f) + Vector3.up * (LiftPixels * transform.lossyScale.y);
+                flight.HangScale = Mathf.Max(fromScale, toScale) * 1.25f;
+                flight.Element = CardView.GetElementColor(CardCatalog.Get(card).Element);
+            }
             Begin(flight, from, Quaternion.Euler(0f, 0f, fromAngle), fromScale, duration, landed);
         }
 
@@ -138,7 +172,8 @@ namespace SoulBind.UI
             flight.FromRotation = fromRotation;
             flight.FromScale = fromScale;
             flight.Elapsed = 0f;
-            flight.Duration = Mathf.Max(0.05f, duration);
+            // A play is the slow, weighty moment; a draw is a smooth glide, a little slower than before.
+            flight.Duration = Mathf.Max(0.05f, MotionStyle.Seconds(flight.IsPlay ? duration * 1.9f : duration * 1.15f));
             flight.Landed = landed;
             flight.Active = true;
             ActiveCount++;
@@ -186,6 +221,7 @@ namespace SoulBind.UI
                 _flights.Add(flight);
             }
 
+            flight.IsPlay = false;
             flight.Card.Show(CardCatalog.Get(card));
             flight.Card.SetSelected(false);
             flight.Card.SetDimmed(false);
@@ -198,6 +234,7 @@ namespace SoulBind.UI
 
         private void Update()
         {
+            UpdateEmbers(Time.unscaledDeltaTime);
             if (ActiveCount == 0)
                 return;
 
@@ -222,6 +259,8 @@ namespace SoulBind.UI
                     flight.Active = false;
                     flight.Card.gameObject.SetActive(false);
                     ActiveCount--;
+                    if (flight.IsPlay)
+                        Glow(flight.To, flight.Element, flight.Card.Rect.rect.height * flight.ToScale * transform.lossyScale.y);
                     Action landed = flight.Landed;
                     flight.Landed = null;
                     landed?.Invoke();
@@ -231,14 +270,20 @@ namespace SoulBind.UI
 
         private void Place(Flight flight, float t)
         {
-            float eased = 1f - (1f - t) * (1f - t) * (1f - t); // fast start, gentle landing
+            if (flight.IsPlay)
+            {
+                PlacePlay(flight, t);
+                return;
+            }
+
+            float eased = MotionStyle.InOut(t); // a smooth glide: no snap at either end
 
             Vector3 to = flight.Follow != null ? flight.Follow.position : flight.To;
             Quaternion toRotation = flight.Follow != null ? flight.Follow.rotation : flight.ToRotation;
             float toScale = flight.Follow != null ? flight.Follow.localScale.x : flight.ToScale;
 
-            // A small arc upward, scaled with the canvas so it looks the same at any resolution.
-            float arc = Mathf.Sin(t * Mathf.PI) * _arcHeight * transform.lossyScale.y;
+            // A low, gentle arc, scaled with the canvas so it looks the same at any resolution.
+            float arc = Mathf.Sin(eased * Mathf.PI) * _arcHeight * 0.35f * transform.lossyScale.y;
 
             RectTransform rect = flight.Card.Rect;
             rect.position = Vector3.Lerp(flight.From, to, eased) + Vector3.up * arc;
@@ -259,6 +304,122 @@ namespace SoulBind.UI
                 if (flight.Back != null)
                     flight.Back.gameObject.SetActive(flight.StartFaceDown);
             }
+        }
+    
+        // Lift (ease out), hang with a slow drift (an opponent's card turns face-up here), then drop
+        // (ease in, so it lands with weight).
+        private void PlacePlay(Flight flight, float t)
+        {
+            RectTransform rect = flight.Card.Rect;
+            Vector3 position;
+            Quaternion rotation;
+            float scale;
+            bool faceDown;
+            float width = 1f;
+
+            if (t < LiftEnd)
+            {
+                float u = MotionStyle.Out(t / LiftEnd);
+                position = Vector3.Lerp(flight.From, flight.Hang, u);
+                rotation = Quaternion.Slerp(flight.FromRotation, Quaternion.identity, u);
+                scale = Mathf.Lerp(flight.FromScale, flight.HangScale, u);
+                faceDown = flight.StartFaceDown;
+            }
+            else if (t < HangEnd)
+            {
+                float u = (t - LiftEnd) / (HangEnd - LiftEnd);
+                position = flight.Hang + Vector3.up * (12f * transform.lossyScale.y * MotionStyle.InOut(u));
+                rotation = Quaternion.identity;
+                scale = flight.HangScale;
+                if (flight.StartFaceDown != flight.EndFaceDown)
+                {
+                    width = Mathf.Abs(Mathf.Cos(u * Mathf.PI));
+                    faceDown = u < 0.5f ? flight.StartFaceDown : flight.EndFaceDown;
+                }
+                else
+                {
+                    faceDown = flight.EndFaceDown;
+                }
+            }
+            else
+            {
+                float u = MotionStyle.In((t - HangEnd) / (1f - HangEnd));
+                Vector3 top = flight.Hang + Vector3.up * (12f * transform.lossyScale.y);
+                position = Vector3.Lerp(top, flight.To, u);
+                rotation = Quaternion.Slerp(Quaternion.identity, flight.ToRotation, u);
+                scale = Mathf.Lerp(flight.HangScale, flight.ToScale, u);
+                faceDown = flight.EndFaceDown;
+            }
+
+            rect.position = position;
+            rect.rotation = rotation;
+            rect.localScale = new Vector3(scale * width, scale, 1f);
+            if (flight.Back != null)
+                flight.Back.gameObject.SetActive(faceDown);
+        }
+
+        // A soft glow in the card's element colour where it landed, spreading and fading.
+        private void Glow(Vector3 position, Color color, float size)
+        {
+            Ember ember = null;
+            for (int i = 0; i < _embers.Count; i++)
+            {
+                if (!_embers[i].Active)
+                {
+                    ember = _embers[i];
+                    break;
+                }
+            }
+            if (ember == null)
+            {
+                var go = new GameObject("Ember", typeof(RectTransform));
+                go.layer = gameObject.layer;
+                go.transform.SetParent(transform, false);
+                var image = go.AddComponent<UnityEngine.UI.Image>();
+                image.sprite = MotionStyle.Glow;
+                image.raycastTarget = false;
+                ember = new Ember { Image = image };
+                _embers.Add(ember);
+            }
+            ember.Age = 0f;
+            ember.Duration = MotionStyle.Seconds(0.6f);
+            ember.Size = Mathf.Max(10f, size);
+            ember.Color = color;
+            ember.Active = true;
+            RectTransform rect = ember.Image.rectTransform;
+            rect.SetAsFirstSibling(); // under the flying cards
+            rect.position = position;
+            ember.Image.gameObject.SetActive(true);
+            PlaceEmber(ember, 0f);
+        }
+
+        private void UpdateEmbers(float delta)
+        {
+            for (int i = 0; i < _embers.Count; i++)
+            {
+                Ember ember = _embers[i];
+                if (!ember.Active)
+                    continue;
+                ember.Age += delta;
+                float t = ember.Age / ember.Duration;
+                if (t >= 1f)
+                {
+                    ember.Active = false;
+                    ember.Image.gameObject.SetActive(false);
+                    continue;
+                }
+                PlaceEmber(ember, t);
+            }
+        }
+
+        private void PlaceEmber(Ember ember, float t)
+        {
+            float lossy = Mathf.Max(0.0001f, transform.lossyScale.y);
+            float size = ember.Size / lossy * Mathf.Lerp(0.7f, 1.6f, MotionStyle.Out(t));
+            ember.Image.rectTransform.sizeDelta = new Vector2(size, size);
+            Color color = ember.Color;
+            color.a = 0.85f * (1f - MotionStyle.InOut(t));
+            ember.Image.color = color;
         }
     }
 }

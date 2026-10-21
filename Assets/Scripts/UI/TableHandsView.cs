@@ -694,7 +694,7 @@ namespace SoulBind.UI
                 return false;
 
             _flights.Fly(card, start, startAngle, _flights.ScaleForPixels(startPixels), to, 0f,
-                _flights.ScaleForPixels(toPixels), !seat.IsYours, false, playFlightTime, discardPile.ReleaseOne);
+                _flights.ScaleForPixels(toPixels), !seat.IsYours, false, playFlightTime, discardPile.ReleaseOne, true);
             return true;
         }
 
