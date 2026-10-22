@@ -61,7 +61,14 @@ namespace SoulBind.UI
             if (matchController == null)
                 Debug.LogError("MatchHud: assign the Match Controller in the Inspector.", this);
             else if (_canvas != null)
-                MatchOverlay.Create(_canvas.rootCanvas, matchController); // banners and the end-of-match screen
+            {
+                // Banners and the end-of-match screen.
+                MatchOverlay overlay = MatchOverlay.Create(_canvas.rootCanvas, matchController);
+                // The dark gothic look, over what Build Match HUD made (nothing in the scene is rebuilt).
+                GothicTheme.ApplyToHud(transform);
+                GothicTheme.ApplyToOverlay(overlay.transform);
+                GothicTheme.ApplyToTable(matchController.BoardView);
+            }
             Refresh();
         }
 
@@ -101,6 +108,7 @@ namespace SoulBind.UI
 
                 bool isPickable = matchController.IsChoosingComboTarget && !isCurrent && !apostle.IsEliminated;
                 panel.Show(apostle, isCurrent, ascension.HasAwakened && ascension.AwakenedId == apostle.Id, isPickable);
+                GothicTheme.SetPortraitHighlight(panel, isCurrent);
             }
         }
 
@@ -119,6 +127,7 @@ namespace SoulBind.UI
                 panel.Initialize(apostle.Id, ApostleColors.Get(apostle.Id));
                 if (apostleArt != null)
                     panel.SetPortrait(apostleArt.GetPortrait(apostle.Id));
+                GothicTheme.StylePortrait(panel); // after the portrait art, so the gold frame sits on top
                 panel.Clicked += OnPortraitClicked;
                 _panels.Add(panel);
             }

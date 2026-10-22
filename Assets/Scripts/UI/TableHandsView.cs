@@ -53,6 +53,12 @@ namespace SoulBind.UI
         [Tooltip("Opponents' hands bigger than this show this many face-down cards (the label still gives the real count). Your own hand always shows every card.")]
         [SerializeField, Range(1, 15)] private int maxCardsShown = 10;
 
+        [Header("Glows around the hands")]
+        [Tooltip("The hand of the Apostle whose turn it is glows in this colour (pulsing slowly).")]
+        [SerializeField] private Color turnGlowColor = new Color(1f, 0.80f, 0.42f, 1f);
+        [Tooltip("A hand whose Apostle has DEF above 0 glows in this colour.")]
+        [SerializeField] private Color defenseGlowColor = new Color(0.45f, 0.70f, 1f, 1f);
+
         [Header("Your hand")]
         [Tooltip("How far a hovered card slides toward the board, in canvas pixels.")]
         [SerializeField] private float hoverLift = 70f;
@@ -73,6 +79,11 @@ namespace SoulBind.UI
             public float CardScale;
             public RectTransform Root;
             public RectTransform Tray;
+            public Image TurnGlow;
+            public Image DefenseGlow;
+            public Outline Edge;
+            public bool IsTurn;
+            public bool HasDefense;
             public TMP_Text Label;
             public readonly List<CardView> Faces = new List<CardView>(12);
             public readonly List<RectTransform> Backs = new List<RectTransform>(12);
@@ -200,6 +211,7 @@ namespace SoulBind.UI
             }
 
             ApplyChanges(match);
+            UpdateGlows(match);
 
             // The screen now belongs to someone else (hot-seat testing): let cards land, then turn the table.
             if (viewer != _builtViewer)
@@ -257,6 +269,11 @@ namespace SoulBind.UI
                 seat.Root.anchoredPosition = new Vector2(local.x, local.y);
                 seat.Root.localRotation = Quaternion.Euler(0f, 0f, rotation);
 
+                // Glows behind the tray: gold on the turn's Apostle, blue while it has DEF.
+                // The gold one is wide, the blue one tight to the tray, so both show when both apply.
+                seat.TurnGlow = CreateGlow("TurnGlow", seat.Root, turnGlowColor, 0.25f);
+                seat.DefenseGlow = CreateGlow("DefenseGlow", seat.Root, defenseGlowColor, 0.38f);
+
                 // A dark tray behind the cards, edged in the Apostle's color.
                 seat.Tray = CreateRect("Tray", seat.Root);
                 Image tray = seat.Tray.gameObject.AddComponent<Image>();
@@ -265,6 +282,7 @@ namespace SoulBind.UI
                 Outline edge = seat.Tray.gameObject.AddComponent<Outline>();
                 edge.effectColor = ApostleColors.Get(apostle.Id);
                 edge.effectDistance = new Vector2(3f, -3f);
+                seat.Edge = edge;
 
                 // The name, on the outer edge, always upright on screen.
                 RectTransform labelRect = CreateRect("Label", seat.Root);
@@ -293,6 +311,7 @@ namespace SoulBind.UI
 
             _builtFor = match;
             _builtViewer = viewer;
+            UpdateGlows(match);
             _lastDiscardCount = match.Deck.DiscardCount;
             _lastDrawCount = match.Deck.DrawCount;
         }
@@ -437,6 +456,8 @@ namespace SoulBind.UI
             float rowWidth = (slots - 1) * Spacing(seat, slots) + CardWidth * seat.CardScale;
             seat.Tray.sizeDelta = new Vector2(rowWidth + 2f * trayPadding, CardHeight * seat.CardScale + 2f * trayPadding);
             seat.Tray.anchoredPosition = new Vector2(0f, RowY(seat));
+            FitGlow(seat.TurnGlow, seat.Tray, 64f);
+            FitGlow(seat.DefenseGlow, seat.Tray, 42f);
 
             ApostleState apostle = FindApostle(match, seat.ApostleId);
             int count = Mathf.Max(0, seat.Shown.Count - seat.Arriving);
@@ -506,6 +527,8 @@ namespace SoulBind.UI
                 if (match != null)
                     BuildSeats(match, matchController.ViewerId);
             }
+
+            PulseGlows();
 
             Seat seat = _yours;
             if (seat == null)
@@ -750,6 +773,80 @@ namespace SoulBind.UI
                     seat.Faces[last].Rect.localScale = Vector3.one * seat.CardScale;
                 }
             }
+        }
+
+        // ---- Glows ----
+
+        // Which hands glow: the turn's Apostle (gold) and every Apostle with DEF above 0 (blue).
+        private void UpdateGlows(Match match)
+        {
+            for (int i = 0; i < _seats.Count; i++)
+            {
+                Seat seat = _seats[i];
+                ApostleState apostle = FindApostle(match, seat.ApostleId);
+                bool alive = apostle != null && !apostle.IsEliminated && !match.IsOver;
+                seat.IsTurn = alive && match.CurrentApostle != null && match.CurrentApostle.Id == seat.ApostleId;
+                seat.HasDefense = alive && apostle.Defense > 0;
+                if (seat.TurnGlow != null)
+                    seat.TurnGlow.gameObject.SetActive(seat.IsTurn);
+                if (seat.DefenseGlow != null)
+                    seat.DefenseGlow.gameObject.SetActive(seat.HasDefense);
+                // While it has DEF, the tray's edge also turns the defense colour, and thicker.
+                if (seat.Edge != null)
+                {
+                    seat.Edge.effectColor = seat.HasDefense ? defenseGlowColor : ApostleColors.Get(seat.ApostleId);
+                    seat.Edge.effectDistance = seat.HasDefense ? new Vector2(6f, -6f) : new Vector2(3f, -3f);
+                }
+            }
+        }
+
+        // The turn's glow breathes slowly; the DEF glow shimmers faintly. A few seats, no allocation.
+        private void PulseGlows()
+        {
+            float speed = Mathf.Max(0.1f, MotionStyle.Speed);
+            float time = Time.unscaledTime * speed;
+            float breath = (Mathf.Sin(time * Mathf.PI * 2f / 2.4f) + 1f) / 2f;
+            float shimmer = (Mathf.Sin(time * Mathf.PI * 2f / 3.7f) + 1f) / 2f;
+            for (int i = 0; i < _seats.Count; i++)
+            {
+                Seat seat = _seats[i];
+                if (seat.IsTurn && seat.TurnGlow != null)
+                {
+                    Color color = turnGlowColor;
+                    color.a *= Mathf.Lerp(0.45f, 0.95f, breath);
+                    seat.TurnGlow.color = color;
+                }
+                if (seat.HasDefense && seat.DefenseGlow != null)
+                {
+                    Color color = defenseGlowColor;
+                    color.a *= Mathf.Lerp(0.85f, 1f, shimmer);
+                    seat.DefenseGlow.color = color;
+                }
+            }
+        }
+
+        // width: smaller makes a wider band (it scales the glow sprite's edge).
+        private static Image CreateGlow(string name, RectTransform parent, Color color, float width)
+        {
+            RectTransform rect = CreateRect(name, parent);
+            Image image = rect.gameObject.AddComponent<Image>();
+            image.sprite = GothicTheme.EdgeGlowSprite;
+            image.type = Image.Type.Sliced;
+            image.pixelsPerUnitMultiplier = width;
+            image.color = color;
+            image.raycastTarget = false;
+            rect.gameObject.SetActive(false);
+            return image;
+        }
+
+        // The glow covers the tray plus this much on every side.
+        private static void FitGlow(Image glow, RectTransform tray, float outset)
+        {
+            if (glow == null)
+                return;
+            RectTransform rect = glow.rectTransform;
+            rect.sizeDelta = tray.sizeDelta + new Vector2(2f * outset, 2f * outset);
+            rect.anchoredPosition = tray.anchoredPosition;
         }
 
         private static ApostleState FindApostle(Match match, int id)

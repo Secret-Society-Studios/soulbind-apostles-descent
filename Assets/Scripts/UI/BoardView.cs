@@ -226,6 +226,9 @@ namespace SoulBind.UI
         /// <summary>The mat's half-width (center to its left and right corners), in world units.</summary>
         public float MatRadius => _matRadius;
 
+        /// <summary>The mat's half-height (center to its flat top and bottom sides), in world units.</summary>
+        public float MatHalfHeight => _matHalfHeight;
+
         /// <summary>The radius of a circle that encloses the mat and the hands lying around it.</summary>
         public float SeatRingRadius => Mathf.Max(_matRadius, _matHalfHeight) + seatGap + seatDepth;
 

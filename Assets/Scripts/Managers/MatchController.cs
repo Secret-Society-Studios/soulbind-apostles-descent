@@ -51,6 +51,8 @@ namespace SoulBind.Managers
         [SerializeField, Range(0.5f, 2f)] private float animationSpeed = 1f;
         [Tooltip("A short, subtle camera shake when a Strike lands.")]
         [SerializeField] private bool screenShake = true;
+        [Tooltip("The glow under an Apostle's piece while it has DEF (the same blue as its hand's glow).")]
+        [SerializeField] private Color defenseGlowColor = new Color(0.45f, 0.70f, 1f, 1f);
         [Tooltip("How fast pieces glide from tile to tile, in world units per second (before easing in and out).")]
         [SerializeField] private float discMoveSpeed = 7f;
         [Tooltip("How far an attacker's piece lunges toward its target when it Strikes.")]
@@ -158,6 +160,7 @@ namespace SoulBind.Managers
         private readonly float[] _smokeTimer = new float[GameConstants.MaxPlayers];
         private TableEffects _effects;
         private int _auraIndex = -1;
+        private readonly bool[] _defended = new bool[GameConstants.MaxPlayers];
 
         // A Strike, as shares of its time: wind-up (pull back), strike (impact at the end), recovery.
         private const float WindUpEnd = 0.4f;
@@ -1067,6 +1070,12 @@ namespace SoulBind.Managers
 
             if (_effects != null)
             {
+                for (int i = 0; i < _views.Count; i++)
+                {
+                    bool glow = _defended[i] && _views[i].gameObject.activeSelf;
+                    _effects.SetDefenseGlow(i, glow, _views[i].transform.position, defenseGlowColor, apostleDiameter * 2.4f);
+                }
+
                 bool aura = _auraIndex >= 0 && _auraIndex < _views.Count && _views[_auraIndex].gameObject.activeSelf;
                 _effects.SetAura(aura, aura ? _views[_auraIndex].transform.position : Vector3.zero,
                     aura ? ApostleColors.Get(_auraIndex + 1) : Color.clear, apostleDiameter * 2f);
@@ -1249,6 +1258,9 @@ namespace SoulBind.Managers
                     _discPositions[i] = _discTargets[i];
                     view.transform.position = _discTargets[i];
                 }
+                if (i < _defended.Length)
+                    _defended[i] = !apostle.IsEliminated && !CurrentMatch.IsOver && apostle.Defense > 0;
+
                 // No size pop for the Apostle whose turn it is: a slow aura under its piece instead.
                 view.SetActiveTurn(false);
                 if (apostle == CurrentMatch.CurrentApostle && !CurrentMatch.IsOver)

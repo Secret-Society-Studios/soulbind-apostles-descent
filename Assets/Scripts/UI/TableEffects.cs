@@ -32,6 +32,11 @@ namespace SoulBind.UI
 
         private readonly List<Effect> _effects = new List<Effect>(32);
         private SpriteRenderer _aura;
+        private readonly SpriteRenderer[] _defense = new SpriteRenderer[6];
+        private readonly SpriteRenderer[] _defenseRing = new SpriteRenderer[6];
+        private const int RingOrder = 11; // over a flat disc's edge (10), under standing pieces
+        private readonly Color[] _defenseColor = new Color[6];
+        private readonly float[] _defenseSize = new float[6];
         private Color _auraColor;
         private float _auraTime;
         private float _auraSize = 1f;
@@ -129,6 +134,37 @@ namespace SoulBind.UI
             _auraSize = size;
         }
 
+        /// <summary>
+        /// A steady blue glow under a piece while its Apostle has DEF (index = the piece's slot, 0 to 5).
+        /// Call every frame with the piece's position, so it follows the piece as it moves.
+        /// </summary>
+        public void SetDefenseGlow(int index, bool visible, Vector3 position, Color color, float size)
+        {
+            if (index < 0 || index >= _defense.Length)
+                return;
+            if (_defense[index] == null)
+            {
+                if (!visible)
+                    return;
+                _defense[index] = CreateRenderer("DefenseGlow", AuraOrder);
+                _defenseRing[index] = CreateRenderer("DefenseRing", RingOrder);
+                _defenseRing[index].sprite = MotionStyle.Ring;
+            }
+            SpriteRenderer glow = _defense[index];
+            SpriteRenderer ring = _defenseRing[index];
+            if (glow.gameObject.activeSelf != visible)
+            {
+                glow.gameObject.SetActive(visible);
+                ring.gameObject.SetActive(visible);
+            }
+            if (!visible)
+                return;
+            glow.transform.position = position + new Vector3(0f, 0f, -0.01f);
+            ring.transform.position = position + new Vector3(0f, 0f, -0.015f);
+            _defenseColor[index] = color;
+            _defenseSize[index] = size;
+        }
+
         /// <summary>The edges of the screen darken briefly.</summary>
         public void DarkPulse(float strength)
         {
@@ -169,14 +205,33 @@ namespace SoulBind.UI
                 Place(effect, t);
             }
 
+            _auraTime += delta * Mathf.Max(0.1f, MotionStyle.Speed);
             if (_aura.gameObject.activeSelf)
             {
-                _auraTime += delta * Mathf.Max(0.1f, MotionStyle.Speed);
                 float wave = (Mathf.Sin(_auraTime * Mathf.PI * 2f / 2.4f) + 1f) / 2f; // one breath every 2.4 s
                 Color color = _auraColor;
                 color.a = Mathf.Lerp(0.35f, 0.7f, wave);
                 _aura.color = color;
                 _aura.transform.localScale = Vector3.one * (_auraSize * Mathf.Lerp(0.95f, 1.1f, wave));
+            }
+
+            // The DEF glows shimmer faintly, slower than the turn aura.
+            float shimmer = (Mathf.Sin(_auraTime * Mathf.PI * 2f / 3.7f) + 1f) / 2f;
+            for (int i = 0; i < _defense.Length; i++)
+            {
+                SpriteRenderer glow = _defense[i];
+                if (glow == null || !glow.gameObject.activeSelf)
+                    continue;
+                // A wide soft glow, plus a bright ring hugging the piece's base, so it reads at a glance.
+                Color color = _defenseColor[i];
+                color.a = 1f;
+                glow.color = color;
+                glow.transform.localScale = Vector3.one * (_defenseSize[i] * 1.35f * Mathf.Lerp(0.97f, 1.06f, shimmer));
+                SpriteRenderer ring = _defenseRing[i];
+                Color ringColor = Color.Lerp(color, Color.white, 0.35f);
+                ringColor.a = Mathf.Lerp(0.85f, 1f, shimmer);
+                ring.color = ringColor;
+                ring.transform.localScale = Vector3.one * (_defenseSize[i] * 0.95f);
             }
 
             if (_pulseTime >= 0f)

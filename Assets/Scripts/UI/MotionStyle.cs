@@ -41,6 +41,41 @@ namespace SoulBind.UI
         // Soft round glow, white with alpha fading to the edge: tinted for embers, auras and smoke.
         private static Sprite _glow;
         private static Sprite _vignette;
+        private static Sprite _ring;
+
+        /// <summary>A soft glowing ring (brightest at 60% of the radius, clear in the middle): for halos around pieces.</summary>
+        public static Sprite Ring
+        {
+            get
+            {
+                if (_ring != null)
+                    return _ring;
+                const int size = 128;
+                var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+                {
+                    filterMode = FilterMode.Bilinear,
+                    wrapMode = TextureWrapMode.Clamp,
+                    name = "Ring"
+                };
+                var pixels = new Color32[size * size];
+                float half = size / 2f;
+                for (int y = 0; y < size; y++)
+                {
+                    for (int x = 0; x < size; x++)
+                    {
+                        float dx = (x + 0.5f - half) / half;
+                        float dy = (y + 0.5f - half) / half;
+                        float d = Mathf.Sqrt(dx * dx + dy * dy);
+                        float a = Mathf.Exp(-((d - 0.6f) / 0.14f) * ((d - 0.6f) / 0.14f));
+                        pixels[y * size + x] = new Color32(255, 255, 255, (byte)(Mathf.Clamp01(a) * 255f));
+                    }
+                }
+                texture.SetPixels32(pixels);
+                texture.Apply(false, true);
+                _ring = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), size);
+                return _ring;
+            }
+        }
 
         public static Sprite Glow
         {
