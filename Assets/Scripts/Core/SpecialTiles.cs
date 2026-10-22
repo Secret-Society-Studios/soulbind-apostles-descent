@@ -5,7 +5,8 @@ namespace SoulBind.Core
 {
     /// <summary>
     /// The special tiles still waiting to be used. Each works once: when an Apostle steps
-    /// onto it, its effect applies and the tile becomes an ordinary tile.
+    /// onto it, its effect applies and the tile becomes an ordinary tile. At the start of every
+    /// Phase, every used tile comes back on a random free interior tile (Replenish).
     /// Pure rules data: no Unity types.
     /// </summary>
     public sealed class SpecialTiles
@@ -13,6 +14,8 @@ namespace SoulBind.Core
         private const int TypeCount = 3;
 
         private readonly Dictionary<HexCoord, SpecialTileType> _active = new Dictionary<HexCoord, SpecialTileType>();
+        private readonly int[] _placedPerType = new int[TypeCount];
+        private readonly List<HexCoord> _candidates = new List<HexCoord>(64);
 
         /// <summary>Special tiles that have not been used yet.</summary>
         public IReadOnlyDictionary<HexCoord, SpecialTileType> Active => _active;
@@ -21,6 +24,47 @@ namespace SoulBind.Core
         {
             if (!_active.TryAdd(tile, type))
                 throw new ArgumentException($"There is already a special tile at {tile}.", nameof(tile));
+            _placedPerType[(int)type]++;
+        }
+
+        /// <summary>How many tiles of this type the match started with (used or not).</summary>
+        public int PlacedCountOf(SpecialTileType type) => _placedPerType[(int)type];
+
+        /// <summary>
+        /// Brings back every used special tile (at the start of each Phase), each on a random interior tile
+        /// that is not already special and not blocked (an Apostle standing there, the Ascension tile).
+        /// Unused tiles stay where they are. Returns how many came back.
+        /// </summary>
+        public int Replenish(HexBoard board, Random random, Func<HexCoord, bool> isBlocked)
+        {
+            if (board == null)
+                throw new ArgumentNullException(nameof(board));
+            if (random == null)
+                throw new ArgumentNullException(nameof(random));
+
+            _candidates.Clear();
+            for (int i = 0; i < board.Tiles.Count; i++)
+            {
+                HexCoord tile = board.Tiles[i];
+                if (!board.IsEdge(tile) && !_active.ContainsKey(tile) && (isBlocked == null || !isBlocked(tile)))
+                    _candidates.Add(tile);
+            }
+
+            int added = 0;
+            for (int t = 0; t < TypeCount; t++)
+            {
+                var type = (SpecialTileType)t;
+                int missing = _placedPerType[t] - CountOf(type);
+                for (int k = 0; k < missing && _candidates.Count > 0; k++)
+                {
+                    int pick = random.Next(_candidates.Count);
+                    _active[_candidates[pick]] = type;
+                    _candidates[pick] = _candidates[_candidates.Count - 1];
+                    _candidates.RemoveAt(_candidates.Count - 1);
+                    added++;
+                }
+            }
+            return added;
         }
 
         public int CountOf(SpecialTileType type)

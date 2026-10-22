@@ -698,6 +698,14 @@ namespace SoulBind.Core
             return turnEvent;
         }
 
+        // A special tile can't come back under an Apostle or on the Ascension tile.
+        private bool IsBlockedForSpecialTile(HexCoord tile)
+        {
+            if (Ascension.HasAwakened && Ascension.Tile == tile)
+                return true;
+            return Battlefield.GetApostleAt(tile) != null;
+        }
+
         /// <summary>The Apostle who chooses the turn direction when the next Phase begins.</summary>
         public int GetNextPhaseChooserId() => Turns.GetLowestVesselApostleId(Battlefield.Apostles);
 
@@ -710,6 +718,8 @@ namespace SoulBind.Core
                 throw new InvalidOperationException("The current phase has not ended.");
 
             Turns.BeginNextPhase(Battlefield.Apostles, direction);
+            // Every Phase starts with all the special tiles back: the used ones on random free tiles.
+            Battlefield.Specials.Replenish(Battlefield.Board, _random, IsBlockedForSpecialTile);
             StartTurn();
         }
 
