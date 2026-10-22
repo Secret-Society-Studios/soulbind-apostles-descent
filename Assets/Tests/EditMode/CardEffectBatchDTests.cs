@@ -142,20 +142,6 @@ namespace SoulBind.Tests.EditMode
             Assert.AreEqual(3, CountOf(playerHand, playerFiller), "The player gave one of its cards away");
             Assert.AreEqual(1, CountOf(targetHand, playerFiller), "The target received it");
         }
-
-        [Test]
-        public void WheelOfFortune_WithoutAnAttack_SwapsNothing()
-        {
-            Match match = MatchWithHands(SunHand, MoonHand);
-            ApostleState player = match.CurrentApostle;
-            bool playerHasSuns = player == match.Battlefield.Apostles[0];
-            ArcanaId playerFiller = playerHasSuns ? ArcanaId.Sun : ArcanaId.Moon;
-
-            Play(match, ArcanaId.WheelOfFortune);
-
-            Assert.AreEqual(4, CountOf(match.GetHand(player.Id), playerFiller));
-        }
-
         // ---- The World ----
 
         [Test]

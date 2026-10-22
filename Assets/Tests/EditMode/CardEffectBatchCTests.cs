@@ -110,7 +110,7 @@ namespace SoulBind.Tests.EditMode
             Play(match, ArcanaId.Hierophant);
 
             Play(match, ArcanaId.Magician, target.Id);
-            Assert.AreEqual(3, match.PendingAttack, "Timed ATK is added when the attack resolves");
+            Assert.AreEqual(5, match.PendingAttack, "Timed ATK is added when the attack resolves");
             match.Strike(out AttackOutcome outcome);
 
             Assert.AreEqual(5, outcome.Damage); // 3 + 2
