@@ -50,6 +50,12 @@ namespace SoulBind.Core
         // Who receives the Nocturne combo's Corruption for the card being played (0 = none).
         private int _nocturneVictimId;
 
+        // The opponent picked for the card being played (Wheel of Fortune), or 0.
+        private int _pickedTargetId;
+
+        /// <summary>The Apostle the last Wheel of Fortune swapped a card with (0 = no swap in the last card played).</summary>
+        public int LastSwapTargetId { get; private set; }
+
         public Battlefield Battlefield { get; }
         public TurnTracker Turns { get; }
 
@@ -257,7 +263,8 @@ namespace SoulBind.Core
             }
             else if (targetId != 0)
             {
-                if (definition.Attack == 0)
+                // A card can start an attack if it has ATK, printed or from its effect (The Hierophant).
+                if (CardAttack.Of(card) == 0)
                     return CardPlayResult.CardHasNoAttack;
 
                 switch (CheckTarget(targetId, out _))
@@ -299,8 +306,28 @@ namespace SoulBind.Core
                 }
             }
 
+            // Wheel of Fortune swaps with any living opponent, adjacent or not: the picked one, or the
+            // attack target when it is part of an attack and nobody was picked.
+            int pickedId = 0;
+            if (card == ArcanaId.WheelOfFortune)
+            {
+                if (comboTargetId != 0)
+                {
+                    ApostleState picked = TryFindApostle(comboTargetId);
+                    if (picked == null || picked == CurrentApostle || picked.IsEliminated)
+                        return CardPlayResult.InvalidComboTarget;
+                    pickedId = comboTargetId;
+                }
+                else if (Engagement != EngagementState.Engaged && !engagesNow)
+                {
+                    return CardPlayResult.ComboTargetRequired;
+                }
+            }
+
             // Every check passed: apply the card.
             _nocturneVictimId = nocturneVictimId;
+            _pickedTargetId = pickedId;
+            LastSwapTargetId = 0;
             if (definition.Cap > 0)
                 CurrentCapacity.Spend(definition.Cap);
             hand.Remove(card);
@@ -311,11 +338,13 @@ namespace SoulBind.Core
             {
                 Engagement = EngagementState.Engaged;
                 EngagedTargetId = targetId;
-                PendingAttack = definition.Attack;
+                // ATK bonuses already running (The Hierophant, The Hanged Man, Temperance) join the
+                // attack as it starts, so the player sees them in the attack's total straight away.
+                PendingAttack = CardAttack.Of(card) + CurrentApostle.GetTimedTotal(TimedEffectKind.Attack);
             }
             else if (Engagement == EngagementState.Engaged)
             {
-                PendingAttack += definition.Attack;
+                PendingAttack += CardAttack.Of(card);
             }
             // While Free with no target, the card's ATK is lost and only its DEF applies.
 
@@ -332,7 +361,12 @@ namespace SoulBind.Core
                     _strengthAwaitingPartner = false;
                 }
 
+                int timedAttackBefore = CurrentApostle.GetTimedTotal(TimedEffectKind.Attack);
                 effect.OnPlayed(_playContext);
+                _pickedTargetId = 0;
+                // An ATK bonus that starts during an attack joins that attack now.
+                if (Engagement == EngagementState.Engaged)
+                    PendingAttack += CurrentApostle.GetTimedTotal(TimedEffectKind.Attack) - timedAttackBefore;
 
                 if (effect.ReducesCorruption)
                     _corruptionReducersThisTurn++;
@@ -396,6 +430,9 @@ namespace SoulBind.Core
 
         // ---- Called by card effects through CardPlayContext ----
 
+        /// <summary>The opponent picked for the card being played (Wheel of Fortune), or null.</summary>
+        internal ApostleState PickedTarget => _pickedTargetId != 0 ? TryFindApostle(_pickedTargetId) : null;
+
         internal ApostleState EngagedTarget =>
             Engagement == EngagementState.Engaged ? FindApostle(EngagedTargetId) : null;
 
@@ -443,6 +480,7 @@ namespace SoulBind.Core
             if (mine.Count == 0 || theirs.Count == 0)
                 return false;
 
+            LastSwapTargetId = other.Id;
             int myIndex = _random.Next(mine.Count);
             int theirIndex = _random.Next(theirs.Count);
             ArcanaId given = mine.Cards[myIndex];
@@ -486,7 +524,7 @@ namespace SoulBind.Core
                 return false;
 
             int primaryId = EngagedTargetId;
-            int totalAttack = PendingAttack + CurrentApostle.GetTimedTotal(TimedEffectKind.Attack);
+            int totalAttack = PendingAttack; // timed ATK bonuses were added as the attack started (see PlayCard)
             int executeBelowVessel = _executeBelowVessel;
             bool emperorArmed = _emperorArmed;
 
@@ -631,16 +669,19 @@ namespace SoulBind.Core
                     return TurnEvent.NextTurn;
             }
 
+            int endingId = CurrentApostle.Id;
             FinishTurn(CurrentApostle);
 
             TurnEvent turnEvent = Turns.EndTurn(Battlefield.Apostles);
 
-            // The World: everyone still waiting in this round is passed over without taking a turn
-            // (no start-of-turn effects, no draw), and the next round (or the Phase end) comes next.
+            // The World: every other Apostle loses their turn (no start-of-turn effects, no draw), so the
+            // player who played it goes again straight away, in the next round. If the Phase ends on the
+            // way, it ends as normal.
             if (_skipRestOfRound)
             {
                 _skipRestOfRound = false;
-                while (turnEvent == TurnEvent.NextTurn)
+                int guard = 4 * GameConstants.MaxPlayers;
+                while (turnEvent != TurnEvent.PhaseEnded && Turns.CurrentApostleId != endingId && guard-- > 0)
                     turnEvent = Turns.EndTurn(Battlefield.Apostles);
             }
 

@@ -27,6 +27,9 @@ namespace SoulBind.Core
         /// <summary>The Apostle being attacked, or null when the card is not part of an attack.</summary>
         public ApostleState Target => _match.EngagedTarget;
 
+        /// <summary>The opponent the player picked for this card (Wheel of Fortune), or null.</summary>
+        public ApostleState PickedTarget => _match.PickedTarget;
+
         /// <summary>The current Phase (1, 2, 3 ...).</summary>
         public int Phase => _match.Turns.Phase;
 

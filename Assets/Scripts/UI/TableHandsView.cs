@@ -327,6 +327,8 @@ namespace SoulBind.UI
             IReadOnlyList<ArcanaId> discards = deck.DiscardPile;
             for (int i = Mathf.Max(0, discards.Count - discardGrowth); i < discards.Count; i++)
                 _newDiscards[(int)discards[i]]++;
+            // Wheel of Fortune played as part of an attack swaps a card with the target: shown below.
+            bool wheelPlayed = _newDiscards[(int)ArcanaId.WheelOfFortune] > 0;
 
             // Cards drawn in this action. If the discard pile was shuffled in, every new card was drawn.
             int drawsLeft = deck.DrawCount < _lastDrawCount ? _lastDrawCount - deck.DrawCount
@@ -397,6 +399,11 @@ namespace SoulBind.UI
 
             if (toPile > 0 && discardPile != null)
                 discardPile.HoldTop(toPile);
+            // Who it swapped with: recorded by the match (or, on a joined player's copy, the attack target).
+            int swappedWith = match.LastSwapTargetId != 0 ? match.LastSwapTargetId
+                : match.Engagement == EngagementState.Engaged ? match.EngagedTargetId : 0;
+            if (wheelPlayed && swappedWith != 0 && match.CurrentApostle != null)
+                ShowSwap(match.CurrentApostle.Id, swappedWith);
             _lastDiscardCount = deck.DiscardCount;
             _lastDrawCount = deck.DrawCount;
         }
@@ -773,6 +780,66 @@ namespace SoulBind.UI
                     seat.Faces[last].Rect.localScale = Vector3.one * seat.CardScale;
                 }
             }
+        }
+
+        // ---- Wheel of Fortune's swap ----
+
+        // Two face-down cards cross between the two hands, so the swap can be seen.
+        private void ShowSwap(int playerId, int targetId)
+        {
+            Seat player = FindSeat(playerId);
+            Seat target = FindSeat(targetId);
+            if (_flights == null || player == null || target == null)
+                return;
+            if (!TrySeatSpot(player, out Vector2 a, out float aPixels, out float aAngle)
+                || !TrySeatSpot(target, out Vector2 b, out float bPixels, out float bAngle))
+                return;
+            float time = drawFlightTime * 1.6f;
+            _flights.Fly(default, a, aAngle, _flights.ScaleForPixels(aPixels), b, bAngle, _flights.ScaleForPixels(bPixels),
+                true, true, time, null);
+            _flights.Fly(default, b, bAngle, _flights.ScaleForPixels(bPixels), a, aAngle, _flights.ScaleForPixels(aPixels),
+                true, true, time, null);
+            Debug.Log($"TableHandsView: Wheel of Fortune swapped a card between Apostle {playerId} and Apostle {targetId}.");
+        }
+
+        private Seat FindSeat(int apostleId)
+        {
+            for (int i = 0; i < _seats.Count; i++)
+            {
+                if (_seats[i].ApostleId == apostleId)
+                    return _seats[i];
+            }
+            return null;
+        }
+
+        // The screen spot of a card in this hand (the last one shown), or the middle of its tray.
+        private bool TrySeatSpot(Seat seat, out Vector2 spot, out float pixels, out float angle)
+        {
+            RectTransform rect = null;
+            if (seat.IsYours)
+            {
+                for (int k = seat.Faces.Count - 1; k >= 0 && rect == null; k--)
+                {
+                    if (seat.Faces[k].gameObject.activeSelf)
+                        rect = seat.Faces[k].Rect;
+                }
+            }
+            else
+            {
+                for (int k = seat.Backs.Count - 1; k >= 0 && rect == null; k--)
+                {
+                    if (seat.Backs[k].gameObject.activeSelf)
+                        rect = seat.Backs[k];
+                }
+            }
+            if (rect == null)
+            {
+                spot = default;
+                pixels = 0f;
+                angle = 0f;
+                return false;
+            }
+            return TableSpot.TryGet(rect, _camera, _corners, out spot, out pixels, out angle);
         }
 
         // ---- Glows ----

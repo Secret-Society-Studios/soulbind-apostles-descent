@@ -111,10 +111,17 @@ namespace SoulBind.Managers
         /// <summary>True while a played card waits for the player to pick the Nocturne combo's target.</summary>
         public bool IsChoosingComboTarget { get; private set; }
 
+        /// <summary>The card waiting for its pick while IsChoosingComboTarget (Wheel of Fortune, or a Nocturne card).</summary>
+        public ArcanaId ChoosingTargetFor => _comboCard;
+
+        /// <summary>True while the player must pick who the Nocturne combo hits.</summary>
+        public bool IsChoosingNocturneTarget => IsChoosingComboTarget && _comboCard != ArcanaId.WheelOfFortune;
+
         /// <summary>A one-line instruction for the player (empty when there is nothing special to do).</summary>
         public string Hint { get; private set; } = string.Empty;
 
         private ArcanaId _comboCard;
+        private int _comboAttackTarget; // the attack target that card was dropped on, kept while the player picks
 
         private readonly SimpleBot _bot = new SimpleBot();
         private float _botWait;
@@ -567,7 +574,7 @@ namespace SoulBind.Managers
             }
 
             CardDefinition definition = CardCatalog.Get(card);
-            if (CurrentMatch.Engagement == EngagementState.Engaged || definition.Attack == 0)
+            if (CurrentMatch.Engagement == EngagementState.Engaged || CardAttack.Of(card) == 0)
             {
                 PlayFromHand(card, 0, 0);
                 return;
@@ -618,7 +625,7 @@ namespace SoulBind.Managers
                 return true;
             }
 
-            if (CardCatalog.Get(card).Attack == 0)
+            if (CardAttack.Of(card) == 0)
                 return false;
 
             PlayFromHand(card, apostle.Id, 0);
@@ -645,7 +652,7 @@ namespace SoulBind.Managers
         public void ChooseComboTarget(int apostleId)
         {
             if (IsChoosingComboTarget)
-                PlayFromHand(_comboCard, 0, apostleId);
+                PlayFromHand(_comboCard, _comboAttackTarget, apostleId);
         }
 
         private bool IsAttackTarget(ApostleState apostle)
@@ -664,6 +671,7 @@ namespace SoulBind.Managers
                 HasSelectedCard = false;
                 IsChoosingComboTarget = true;
                 _comboCard = card;
+                _comboAttackTarget = targetId;
                 AfterStateChange();
                 return;
             }
@@ -711,7 +719,7 @@ namespace SoulBind.Managers
                 return;
 
             int targetId = 0;
-            if (attack && CardCatalog.Get(card).Attack > 0)
+            if (attack && CardAttack.Of(card) > 0)
             {
                 CurrentMatch.GetAttackTargets(_attackTargets);
                 if (_attackTargets.Count > 0)
@@ -1074,6 +1082,13 @@ namespace SoulBind.Managers
                 {
                     bool glow = _defended[i] && _views[i].gameObject.activeSelf;
                     _effects.SetDefenseGlow(i, glow, _views[i].transform.position, defenseGlowColor, apostleDiameter * 2.4f);
+
+                    // While picking an opponent, everyone who can be picked gets a pulsing ring:
+                    // violet for the Nocturne combo, gold for Wheel of Fortune.
+                    bool pickable = IsChoosingComboTarget && IsLocalTurn && _views[i].gameObject.activeSelf
+                                    && CurrentMatch.CurrentApostle != null && CurrentMatch.CurrentApostle.Id != i + 1;
+                    Color pickColor = _comboCard == ArcanaId.WheelOfFortune ? new Color(1f, 0.82f, 0.4f) : new Color(0.72f, 0.4f, 1f);
+                    _effects.SetPickRing(i, pickable, _views[i].transform.position, pickColor, apostleDiameter * 2.2f);
                 }
 
                 bool aura = _auraIndex >= 0 && _auraIndex < _views.Count && _views[_auraIndex].gameObject.activeSelf;
@@ -1229,7 +1244,9 @@ namespace SoulBind.Managers
                     : $"Apostle {match.CurrentApostle.Id} is playing...";
             }
             if (IsChoosingComboTarget)
-                return "Nocturne combo: click an opponent's portrait or disc. Right-click to cancel.";
+                return _comboCard == ArcanaId.WheelOfFortune
+                    ? "Wheel of Fortune: choose any opponent to swap a random card with (click their portrait or piece). Right-click to cancel."
+                    : "Nocturne combo! Choose an opponent to gain +1 Corruption (click their portrait or piece). Right-click to cancel.";
             if (HasSelectedCard)
                 return "Click a red-ringed Apostle to attack (everyone adjacent is hit), or play it without attacking.";
             if (match.Engagement == EngagementState.Engaged)

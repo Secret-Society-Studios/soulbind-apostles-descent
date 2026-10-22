@@ -14,6 +14,12 @@ namespace SoulBind.Core
         public virtual bool ReducesCorruption => false;
 
         /// <summary>
+        /// ATK the card brings to an attack on top of its printed ATK. A card with a bonus here can
+        /// start an attack even when its printed ATK is 0 (The Hierophant).
+        /// </summary>
+        public virtual int AttackBonus => 0;
+
+        /// <summary>
         /// Called right after the card is played: its CAP is paid, it is in the discard pile,
         /// its DEF is on the shield, and engaging (if any) has happened.
         /// </summary>

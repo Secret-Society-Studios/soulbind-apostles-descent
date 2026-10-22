@@ -35,6 +35,9 @@ namespace SoulBind.UI
         private readonly SpriteRenderer[] _defense = new SpriteRenderer[6];
         private readonly SpriteRenderer[] _defenseRing = new SpriteRenderer[6];
         private const int RingOrder = 11; // over a flat disc's edge (10), under standing pieces
+        private const int PickOrder = 12;
+        private readonly SpriteRenderer[] _pick = new SpriteRenderer[6];
+        private Color _pickColor;
         private readonly Color[] _defenseColor = new Color[6];
         private readonly float[] _defenseSize = new float[6];
         private Color _auraColor;
@@ -138,6 +141,34 @@ namespace SoulBind.UI
         /// A steady blue glow under a piece while its Apostle has DEF (index = the piece's slot, 0 to 5).
         /// Call every frame with the piece's position, so it follows the piece as it moves.
         /// </summary>
+        /// <summary>
+        /// A fast-pulsing ring around a piece the player can pick right now (the Nocturne combo's or
+        /// Wheel of Fortune's target). Call every frame with the piece's position.
+        /// </summary>
+        public void SetPickRing(int index, bool visible, Vector3 position, Color color, float size)
+        {
+            if (index < 0 || index >= _pick.Length)
+                return;
+            if (_pick[index] == null)
+            {
+                if (!visible)
+                    return;
+                _pick[index] = CreateRenderer("PickRing", PickOrder);
+                _pick[index].sprite = MotionStyle.Ring;
+            }
+            SpriteRenderer ring = _pick[index];
+            if (ring.gameObject.activeSelf != visible)
+                ring.gameObject.SetActive(visible);
+            if (!visible)
+                return;
+            ring.transform.position = position + new Vector3(0f, 0f, -0.02f);
+            float pulse = (Mathf.Sin(Time.unscaledTime * Mathf.PI * 2f / 0.9f) + 1f) / 2f;
+            Color c = Color.Lerp(color, Color.white, 0.25f * pulse);
+            c.a = Mathf.Lerp(0.6f, 1f, pulse);
+            ring.color = c;
+            ring.transform.localScale = Vector3.one * (size * Mathf.Lerp(0.95f, 1.15f, pulse));
+        }
+
         public void SetDefenseGlow(int index, bool visible, Vector3 position, Color color, float size)
         {
             if (index < 0 || index >= _defense.Length)
