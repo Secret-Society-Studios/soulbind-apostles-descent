@@ -31,6 +31,12 @@ namespace SoulBind.UI
         [SerializeField] private TMP_Text turnText;
         [SerializeField] private TMP_Text capacityText;
 
+        [Header("Phones")]
+        [Tooltip("On phones and tablets the portraits are this much bigger (1 = same as on PC).")]
+        [SerializeField, Range(1f, 2f)] private float mobilePortraitScale = 1.25f;
+        [Tooltip("Tick to see the phone portrait size while testing in the Editor.")]
+        [SerializeField] private bool previewMobileInEditor;
+
         private readonly List<ApostlePanelView> _panels = new List<ApostlePanelView>(GameConstants.MaxPlayers);
         private readonly Vector3[] _corners = new Vector3[4]; // reused every frame, so nothing is allocated
         private Canvas _canvas;
@@ -62,6 +68,8 @@ namespace SoulBind.UI
                 Debug.LogError("MatchHud: assign the Match Controller in the Inspector.", this);
             else if (_canvas != null)
             {
+                if (Application.isMobilePlatform || (Application.isEditor && previewMobileInEditor))
+                    EnlargePortraits(mobilePortraitScale);
                 // Banners and the end-of-match screen.
                 MatchOverlay overlay = MatchOverlay.Create(_canvas.rootCanvas, matchController);
                 // The dark gothic look, over what Build Match HUD made (nothing in the scene is rebuilt).
@@ -113,6 +121,28 @@ namespace SoulBind.UI
                 panel.Show(apostle, isCurrent, ascension.HasAwakened && ascension.AwakenedId == apostle.Id, isPickable);
                 GothicTheme.SetPortraitHighlight(panel, isCurrent);
             }
+        }
+
+        // Bigger portraits for small screens. Each row grows away from its screen edge, so nothing is pushed
+        // off the screen: the opponents' row from the top, your portrait from the bottom-right corner.
+        private void EnlargePortraits(float scale)
+        {
+            if (scale <= 1.001f)
+                return;
+            ScaleFromCorner(opponentRow, new Vector2(0.5f, 1f), scale);
+            ScaleFromCorner(playerSlot, new Vector2(1f, 0f), scale);
+        }
+
+        private static void ScaleFromCorner(RectTransform rect, Vector2 pivot, float scale)
+        {
+            if (rect == null)
+                return;
+            // Move the pivot without moving the rect, then scale around it.
+            Vector2 size = rect.rect.size;
+            Vector2 shift = pivot - rect.pivot;
+            rect.pivot = pivot;
+            rect.anchoredPosition += new Vector2(shift.x * size.x, shift.y * size.y);
+            rect.localScale = new Vector3(scale, scale, 1f);
         }
 
         private void CreatePanels(Match match)

@@ -498,10 +498,8 @@ namespace SoulBind.Managers
                     CancelSelection();
             }
 
-            if (mouse == null || !mouse.leftButton.wasPressedThisFrame)
+            if (!TryGetPress(out Vector2 screenPoint))
                 return;
-
-            Vector2 screenPoint = mouse.position.ReadValue();
             if (hud != null && hud.ContainsScreenPoint(screenPoint))
                 return;
 
@@ -841,16 +839,27 @@ namespace SoulBind.Managers
                 return;
             }
 
-            Mouse mouse = Mouse.current;
-            if (mouse == null || !mouse.leftButton.wasPressedThisFrame)
+            if (!TryGetPress(out Vector2 screenPoint))
                 return;
-            Vector2 screenPoint = mouse.position.ReadValue();
             if (hud != null && hud.ContainsScreenPoint(screenPoint))
                 return;
             if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
                 return;
             if (boardView.TryGetTileAtScreen(screenPoint, out HexCoord tile) && _draft.CanPick(tile))
                 PickSpawn(tile);
+        }
+
+        // A left-click or a finger tap this frame (Pointer covers mouse, touchscreen and pen).
+        private static bool TryGetPress(out Vector2 screenPoint)
+        {
+            Pointer pointer = Pointer.current;
+            if (pointer == null || !pointer.press.wasPressedThisFrame)
+            {
+                screenPoint = default;
+                return false;
+            }
+            screenPoint = pointer.position.ReadValue();
+            return true;
         }
 
         private void PickSpawn(HexCoord tile)

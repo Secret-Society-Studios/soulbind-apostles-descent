@@ -5,6 +5,7 @@ using SoulBind.Utility;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 namespace SoulBind.UI
@@ -123,6 +124,11 @@ namespace SoulBind.UI
         private bool _ready;
         private CardView _hovered;
         private CardView _dragged;
+        // The card whose preview stays up after a tap, until the preview itself is tapped.
+        private bool _hasPinned;
+        private ArcanaId _pinned;
+        private CanvasGroup _previewGroup;
+        private Camera _previewCamera;
 
         private void Awake()
         {
@@ -134,6 +140,7 @@ namespace SoulBind.UI
                     group = preview.gameObject.AddComponent<CanvasGroup>();
                 group.blocksRaycasts = false;
                 group.interactable = false;
+                _previewGroup = group;
                 preview.gameObject.SetActive(false);
             }
             if (previewReason != null)
@@ -173,8 +180,15 @@ namespace SoulBind.UI
 
             // Flying cards are drawn on the screen-space canvas, above everything.
             Canvas screenCanvas = preview != null ? preview.GetComponentInParent<Canvas>() : null;
+            if (screenCanvas != null && screenCanvas.rootCanvas.renderMode != RenderMode.ScreenSpaceOverlay)
+                _previewCamera = screenCanvas.rootCanvas.worldCamera;
             if (screenCanvas != null)
                 _flights = CardFlightLayer.Create(screenCanvas.rootCanvas, cardPrefab, drawPile.CardBackTemplate, arcHeight);
+
+            // On a phone a finger wobbles a little while tapping: only a real move starts a drag.
+            if (EventSystem.current != null && Screen.dpi > 0f)
+                EventSystem.current.pixelDragThreshold = Mathf.Max(EventSystem.current.pixelDragThreshold,
+                    Mathf.RoundToInt(Screen.dpi * 0.08f));
 
             PlaceOnTable();
             _ready = true;
@@ -223,8 +237,14 @@ namespace SoulBind.UI
                 return;
             }
 
+            // A pinned card that left the hand (played, discarded) lets go of the preview.
+            if (_hasPinned && (_yours == null || !_yours.Shown.Contains(_pinned)))
+                Unpin();
+
             if (_hovered != null)
-                ShowPreview(_hovered);
+                ShowPreview(_hovered.CardId);
+            else if (_hasPinned)
+                ShowPreview(_pinned);
         }
 
         // ---- Seats ----
@@ -232,6 +252,7 @@ namespace SoulBind.UI
         private void BuildSeats(Match match, int viewer)
         {
             _pendingRebuild = false;
+            Unpin();
             EndHover();
             EndDrag();
             for (int i = 0; i < _seats.Count; i++)
@@ -536,6 +557,7 @@ namespace SoulBind.UI
             }
 
             PulseGlows();
+            CheckPreviewTap();
 
             Seat seat = _yours;
             if (seat == null)
@@ -549,7 +571,7 @@ namespace SoulBind.UI
                 if (face == _dragged || !face.gameObject.activeSelf)
                     continue;
 
-                bool hovered = face == _hovered;
+                bool hovered = face == _hovered || (_hasPinned && face.CardId == _pinned);
                 bool selected = matchController.HasSelectedCard && matchController.SelectedCard == face.CardId;
                 Vector2 target = SlotPosition(seat, k, total);
                 if (hovered)
@@ -571,7 +593,7 @@ namespace SoulBind.UI
                 return;
             _hovered = card;
             card.transform.SetAsLastSibling(); // in front of its neighbours
-            ShowPreview(card);
+            ShowPreview(card.CardId);
         }
 
         private void OnHoverEnded(CardView card)
@@ -585,10 +607,47 @@ namespace SoulBind.UI
             if (_hovered != null)
                 RestoreOrder();
             _hovered = null;
+            // A pinned card keeps its preview up; otherwise the preview goes.
+            if (_hasPinned)
+            {
+                ShowPreview(_pinned);
+                return;
+            }
+            HidePreview();
+        }
+
+        private void HidePreview()
+        {
             if (preview != null)
                 preview.gameObject.SetActive(false);
             if (previewReason != null)
                 previewReason.gameObject.SetActive(false);
+            if (_previewGroup != null)
+                _previewGroup.blocksRaycasts = false;
+        }
+
+        private void Unpin()
+        {
+            if (!_hasPinned)
+                return;
+            _hasPinned = false;
+            if (_hovered == null)
+                HidePreview();
+        }
+
+        // Tapping (or clicking) the pinned preview puts it away.
+        private void CheckPreviewTap()
+        {
+            if (!_hasPinned || preview == null || !preview.gameObject.activeInHierarchy)
+                return;
+            Pointer pointer = Pointer.current;
+            if (pointer == null || !pointer.press.wasPressedThisFrame)
+                return;
+            if (RectTransformUtility.RectangleContainsScreenPoint(preview.Rect, pointer.position.ReadValue(), _previewCamera))
+            {
+                _hovered = null;
+                Unpin();
+            }
         }
 
         // Puts your cards back in hand order (after the tray) once a hovered card was brought to the front.
@@ -600,28 +659,35 @@ namespace SoulBind.UI
                 _yours.Faces[i].transform.SetAsLastSibling();
         }
 
-        private void ShowPreview(CardView card)
+        private void ShowPreview(ArcanaId card)
         {
             if (preview != null)
             {
                 preview.gameObject.SetActive(true);
-                preview.Show(CardCatalog.Get(card.CardId));
+                preview.Show(CardCatalog.Get(card));
                 preview.SetSelected(false);
                 preview.SetDimmed(false);
             }
 
             if (previewReason != null)
             {
-                string reason = matchController.GetUnplayableReason(card.CardId);
+                string reason = matchController.GetUnplayableReason(card);
                 previewReason.gameObject.SetActive(reason != null);
                 if (reason != null)
                     previewReason.text = reason;
             }
         }
 
+        // A tap only shows the card: its preview stays up until the preview is tapped.
+        // Cards are played by dragging them out of the hand.
         private void OnClicked(CardView card)
         {
-            matchController.ClickCard(card.CardId);
+            _hasPinned = true;
+            _pinned = card.CardId;
+            ShowPreview(_pinned);
+            // While pinned, the preview catches taps, so a tap on it never reaches the board underneath.
+            if (_previewGroup != null)
+                _previewGroup.blocksRaycasts = true;
         }
 
         private void OnDragStarted(CardView card, PointerEventData eventData)
@@ -632,6 +698,7 @@ namespace SoulBind.UI
                 return;
 
             _dragged = card;
+            _hasPinned = false; // the board should be clear while dragging
             EndHover();
             card.transform.SetAsLastSibling();
             card.GetComponent<CanvasGroup>().blocksRaycasts = false;
@@ -650,12 +717,23 @@ namespace SoulBind.UI
                 return;
             EndDrag();
 
-            // Played cards leave the hand when the controller refreshes it; anything else slides back.
+            // Dropped back on the hand: nothing happens, the card slides back.
             Vector2 point = eventData.position;
-            if (discardPile != null && discardPile.ContainsScreenPoint(point))
+            if (IsOverYourHand(point, eventData.pressEventCamera))
+                return;
+
+            // Dropped anywhere else: on a red-ringed Apostle it attacks that Apostle; otherwise the card
+            // is played (an ATK card with targets in reach waits, lifted, for a target to be tapped).
+            if (!matchController.TryDropCardOnBoard(card.CardId, point))
                 matchController.DropCardOnPile(card.CardId);
-            else
-                matchController.TryDropCardOnBoard(card.CardId, point);
+        }
+
+        private bool IsOverYourHand(Vector2 screenPoint, Camera eventCamera)
+        {
+            if (_yours == null || _yours.Tray == null)
+                return false;
+            Camera cam = eventCamera != null ? eventCamera : _camera;
+            return RectTransformUtility.RectangleContainsScreenPoint(_yours.Tray, screenPoint, cam);
         }
 
         // The dragged card slides across the table under the pointer.
