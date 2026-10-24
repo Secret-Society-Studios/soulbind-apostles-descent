@@ -3,6 +3,8 @@ using SoulBind.Core;
 using SoulBind.Managers;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 namespace SoulBind.UI
@@ -27,6 +29,8 @@ namespace SoulBind.UI
         [SerializeField] private TMP_Text emptyText;
         [Tooltip("Shown while a card is being dragged.")]
         [SerializeField] private Image glow;
+        [Tooltip("The screen-space HUD canvas the discard viewer opens on. Empty: the MatchHud's canvas.")]
+        [SerializeField] private Canvas screenCanvas;
 
 
         [Header("Stack")]
@@ -46,6 +50,8 @@ namespace SoulBind.UI
         private int _lastCount;
         private bool _dragging;
         private bool _overPile;
+        private DiscardViewer _viewer;
+        private bool _pressedOnPile;
 
         private void Awake()
         {
@@ -81,7 +87,26 @@ namespace SoulBind.UI
             PlaceOnTable();
             for (int i = 0; i < maxShown; i++)
                 _views.Add(CreateView());
+            CreateViewer();
             Refresh();
+        }
+
+        // The full list of discarded cards, on the HUD's screen canvas.
+        private void CreateViewer()
+        {
+            if (screenCanvas == null)
+            {
+                MatchHud hud = FindAnyObjectByType<MatchHud>();
+                Canvas hudCanvas = hud != null ? hud.GetComponentInParent<Canvas>() : null;
+                if (hudCanvas != null)
+                    screenCanvas = hudCanvas.rootCanvas;
+            }
+            if (screenCanvas == null)
+            {
+                Debug.LogWarning("DiscardPileView: no screen canvas found, so the discard pile can't be opened.", this);
+                return;
+            }
+            _viewer = DiscardViewer.Create(screenCanvas, matchController, cardPrefab, () => _held);
         }
 
         /// <summary>True if this screen point is over the pile (used when a dragged card is dropped).</summary>
@@ -99,6 +124,8 @@ namespace SoulBind.UI
         {
             _held += Mathf.Max(0, cards);
             Refresh();
+            if (_viewer != null)
+                _viewer.Refresh();
         }
 
         /// <summary>A flying card has landed: show it on top of the pile.</summary>
@@ -107,6 +134,8 @@ namespace SoulBind.UI
             if (_held > 0)
                 _held--;
             Refresh();
+            if (_viewer != null)
+                _viewer.Refresh();
         }
 
         /// <summary>
@@ -158,6 +187,7 @@ namespace SoulBind.UI
 
         private void Update()
         {
+            CheckOpenViewer();
             float t = 1f - Mathf.Exp(-settleSpeed * Time.unscaledDeltaTime);
             for (int i = 0; i < _views.Count; i++)
             {
@@ -219,6 +249,38 @@ namespace SoulBind.UI
                 countText.text = count == 0 ? string.Empty : count.ToString();
         }
 
+
+        // A click or tap that starts and ends on the pile opens the viewer. Opening on release (not press)
+        // means the same press can't land on the viewer's background and close it straight away, and a card
+        // dragged from the hand and dropped here is never mistaken for a click (that press began on the hand).
+                // A click or tap that starts and ends on the pile opens the viewer.
+        private void CheckOpenViewer()
+        {
+            Pointer pointer = Pointer.current;
+            if (pointer == null)
+                return;
+            Vector2 screenPoint = pointer.position.ReadValue();
+
+            
+
+            if (_viewer == null || _viewer.IsOpen)
+            {
+                _pressedOnPile = false;
+                return;
+            }
+
+            if (pointer.press.wasPressedThisFrame)
+            {
+                bool overUi = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+                _pressedOnPile = !_dragging && !overUi && ContainsScreenPoint(screenPoint);
+            }
+            else if (pointer.press.wasReleasedThisFrame)
+            {
+                if (_pressedOnPile && !_dragging && ContainsScreenPoint(screenPoint))
+                    _viewer.Open();
+                _pressedOnPile = false;
+            }
+        }
         // A steady value from -1 to 1 for this pile position, so a card doesn't move when others land.
         private static float Jitter(int index, int shift)
         {

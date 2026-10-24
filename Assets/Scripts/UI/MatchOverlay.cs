@@ -68,6 +68,8 @@ namespace SoulBind.UI
         // What was last seen, to notice changes.
         private readonly bool[] _wasEliminated = new bool[GameConstants.MaxPlayers + 1];
         private int _lastAwakenedId;
+        private int _lastDrawCount;
+        private int _lastDiscardCount;
         private Match _seenMatch;
 
         public static MatchOverlay Create(Canvas canvas, MatchController controller)
@@ -112,6 +114,8 @@ namespace SoulBind.UI
                 for (int i = 0; i < apostles.Count; i++)
                     _wasEliminated[apostles[i].Id] = apostles[i].IsEliminated;
                 _lastAwakenedId = match.Ascension.AwakenedId;
+                _lastDrawCount = match.Deck.DrawCount;
+                _lastDiscardCount = match.Deck.DiscardCount;
                 _endShown = false;
                 _endScreenTimer = -1f;
                 _endScreen.SetActive(false);
@@ -138,6 +142,15 @@ namespace SoulBind.UI
                         : $"{Name(awakened)} is Awakened! The Ascension tile has appeared");
             }
             _lastAwakenedId = awakened;
+
+            // Only a reshuffle (the draw pile ran out) ever grows the draw pile or shrinks the discard pile.
+            // Watching the counts works the same for online clients, who only see snapshots.
+            int drawCount = match.Deck.DrawCount;
+            int discardCount = match.Deck.DiscardCount;
+            if ((drawCount > _lastDrawCount || discardCount < _lastDiscardCount) && !match.IsOver)
+                QueueBanner("Draw pile empty: the discard pile is shuffled into a new draw pile");
+            _lastDrawCount = drawCount;
+            _lastDiscardCount = discardCount;
 
             if (match.IsOver && !_endShown && _endScreenTimer < 0f)
                 _endScreenTimer = EndScreenDelay;

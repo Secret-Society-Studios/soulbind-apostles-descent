@@ -73,6 +73,26 @@ namespace SoulBind.Tests.EditMode
         }
 
         [Test]
+        public void TryDraw_EmptyDrawPile_MovesEveryDiscardIntoTheNewDrawPile()
+        {
+            var cards = new[] { ArcanaId.Fool, ArcanaId.Sun, ArcanaId.Moon, ArcanaId.Star };
+            Deck deck = Deck.CreateStacked(cards, new Random(7));
+            foreach (ArcanaId card in DrawAll(deck))
+                deck.Discard(card);
+            Assert.AreEqual(0, deck.DrawCount);
+            Assert.AreEqual(4, deck.DiscardCount);
+
+            Assert.IsTrue(deck.TryDraw(out ArcanaId first));
+
+            // The discard pile is emptied; the other three cards wait in the new draw pile.
+            Assert.AreEqual(0, deck.DiscardCount);
+            Assert.AreEqual(3, deck.DrawCount);
+            var all = new List<ArcanaId> { first };
+            all.AddRange(DrawAll(deck));
+            CollectionAssert.AreEquivalent(cards, all);
+        }
+
+        [Test]
         public void TryDraw_BothPilesEmpty_ReturnsFalse()
         {
             var deck = new Deck(new[] { ArcanaId.Fool }, new Random(1));

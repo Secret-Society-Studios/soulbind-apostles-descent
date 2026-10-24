@@ -491,8 +491,7 @@ namespace SoulBind.Managers
             Mouse mouse = Mouse.current;
 
             // Esc or right-click cancels a selected card or a pending combo target.
-            if ((keyboard != null && keyboard.escapeKey.wasPressedThisFrame)
-                || (mouse != null && mouse.rightButton.wasPressedThisFrame))
+            if (!DiscardViewer.IsAnyOpen && ((keyboard != null && keyboard.escapeKey.wasPressedThisFrame) || (mouse != null && mouse.rightButton.wasPressedThisFrame)))
             {
                 if (HasSelectedCard || IsChoosingComboTarget)
                     CancelSelection();
