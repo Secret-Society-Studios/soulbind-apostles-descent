@@ -39,7 +39,7 @@ namespace SoulBind.EditorTools
                 Debug.LogWarning("CardArtImportTools: no CardArtLibrary at " + LibraryPath + ", so only the card back is fixed.");
             }
 
-            foreach (DrawPileView pile in Object.FindObjectsByType<DrawPileView>(FindObjectsSortMode.None))
+            foreach (DrawPileView pile in Object.FindObjectsByType<DrawPileView>())
             {
                 SerializedProperty back = new SerializedObject(pile).FindProperty("cardBackSprite");
                 if (back != null)
