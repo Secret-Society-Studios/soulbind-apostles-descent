@@ -45,12 +45,14 @@ namespace SoulBind.UI
         [SerializeField] private float matPadding = 0.6f;
         [Tooltip("Width of the lighter rim around the hexagonal mat, in world units.")]
         [SerializeField] private float matRimWidth = 0.15f;
-        [Tooltip("How steep the mat's four slanted sides are, in degrees from flat. 60 = a regular hexagon; " +
-                 "lower makes a wider mat with longer top and bottom sides.")]
+        [Tooltip("How steep the mat's four slanted sides are, in degrees from flat. 60 = a regular hexagon; " + "lower makes a wider mat with longer top and bottom sides.")]
         [SerializeField, Range(30f, 60f)] private float matSideAngle = 45f;
-        [Tooltip("Extra room above and below the board, in world units (added to both the top and the bottom). " +
-                 "The slanted sides move out with it, so the top and bottom sides keep their length.")]
+        [Tooltip("Extra room above and below the board, in world units (added to both the top and the bottom). " + "The slanted sides move out with it, so the top and bottom sides keep their length.")]
         [SerializeField, Min(0f)] private float matExtraHeight = 1f;
+        
+        [Header("Tapping tiles")]
+        [Tooltip("A tap this close to a tile you can pick (a highlighted move, an Apostle you can attack) " + "picks it, even if the finger landed on a neighbouring tile. In centimetres on the screen. " + "Tiles far from the camera look small, so this makes them much easier to hit on a phone.")]
+        [SerializeField, Range(0f, 2f)] private float tapRadiusCm = 0.8f;
 
         [Header("Piles (on the mat, in its left and right corners)")]
         [Tooltip("Height of a pile's card, in world units. The mat grows if the piles need more room.")]
@@ -101,6 +103,56 @@ namespace SoulBind.UI
             tile.ToPlane(hexSize, out float x, out float y);
             return transform.position + new Vector3(x - _centerX, y - _centerY, 0f);
         }
+
+        /// <summary>
+        /// Like TryGetTileAtScreen, but forgiving for fingers: if the tap is near one of the tiles that can
+        /// be picked right now, that tile wins, even when the exact point fell on a neighbouring tile.
+        /// Among several, the one whose center looks closest on the screen wins. A tap far from all of
+        /// them falls back to the exact tile under the point.
+        /// </summary>
+        public bool TryPickTile(Vector2 screenPoint, IReadOnlyList<HexCoord> pickable, out HexCoord tile)
+        {
+            bool hit = TryGetTileAtScreen(screenPoint, out tile);
+            if (pickable == null || pickable.Count == 0)
+                return hit;
+            
+            // A tap right on a pickable tile always picks it.
+            if (hit)
+            {
+                for (int i = 0; i < pickable.Count; i++)
+                {
+                    if (pickable[i].Equals(tile))
+                        return true;
+                }
+            }
+
+            Camera cam = Camera.main;
+            if (cam == null)
+                return hit;
+
+            float dpi = Screen.dpi > 0f ? Screen.dpi : 96f; // some devices report 0
+            float radius = tapRadiusCm / 2.54f * dpi;
+            float best = radius * radius;
+            bool found = false;
+            for (int i = 0; i < pickable.Count; i++)
+            {
+                Vector3 onScreen = cam.WorldToScreenPoint(GetWorldPosition(pickable[i]));
+                if (onScreen.z <= 0f)
+                    continue; // behind the camera
+                float distance = ((Vector2)onScreen - screenPoint).sqrMagnitude;
+                if (distance <= best)
+                {
+                    best = distance;
+                    tile = pickable[i];
+                    found = true;
+                }
+            }
+            return found || hit;
+        }
+        
+
+
+
 
         /// <summary>Finds the board tile under a world point. Returns false if the point is off the board.</summary>
         public bool TryGetTileAt(Vector3 worldPoint, out HexCoord tile)

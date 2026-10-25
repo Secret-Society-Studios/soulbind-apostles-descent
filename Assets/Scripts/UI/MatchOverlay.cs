@@ -20,6 +20,7 @@ namespace SoulBind.UI
     /// (the Ascension tile appears), an Apostle loses Awakened status.
     /// End screen: who won and how, every Apostle's final Vessel, Souls and Corruption, and
     /// Play Again / View Board buttons.
+    /// During the match: a Quit button in the top-right corner, which asks before leaving to the main menu.
     /// MatchHud creates it at runtime on its Canvas, so it needs no setup. Display only.
     /// </summary>
     public sealed class MatchOverlay : MonoBehaviour
@@ -63,6 +64,11 @@ namespace SoulBind.UI
         private GameObject _mainMenuButton;
         private GameObject _playAgainButton;
         private float _endScreenTimer = -1f;
+        // quit button and its "are you sure?" box
+        private const float QuitButtonTop = 124f;
+        private GameObject _quitButton;
+        private GameObject _quitConfirm;
+        private TMP_Text _quitText;
         private bool _endShown;
 
         // What was last seen, to notice changes.
@@ -120,6 +126,7 @@ namespace SoulBind.UI
                 _endScreenTimer = -1f;
                 _endScreen.SetActive(false);
                 _showResultButton.SetActive(false);
+                RefreshQuit(match);
                 return;
             }
 
@@ -154,6 +161,33 @@ namespace SoulBind.UI
 
             if (match.IsOver && !_endShown && _endScreenTimer < 0f)
                 _endScreenTimer = EndScreenDelay;
+
+            RefreshQuit(match);
+        }
+
+
+        // ---- Quit ----
+
+        // Quit is there while the match runs; at the end the result screen has its own Main Menu button.
+        // Like that button, it needs the menu scene to be first in the Build Settings.
+        private void RefreshQuit(Match match)
+        {
+            bool canQuit = !match.IsOver && SceneManager.GetActiveScene().buildIndex > 0;
+            _quitButton.SetActive(canQuit);
+            if (!canQuit)
+                _quitConfirm.SetActive(false);
+        }
+
+        private void AskToQuit()
+        {
+            _quitText.text = _controller != null && _controller.IsOnline ? "You will leave the online match and go back to the main menu." : "This match will end and you will go back to the main menu.";
+            _quitConfirm.transform.SetAsLastSibling();
+            _quitConfirm.SetActive(true);
+        }
+
+        private void CancelQuit()
+        {
+            _quitConfirm.SetActive(false);
         }
 
         private void Update()
@@ -462,6 +496,63 @@ namespace SoulBind.UI
             Stretch(label.rectTransform);
             label.text = "Show Result";
             _showResultButton.SetActive(false);
+
+            BuildQuit(root);
+        }
+
+        private void BuildQuit(RectTransform root)
+        {
+            // The small Quit button, top-right, left of the turn info box.
+            RectTransform quit = CreateRect("QuitButton", root);
+            quit.anchorMin = quit.anchorMax = new Vector2(1f, 1f);
+            quit.pivot = new Vector2(1f, 1f);
+            quit.anchoredPosition = new Vector2(-20f, -QuitButtonTop);
+            quit.sizeDelta = new Vector2(100f, 56f);
+            AddImage(quit, ButtonColor, true);
+            Button quitButton = quit.gameObject.AddComponent<Button>();
+            quitButton.onClick.AddListener(AskToQuit);
+            TMP_Text quitLabel = CreateText("Label", quit, 24f, FontStyles.Bold);
+            Stretch(quitLabel.rectTransform);
+            quitLabel.text = "Quit";
+            GothicTheme.StyleButton(quitButton);
+            _quitButton = quit.gameObject;
+
+            // "Leave the match?": dims everything and blocks clicks. Tapping outside the box means Stay.
+            RectTransform confirm = CreateRect("QuitConfirm", root);
+            Stretch(confirm);
+            AddImage(confirm, DimColor, true);
+            Button outside = confirm.gameObject.AddComponent<Button>();
+            outside.transition = Selectable.Transition.None;
+            outside.onClick.AddListener(CancelQuit);
+            _quitConfirm = confirm.gameObject;
+
+            RectTransform box = CreateRect("Box", confirm);
+            box.anchorMin = box.anchorMax = new Vector2(0.5f, 0.5f);
+            box.sizeDelta = new Vector2(640f, 300f);
+            AddImage(box, PanelColor, true); // catches taps, so they don't reach the dim behind it
+            Outline edge = box.gameObject.AddComponent<Outline>();
+            edge.effectColor = GoldColor;
+            edge.effectDistance = new Vector2(3f, -3f);
+
+            TMP_Text title = CreateText("Title", box, 40f, FontStyles.Bold);
+            Row(title.rectTransform, 24f, 56f);
+            title.text = "Leave the match?";
+            title.color = GoldColor;
+            _quitText = CreateText("Text", box, 24f, FontStyles.Normal);
+            Row(_quitText.rectTransform, 90f, 80f);
+
+            // The version, small in the corner, so testers can say which APK they are playing.
+            TMP_Text version = CreateText("Version", box, 18f, FontStyles.Normal);
+            version.rectTransform.anchorMin = version.rectTransform.anchorMax = version.rectTransform.pivot = new Vector2(1f, 1f);
+            version.rectTransform.anchoredPosition = new Vector2(-12f, -8f);
+            version.rectTransform.sizeDelta = new Vector2(200f, 26f);
+            version.alignment = TextAlignmentOptions.TopRight;
+            version.color = new Color(1f, 1f, 1f, 0.45f);
+            version.text = "v" + Application.version;
+
+            CreateButton("StayButton", box, "Stay", new Vector2(-125f, 0f), CancelQuit);
+            CreateButton("LeaveButton", box, "Leave", new Vector2(125f, 0f), MainMenu);
+            _quitConfirm.SetActive(false);
         }
 
         private GameObject CreateButton(string name, RectTransform parent, string label, Vector2 position,

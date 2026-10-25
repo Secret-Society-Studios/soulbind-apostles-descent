@@ -558,6 +558,8 @@ MonoBehaviour:
   roundText: {fileID: 104998600}
   turnText: {fileID: 1843671764}
   capacityText: {fileID: 1895934297}
+  mobilePortraitScale: 1.25
+  previewMobileInEditor: 0
 --- !u!1 &331999870
 GameObject:
   m_ObjectHideFlags: 0
@@ -1428,6 +1430,8 @@ MonoBehaviour:
   discardPile: {fileID: 2141627598}
   preview: {fileID: 1561972223}
   previewReason: {fileID: 1550286450}
+  mobilePreviewScale: 0.6
+  previewMobileInEditor: 0
   cardWorldHeight: 1.4
   yourCardScale: 1.6
   labelFontSize: 44
@@ -1435,6 +1439,8 @@ MonoBehaviour:
   trayColor: {r: 0.04, g: 0.04, b: 0.07, a: 0.8}
   trayPadding: 12
   maxCardsShown: 10
+  turnGlowColor: {r: 1, g: 0.8, b: 0.42, a: 1}
+  defenseGlowColor: {r: 0.45, g: 0.7, b: 1, a: 1}
   hoverLift: 70
   hoverScale: 1.1
   selectedLift: 45
@@ -1903,6 +1909,7 @@ MonoBehaviour:
   matRimWidth: 0.1
   matSideAngle: 45
   matExtraHeight: 1
+  tapRadiusCm: 0.8
   pileCardHeight: 2.4
   pileGap: 0.3
   seatGap: 0.15
@@ -1971,6 +1978,10 @@ MonoBehaviour:
   cancelButton: {fileID: 1874010489}
   forwardButton: {fileID: 488454033}
   backwardButton: {fileID: 450634447}
+  endTurnHeight: 54
+  endTurnFontSize: 26
+  mobileEndTurnScale: 1.2
+  previewMobileInEditor: 0
 --- !u!114 &980034799
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2313,6 +2324,7 @@ MonoBehaviour:
   botTurnStartDelay: 0.6
   animationSpeed: 1
   screenShake: 1
+  defenseGlowColor: {r: 0.45, g: 0.7, b: 1, a: 1}
   discMoveSpeed: 7
   lungeDistance: 0.4
   lungeTime: 0.3
@@ -5187,6 +5199,7 @@ MonoBehaviour:
   countText: {fileID: 411442646}
   emptyText: {fileID: 191061858}
   glow: {fileID: 1598799870}
+  screenCanvas: {fileID: 0}
   maxShown: 8
   maxTurn: 10
   maxShift: 10
