@@ -222,6 +222,16 @@ namespace SoulBind.UI
             TMP_Text subtitle = CreateText("Subtitle", root, "Apostle's Descent", 46f, FontStyles.Italic);
             Place(subtitle.rectTransform, new Vector2(0f, 235f), new Vector2(1400f, 70f));
 
+            // The game's version (Player Settings > Version, raised by SoulBind > Build Android APK),
+            // bottom-right, so testers can tell which APK they have.
+            TMP_Text version = CreateText("Version", root, "v" + Application.version, 26f, FontStyles.Normal);
+            RectTransform versionRect = version.rectTransform;
+            versionRect.anchorMin = versionRect.anchorMax = versionRect.pivot = new Vector2(1f, 0f);
+            versionRect.anchoredPosition = new Vector2(-24f, 16f);
+            versionRect.sizeDelta = new Vector2(320f, 40f);
+            version.alignment = TextAlignmentOptions.BottomRight;
+            version.color = new Color(1f, 1f, 1f, 0.5f);
+
             _choicesScreen = CreateRect("Choices", root).gameObject;
             Stretch((RectTransform)_choicesScreen.transform);
             var choices = (RectTransform)_choicesScreen.transform;

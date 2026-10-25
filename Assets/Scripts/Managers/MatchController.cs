@@ -66,6 +66,7 @@ namespace SoulBind.Managers
         private readonly List<ApostleView> _views = new List<ApostleView>(GameConstants.MaxPlayers);
         private readonly List<HexCoord> _legalDestinations = new List<HexCoord>(6);
         private readonly List<ApostleState> _attackTargets = new List<ApostleState>(6);
+        private readonly List<HexCoord> _pickTiles = new List<HexCoord>(6);
         private readonly List<HexCoord> _attackTiles = new List<HexCoord>(6);
 
         /// <summary>Raised after anything that changes what the player should see.</summary>
@@ -506,7 +507,7 @@ namespace SoulBind.Managers
             if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
                 return;
 
-            if (!boardView.TryGetTileAtScreen(screenPoint, out HexCoord tile))
+            if (!PickTile(screenPoint, out HexCoord tile))
                 return;
 
             ApostleState clicked = CurrentMatch.Battlefield.GetApostleAt(tile);
@@ -584,6 +585,13 @@ namespace SoulBind.Managers
                 return;
             }
 
+            // only one enemy in reach: there is nothing to choose, so attack it straight away.
+            if (_attackTargets.Count == 1)
+            {
+                PlayFromHand(card, _attackTargets[0].Id, 0);
+                return;
+            }
+
             HasSelectedCard = true;
             SelectedCard = card;
             AfterStateChange();
@@ -609,7 +617,11 @@ namespace SoulBind.Managers
         {
             if (!IsLocalTurn || IsChoosingComboTarget || GetUnplayableReason(card) != null)
                 return false;
-            if (!boardView.TryGetTileAtScreen(screenPoint, out HexCoord tile))
+            CurrentMatch.GetAttackTargets(_attackTargets);
+            _pickTiles.Clear();
+            for (int i = 0; i < _attackTargets.Count; i++)
+                _pickTiles.Add(_attackTargets[i].Position);
+            if (!boardView.TryPickTile(screenPoint, _pickTiles, out HexCoord tile))
                 return false;
 
             ApostleState apostle = CurrentMatch.Battlefield.GetApostleAt(tile);
@@ -651,6 +663,47 @@ namespace SoulBind.Managers
             if (IsChoosingComboTarget)
                 PlayFromHand(_comboCard, _comboAttackTarget, apostleId);
         }
+
+        // The tile a tap on the board means, forgiving for fingers (see FillPickableTiles).
+        private bool PickTile(Vector2 screenPoint, out HexCoord tile)
+        {
+            FillPickableTiles();
+
+            // Moving: a tap right on an Apostle's disc means that disc (no move goes there),
+            // so it is never pulled onto a move tile next to it.
+            if (!HasSelectedCard && !IsChoosingComboTarget && boardView.TryGetTileAtScreen(screenPoint, out tile) && CurrentMatch.Battlefield.GetApostleAt(tile) != null)
+                return true;
+
+            return boardView.TryPickTile(screenPoint, _pickTiles, out tile);
+        }
+
+        // The tiles a tap can pick right now, so a tap near one of them picks it (see BoardView.TryPickTile):
+        // the Apostles in reach while an ATK card is selected, the opponents while picking a combo target,
+        // and otherwise the highlighted move tiles.
+        private void FillPickableTiles()
+        {
+            _pickTiles.Clear();
+            if (HasSelectedCard)
+            {
+                CurrentMatch.GetAttackTargets(_attackTargets);
+                for (int i = 0; i < _attackTargets.Count; i++)
+                    _pickTiles.Add(_attackTargets[i].Position);
+            }
+            else if (IsChoosingComboTarget)
+            {
+                IReadOnlyList<ApostleState> apostles = CurrentMatch.Battlefield.Apostles;
+                for (int i = 0; i < apostles.Count; i++)
+                {
+                    if (apostles[i] != CurrentMatch.CurrentApostle && !apostles[i].IsEliminated)
+                        _pickTiles.Add(apostles[i].Position);
+                }
+            }
+            else
+            {
+                _pickTiles.AddRange(_legalDestinations);
+            }
+        }
+
 
         private bool IsAttackTarget(ApostleState apostle)
         {
@@ -844,7 +897,7 @@ namespace SoulBind.Managers
                 return;
             if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
                 return;
-            if (boardView.TryGetTileAtScreen(screenPoint, out HexCoord tile) && _draft.CanPick(tile))
+            if (boardView.TryPickTile(screenPoint, _legalDestinations, out HexCoord tile) && _draft.CanPick(tile))
                 PickSpawn(tile);
         }
 

@@ -39,6 +39,10 @@ namespace SoulBind.UI
         [SerializeField] private CardView preview;
         [Tooltip("Shown under the preview when the hovered card can't be played.")]
         [SerializeField] private TMP_Text previewReason;
+        [Tooltip("On phones and tablets the card preview is this size compared with PC (1 = same size).")]
+        [SerializeField, Range(0.3f, 1f)] private float mobilePreviewScale = 0.6f;
+        [Tooltip("Tick to see the phone preview size while testing in the Editor.")]
+        [SerializeField] private bool previewMobileInEditor;
 
         [Header("Cards on the table")]
         [Tooltip("Height of an opponent's card on the table, in world units (a hex tile is about 1).")]
@@ -145,6 +149,26 @@ namespace SoulBind.UI
             }
             if (previewReason != null)
                 previewReason.gameObject.SetActive(false);
+            ShrinkPreviewOnPhones();
+        }
+
+        // On a phone the big PC preview covers too much of the board, so it is drawn smaller there.
+        // It shrinks toward its right edge, and the "can't play" line moves up to stay just under it.
+        private void ShrinkPreviewOnPhones()
+        {
+            bool phone = Application.isMobilePlatform || (Application.isEditor && previewMobileInEditor);
+            if (!phone || preview == null || mobilePreviewScale >= 0.999f)
+                return;
+
+            RectTransform rect = preview.Rect;
+            rect.localScale *= mobilePreviewScale;
+            if (previewReason == null)
+                return;
+
+            RectTransform reason = previewReason.rectTransform;
+            float bottom = rect.anchoredPosition.y - rect.rect.height * rect.pivot.y * rect.localScale.y;
+            reason.anchoredPosition = new Vector2(reason.anchoredPosition.x, bottom - 10f);
+            reason.sizeDelta = new Vector2(rect.rect.width * rect.localScale.x, reason.sizeDelta.y);
         }
 
         private void OnEnable()
