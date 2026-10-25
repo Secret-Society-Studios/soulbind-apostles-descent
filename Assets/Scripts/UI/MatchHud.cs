@@ -3,7 +3,9 @@ using SoulBind.Core;
 using SoulBind.Managers;
 using SoulBind.Utility;
 using TMPro;
+using Unity.GraphToolkit.Editor;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace SoulBind.UI
 {
@@ -180,6 +182,15 @@ namespace SoulBind.UI
                 if (apostleArt != null)
                     panel.SetPortrait(apostleArt.GetPortrait(apostle.Id));
                 GothicTheme.StylePortrait(panel); // after the portrait art, so the gold frame sits on top
+
+                // a ring in the apostle's colour around the portrait: the same colour as their disc and their hand
+                Transform portrait = panel.transform.Find("Portrait");
+                if (portrait != null && portrait.GetComponent<Graphic>() != null)
+                {
+                    Outline ring = portrait.gameObject.AddComponent<Outline>();
+                    ring.effectColor = ApostleColors.Get(apostle.Id);
+                    ring.effectDistance = new Vector2(4f, -4f);
+                }
                 panel.Clicked += OnPortraitClicked;
                 _panels.Add(panel);
             }

@@ -4,6 +4,7 @@ using SoulBind.Core;
 using SoulBind.Managers;
 using SoulBind.Utility;
 using TMPro;
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -56,6 +57,8 @@ namespace SoulBind.UI
         [SerializeField] private float cardGap = 10f;
         [SerializeField] private Color trayColor = new Color(0.04f, 0.04f, 0.07f, 0.8f);
         [SerializeField] private float trayPadding = 12f;
+        [Tooltip("Opponents' name tags sit on the board side of " + "their cards, where the screen edge can't cut " + "them off. Untick for the old outer-edge spot.")]
+        [SerializeField] private bool nameTagOnBoardSide = true;
         [Tooltip("Opponents' hands bigger than this show this many face-down cards (the label still gives the real count). Your own hand always shows every card.")]
         [SerializeField, Range(1, 15)] private int maxCardsShown = 10;
 
@@ -338,26 +341,55 @@ namespace SoulBind.UI
                 // A dark tray behind the cards, edged in the Apostle's color.
                 seat.Tray = CreateRect("Tray", seat.Root);
                 Image tray = seat.Tray.gameObject.AddComponent<Image>();
-                tray.color = trayColor;
+                Color seatColor = ApostleColors.Get(apostle.Id);
+                tray.color = Color.Lerp(trayColor, seatColor, 0.22f);
                 tray.raycastTarget = false;
                 Outline edge = seat.Tray.gameObject.AddComponent<Outline>();
                 edge.effectColor = ApostleColors.Get(apostle.Id);
-                edge.effectDistance = new Vector2(3f, -3f);
+                edge.effectDistance = new Vector2(6f, -6f);
                 seat.Edge = edge;
 
-                // The name, on the outer edge, always upright on screen.
-                RectTransform labelRect = CreateRect("Label", seat.Root);
-                labelRect.sizeDelta = new Vector2(Mathf.Max(260f, seat.Root.sizeDelta.x * 0.6f), LabelHeight);
-                labelRect.anchoredPosition = new Vector2(0f, -seat.Root.sizeDelta.y / 2f + LabelHeight / 2f);
-                labelRect.localRotation = Quaternion.Euler(0f, 0f, -rotation);
-                TextMeshProUGUI label = labelRect.gameObject.AddComponent<TextMeshProUGUI>();
+                // The name tag: name and card count on a dark plate
+                // edged in the Apostle's colour, always upright.
+                // Opponents' tags sit on the board side of their
+                // cards, where the screen edge can't cut them off.
+                RectTransform tagRect = CreateRect("NameTag", seat.Root);
+                tagRect.sizeDelta = new Vector2(
+                    Mathf.Max(300f, seat.Root.sizeDelta.x * 0.5f),
+                    LabelHeight);
+                bool onBoardSide = nameTagOnBoardSide && !seat.IsYours;
+                float boardSide = RowY(seat)
+                    + CardHeight * seat.CardScale / 2f
+                    + trayPadding + 8f + LabelHeight / 2f;
+                float outerEdge = -seat.Root.sizeDelta.y / 2f
+                    + LabelHeight / 2f;
+                tagRect.anchoredPosition = new Vector2(0f,
+                    onBoardSide ? boardSide : outerEdge);
+                tagRect.localRotation =
+                    Quaternion.Euler(0f, 0f, -rotation);
+
+                Image plate = tagRect.gameObject.AddComponent<Image>();
+                plate.color = new Color(0.05f, 0.04f, 0.08f, 0.85f);
+                plate.raycastTarget = false;
+                Outline plateEdge =
+                    tagRect.gameObject.AddComponent<Outline>();
+                plateEdge.effectColor = seatColor;
+                plateEdge.effectDistance = new Vector2(3f, -3f);
+
+                RectTransform labelRect = CreateRect("Label", tagRect);
+                labelRect.anchorMin = Vector2.zero;
+                labelRect.anchorMax = Vector2.one;
+                labelRect.offsetMin = new Vector2(14f, 2f);
+                labelRect.offsetMax = new Vector2(-14f, -2f);
+                TextMeshProUGUI label =
+                    labelRect.gameObject.AddComponent<TextMeshProUGUI>();
                 label.alignment = TextAlignmentOptions.Center;
                 label.fontSize = labelFontSize;
                 label.enableAutoSizing = true;
                 label.fontSizeMin = 18f;
                 label.fontSizeMax = labelFontSize;
                 label.fontStyle = FontStyles.Bold;
-                label.color = ApostleColors.Get(apostle.Id);
+                label.color = seatColor;
                 label.raycastTarget = false;
                 seat.Label = label;
                 CreateSwapMark(seat);
@@ -535,7 +567,9 @@ namespace SoulBind.UI
             ApostleState apostle = FindApostle(match, seat.ApostleId);
             int count = Mathf.Max(0, seat.Shown.Count - seat.Arriving);
             string who = seat.IsYours ? "You" : PlayerNames.Get(seat.ApostleId);
-            seat.Label.text = apostle != null && apostle.IsEliminated ? $"{who}  OUT" : $"{who}  {count} cards";
+            string state = apostle != null && apostle.IsEliminated ? "OUT" : count == 1 ? "1 card" : $"{count} cards";
+            // The name in the Apostle's colour, the count dimmer.
+            seat.Label.text = $"{who}  <color=#FFFFFFB0>{state}</color>";
         }
 
         // Cards sit toward the board, leaving the outer edge for the name.
@@ -587,6 +621,14 @@ namespace SoulBind.UI
             back.sizeDelta = new Vector2(CardWidth, CardHeight);
             back.localScale = Vector3.one;
             back.localRotation = Quaternion.identity;
+
+            // edged in the owner's colour, so each card shows whose hand it belongs to.
+            if (back.GetComponent<Image>() != null)
+            {
+                Outline ring = back.gameObject.AddComponent<Outline>();
+                ring.effectColor = ApostleColors.Get(seat.ApostleId);
+                ring.effectDistance = new Vector2(5f, -5f);
+            }
             return back;
         }
 
