@@ -3,6 +3,7 @@ using SoulBind.Online;
 using SoulBind.Utility;
 using TMPro;
 using Unity.Services.Lobbies.Models;
+using UnityEditor.Build.Profile;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -41,6 +42,9 @@ namespace SoulBind.UI
         private GameObject _roomScreen;
         private TMP_InputField _codeField;
         private TMP_InputField _nameField;
+        private GameObject _profilePopup;
+        private TMP_Text _profileName;
+        private TMP_Text _profileInitial;
         private TMP_Text _onlineStatus;
         private TMP_Text _roomCode;
         private TMP_Text _roomPlayers;
@@ -108,15 +112,9 @@ namespace SoulBind.UI
                 : "Everyone takes turns on this screen; the view follows whoever's turn it is.";
         }
 
-        private void SaveName()
-        {
-            if (_nameField != null)
-                PlayerNames.LocalName = _nameField.text;
-        }
 
         private void Play()
         {
-            SaveName();
             MatchSettings.Set(_players, _bots, true);
             SceneManager.LoadScene(gameSceneName);
         }
@@ -247,12 +245,7 @@ namespace SoulBind.UI
             Stretch((RectTransform)_choicesScreen.transform);
             var choices = (RectTransform)_choicesScreen.transform;
 
-            // Your name: shown in matches, remembered on this device
-            _nameField = CreateInputField("Name", choices, "Your Name", new Vector2(0f, 172f), new Vector2(460f, 52f));
-            _nameField.characterLimit = PlayerNames.MaxLength;
-            _nameField.onValidateInput = (string _, int __, char c) => PlayerNames.IsAllowed(c) ? c : '\0';
-            _nameField.text = PlayerNames.LocalName;
-            _nameField.onEndEdit.AddListener(value => PlayerNames.LocalName = value);
+            
 
             RectTransform panel = CreateRect("Panel", choices);
             Place(panel, new Vector2(-400f, -40f), new Vector2(760f, 360f));
@@ -283,6 +276,134 @@ namespace SoulBind.UI
             BuildOnlinePanel(choices);
             BuildRoomScreen(root);
             CreateButton("Quit", root, "Quit", new Vector2(0f, -330f), new Vector2(220f, 60f), ButtonColor, Quit);
+            BuildProfile(root);
+        }
+
+        
+        // Top-left: your avatar and name. Tap it to change the name.
+        private void BuildProfile(RectTransform root)
+        {
+            RectTransform card = CreateRect("Profile", root);
+            // Anchored to the safe area's left edge, so a camera
+            // notch or rounded corner never covers it.
+            float left = Screen.width > 0
+                ? Screen.safeArea.xMin / Screen.width : 0f;
+            card.anchorMin = card.anchorMax = new Vector2(left, 1f);
+            card.pivot = new Vector2(0f, 1f);
+            card.anchoredPosition = new Vector2(40f, -30f);
+            card.sizeDelta = new Vector2(320f, 76f);
+            AddImage(card, PanelColor).raycastTarget = true;
+            Outline edge = card.gameObject.AddComponent<Outline>();
+            edge.effectColor = GoldColor;
+            edge.effectDistance = new Vector2(2f, -2f);
+            card.gameObject.AddComponent<Button>()
+                .onClick.AddListener(OpenProfile);
+
+            // A round avatar with the name's first letter.
+            RectTransform avatar = CreateRect("Avatar", card);
+            avatar.anchorMin = avatar.anchorMax = new Vector2(0f, 0.5f);
+            avatar.pivot = new Vector2(0f, 0.5f);
+            avatar.anchoredPosition = new Vector2(10f, 0f);
+            avatar.sizeDelta = new Vector2(56f, 56f);
+            Image disc = AddImage(avatar, GoldColor);
+            disc.sprite = DiscSpriteFactory.Create(1f);
+            disc.preserveAspect = true;
+            _profileInitial = CreateText("Initial", avatar, "?",
+                30f, FontStyles.Bold);
+            Stretch(_profileInitial.rectTransform);
+            _profileInitial.color = BackgroundColor;
+
+            _profileName = CreateText("Name", card, "", 28f,
+                FontStyles.Bold);
+            TopLeft(_profileName.rectTransform, 76f, 8f, 236f, 36f);
+            _profileName.alignment = TextAlignmentOptions.Left;
+            _profileName.overflowMode = TextOverflowModes.Ellipsis;
+
+            TMP_Text hint = CreateText("Hint", card,
+                "Tap to change your name", 16f, FontStyles.Italic);
+            TopLeft(hint.rectTransform, 76f, 44f, 236f, 24f);
+            hint.alignment = TextAlignmentOptions.Left;
+            hint.color = new Color(1f, 1f, 1f, 0.6f);
+
+            // The pop-up for typing it. Tapping outside cancels.
+            RectTransform popup = CreateRect("ProfilePopup", root);
+            Stretch(popup);
+            AddImage(popup, new Color(0f, 0f, 0f, 0.7f))
+                .raycastTarget = true;
+            Button outside = popup.gameObject.AddComponent<Button>();
+            outside.transition = Selectable.Transition.None;
+            outside.onClick.AddListener(CloseProfile);
+            _profilePopup = popup.gameObject;
+
+            RectTransform panel = CreateRect("Panel", popup);
+            Place(panel, Vector2.zero, new Vector2(620f, 300f));
+            AddImage(panel, PanelColor).raycastTarget = true;
+            Outline panelEdge = panel.gameObject.AddComponent<Outline>();
+            panelEdge.effectColor = GoldColor;
+            panelEdge.effectDistance = new Vector2(3f, -3f);
+
+            TMP_Text title = CreateText("Title", panel, "Your name",
+                36f, FontStyles.Bold);
+            Place(title.rectTransform, new Vector2(0f, 100f),
+                new Vector2(560f, 50f));
+            title.color = GoldColor;
+
+            _nameField = CreateInputField("NameField", panel,
+                "Type your name", new Vector2(0f, 15f),
+                new Vector2(500f, 68f));
+            _nameField.characterLimit = PlayerNames.MaxLength;
+            _nameField.onValidateInput = (string _, int __, char c) =>
+                PlayerNames.IsAllowed(c) ? c : '\0';
+            _nameField.onSubmit.AddListener(_ => SaveProfile());
+
+            CreateButton("Cancel", panel, "Cancel",
+                new Vector2(-130f, -95f), new Vector2(220f, 64f),
+                ButtonColor, CloseProfile);
+            CreateButton("Save", panel, "Save",
+                new Vector2(130f, -95f), new Vector2(220f, 64f),
+                PlayColor, SaveProfile);
+
+            _profilePopup.SetActive(false);
+            ShowProfileName();
+        }
+
+        private void OpenProfile()
+        {
+            _nameField.text = PlayerNames.LocalName;
+            _profilePopup.transform.SetAsLastSibling();
+            _profilePopup.SetActive(true);
+        }
+
+        private void SaveProfile()
+        {
+            PlayerNames.LocalName = _nameField.text;
+            CloseProfile();
+        }
+
+        private void CloseProfile()
+        {
+            _profilePopup.SetActive(false);
+            ShowProfileName();
+        }
+
+        private void ShowProfileName()
+        {
+            string typed = PlayerNames.LocalName;
+            bool named = typed.Length > 0;
+            _profileName.text = named ? typed : "Set your name";
+            _profileInitial.text = named
+                ? typed.Substring(0, 1).ToUpperInvariant()
+                : "?";
+        }
+
+        // A box placed from the parent's top-left corner.
+        private static void TopLeft(RectTransform rect, float x,
+            float y, float width, float height)
+        {
+            rect.anchorMin = rect.anchorMax = new Vector2(0f, 1f);
+            rect.pivot = new Vector2(0f, 1f);
+            rect.anchoredPosition = new Vector2(x, -y);
+            rect.sizeDelta = new Vector2(width, height);
         }
 
         // Host a room, or type a code and join one.

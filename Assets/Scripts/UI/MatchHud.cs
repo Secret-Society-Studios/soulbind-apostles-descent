@@ -36,6 +36,9 @@ namespace SoulBind.UI
         [SerializeField, Range(1f, 2f)] private float mobilePortraitScale = 1.25f;
         [Tooltip("Tick to see the phone portrait size while testing in the Editor.")]
         [SerializeField] private bool previewMobileInEditor;
+        [Tooltip("On phones the opponents' portraits start this " + "far in from the left (canvas pixels), clear of " + "rounded corners. A camera notch is added on top.")]
+        [SerializeField, Range(0f, 200f)]
+        private float mobileEdgeInset = 50f;
 
         private readonly List<ApostlePanelView> _panels = new List<ApostlePanelView>(GameConstants.MaxPlayers);
         private readonly Vector3[] _corners = new Vector3[4]; // reused every frame, so nothing is allocated
@@ -68,8 +71,10 @@ namespace SoulBind.UI
                 Debug.LogError("MatchHud: assign the Match Controller in the Inspector.", this);
             else if (_canvas != null)
             {
-                if (Application.isMobilePlatform || (Application.isEditor && previewMobileInEditor))
+                bool phone = Application.isMobilePlatform || (Application.isEditor && previewMobileInEditor);
+                if (phone)
                     EnlargePortraits(mobilePortraitScale);
+                KeepClearOfScreenEdges(phone);
                 // Banners and the end-of-match screen.
                 MatchOverlay overlay = MatchOverlay.Create(_canvas.rootCanvas, matchController);
                 // The dark gothic look, over what Build Match HUD made (nothing in the scene is rebuilt).
@@ -129,7 +134,7 @@ namespace SoulBind.UI
         {
             if (scale <= 1.001f)
                 return;
-            ScaleFromCorner(opponentRow, new Vector2(0.5f, 1f), scale);
+            ScaleFromCorner(opponentRow, new Vector2(0f, 1f), scale);
             ScaleFromCorner(playerSlot, new Vector2(1f, 0f), scale);
         }
 
@@ -143,6 +148,20 @@ namespace SoulBind.UI
             rect.pivot = pivot;
             rect.anchoredPosition += new Vector2(shift.x * size.x, shift.y * size.y);
             rect.localScale = new Vector3(scale, scale, 1f);
+        }
+
+        // The opponents' row starts at the safe area's left edge
+        // (right of a camera notch), plus a margin on phones for
+        // the rounded corners.
+        private void KeepClearOfScreenEdges(bool phone)
+        {
+            if (opponentRow == null || Screen.width <= 0)
+                return;
+            float left = Screen.safeArea.xMin / Screen.width;
+            opponentRow.anchorMin = new Vector2(left, opponentRow.anchorMin.y);
+            opponentRow.anchorMax = new Vector2(left, opponentRow.anchorMax.y);
+            if (phone)
+                opponentRow.anchoredPosition += new Vector2(mobileEdgeInset, 0f);
         }
 
         private void CreatePanels(Match match)
