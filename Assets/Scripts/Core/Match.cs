@@ -56,6 +56,9 @@ namespace SoulBind.Core
         /// <summary>The Apostle the last Wheel of Fortune swapped a card with (0 = no swap in the last card played).</summary>
         public int LastSwapTargetId { get; private set; }
 
+        /// <summary>The last Wheel of Fortune swap in this match: who, which hand positions, which cards.</summary>
+        public CardSwap LastSwap { get; private set;}
+
         public Battlefield Battlefield { get; }
         public TurnTracker Turns { get; }
 
@@ -487,6 +490,7 @@ namespace SoulBind.Core
             ArcanaId received = theirs.Cards[theirIndex];
             mine.ReplaceAt(myIndex, received);
             theirs.ReplaceAt(theirIndex, given);
+            LastSwap = new CardSwap(LastSwap.Number + 1, CurrentApostle.Id, other.Id, myIndex, theirIndex, given, received, true);
             return true;
         }
 

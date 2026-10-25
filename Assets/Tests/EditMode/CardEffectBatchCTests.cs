@@ -202,7 +202,7 @@ namespace SoulBind.Tests.EditMode
 
             Play(match, ArcanaId.HangedMan);
 
-            Assert.AreEqual(HangedManEffect.AttackBonus, player.GetTimedTotal(TimedEffectKind.Attack));
+            Assert.AreEqual(HangedManEffect.Bonus, player.GetTimedTotal(TimedEffectKind.Attack));
         }
     }
 }

@@ -167,6 +167,40 @@ namespace SoulBind.Tests.EditMode
             Assert.IsNull(MatchSnapshot.FromBytes(bytes), "Another format version");
         }
 
+                [Test]
+        public void LastSwap_SurvivesTheBytes()
+        {
+            Match host = NewMatch(3, 12, out _);
+            MatchSnapshot snapshot = host.CaptureSnapshot(1);
+            snapshot.LastSwap = new CardSwap(4, 1, 3, 2, 0, ArcanaId.Sun, ArcanaId.Moon, true);
+
+            CardSwap swap = ThroughBytes(snapshot).LastSwap;
+
+            Assert.AreEqual(4, swap.Number);
+            Assert.AreEqual(1, swap.PlayerId);
+            Assert.AreEqual(3, swap.TargetId);
+            Assert.AreEqual(2, swap.PlayerIndex);
+            Assert.AreEqual(0, swap.TargetIndex);
+            Assert.AreEqual(ArcanaId.Sun, swap.Given);
+            Assert.AreEqual(ArcanaId.Moon, swap.Received);
+            Assert.IsTrue(swap.CardsKnown);
+        }
+
+        [Test]
+        public void LastSwap_ShowsTheCardsOnlyToTheTwoApostlesInvolved()
+        {
+            var swap = new CardSwap(1, 1, 3, 2, 0, ArcanaId.Sun, ArcanaId.Moon, true);
+
+            Assert.IsTrue(swap.SeenBy(1).CardsKnown, "The player");
+            Assert.IsTrue(swap.SeenBy(3).CardsKnown, "The target");
+            CardSwap bystander = swap.SeenBy(2);
+            Assert.IsFalse(bystander.CardsKnown);
+            Assert.AreEqual(default(ArcanaId), bystander.Given);
+            Assert.AreEqual(default(ArcanaId), bystander.Received);
+            Assert.AreEqual(1, bystander.Number, "They still see that a swap happened");
+            Assert.AreEqual(3, bystander.TargetId);
+        }
+
         [Test]
         public void ASnapshot_IsSmall()
         {

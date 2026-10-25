@@ -1,8 +1,10 @@
+using System;
 using System.Collections.Generic;
 using SoulBind.Core;
 using SoulBind.Managers;
 using SoulBind.Utility;
 using TMPro;
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -55,6 +57,8 @@ namespace SoulBind.UI
         [SerializeField] private float cardGap = 10f;
         [SerializeField] private Color trayColor = new Color(0.04f, 0.04f, 0.07f, 0.8f);
         [SerializeField] private float trayPadding = 12f;
+        [Tooltip("Opponents' name tags sit on the board side of " + "their cards, where the screen edge can't cut " + "them off. Untick for the old outer-edge spot.")]
+        [SerializeField] private bool nameTagOnBoardSide = true;
         [Tooltip("Opponents' hands bigger than this show this many face-down cards (the label still gives the real count). Your own hand always shows every card.")]
         [SerializeField, Range(1, 15)] private int maxCardsShown = 10;
 
@@ -76,6 +80,12 @@ namespace SoulBind.UI
         [SerializeField] private float drawFlightTime = 0.5f;
         [Tooltip("How high a flying card arcs, in screen pixels.")]
         [SerializeField] private float arcHeight = 60f;
+        
+        [Header("Wheel of Fortune")]
+        [Tooltip("How long the two swapped cards stay marked, in seconds.")]
+        [SerializeField] private float swapMarkSeconds = 6f;
+        [Tooltip("The glow and the SWAPPED tag around the two swapped cards.")]
+        [SerializeField] private Color swapMarkColor = new Color(0.40f, 0.75f, 0.95f, 1f);
 
         private sealed class Seat
         {
@@ -94,6 +104,14 @@ namespace SoulBind.UI
             public readonly List<RectTransform> Backs = new List<RectTransform>(12);
             public readonly List<ArcanaId> Shown = new List<ArcanaId>(12);
             public int Arriving;
+
+            // Wheel of Fortune: the glow and tag around the card that was just swapped in this hand.
+            public Image SwapMark;
+            public TMP_Text SwapTag;
+            public int SwapIndex = -1; // its place in the hand
+            public int SwapHandSize; // the hand's size when it was swapped: any change ends the mark
+            public float SwapTimeLeft;
+
 
             // Your own hand always shows every card; opponents' face-down hands are capped at max
             // (their label still gives the real count).
@@ -124,6 +142,7 @@ namespace SoulBind.UI
         private int _builtViewer;
         private int _lastDiscardCount;
         private int _lastDrawCount;
+        private int _lastSwapNumber;
         private bool _pendingRebuild;
         private bool _ready;
         private CardView _hovered;
@@ -322,28 +341,58 @@ namespace SoulBind.UI
                 // A dark tray behind the cards, edged in the Apostle's color.
                 seat.Tray = CreateRect("Tray", seat.Root);
                 Image tray = seat.Tray.gameObject.AddComponent<Image>();
-                tray.color = trayColor;
+                Color seatColor = ApostleColors.Get(apostle.Id);
+                tray.color = Color.Lerp(trayColor, seatColor, 0.22f);
                 tray.raycastTarget = false;
                 Outline edge = seat.Tray.gameObject.AddComponent<Outline>();
                 edge.effectColor = ApostleColors.Get(apostle.Id);
-                edge.effectDistance = new Vector2(3f, -3f);
+                edge.effectDistance = new Vector2(6f, -6f);
                 seat.Edge = edge;
 
-                // The name, on the outer edge, always upright on screen.
-                RectTransform labelRect = CreateRect("Label", seat.Root);
-                labelRect.sizeDelta = new Vector2(Mathf.Max(260f, seat.Root.sizeDelta.x * 0.6f), LabelHeight);
-                labelRect.anchoredPosition = new Vector2(0f, -seat.Root.sizeDelta.y / 2f + LabelHeight / 2f);
-                labelRect.localRotation = Quaternion.Euler(0f, 0f, -rotation);
-                TextMeshProUGUI label = labelRect.gameObject.AddComponent<TextMeshProUGUI>();
+                // The name tag: name and card count on a dark plate
+                // edged in the Apostle's colour, always upright.
+                // Opponents' tags sit on the board side of their
+                // cards, where the screen edge can't cut them off.
+                RectTransform tagRect = CreateRect("NameTag", seat.Root);
+                tagRect.sizeDelta = new Vector2(
+                    Mathf.Max(300f, seat.Root.sizeDelta.x * 0.5f),
+                    LabelHeight);
+                bool onBoardSide = nameTagOnBoardSide && !seat.IsYours;
+                float boardSide = RowY(seat)
+                    + CardHeight * seat.CardScale / 2f
+                    + trayPadding + 8f + LabelHeight / 2f;
+                float outerEdge = -seat.Root.sizeDelta.y / 2f
+                    + LabelHeight / 2f;
+                tagRect.anchoredPosition = new Vector2(0f,
+                    onBoardSide ? boardSide : outerEdge);
+                tagRect.localRotation =
+                    Quaternion.Euler(0f, 0f, -rotation);
+
+                Image plate = tagRect.gameObject.AddComponent<Image>();
+                plate.color = new Color(0.05f, 0.04f, 0.08f, 0.85f);
+                plate.raycastTarget = false;
+                Outline plateEdge =
+                    tagRect.gameObject.AddComponent<Outline>();
+                plateEdge.effectColor = seatColor;
+                plateEdge.effectDistance = new Vector2(3f, -3f);
+
+                RectTransform labelRect = CreateRect("Label", tagRect);
+                labelRect.anchorMin = Vector2.zero;
+                labelRect.anchorMax = Vector2.one;
+                labelRect.offsetMin = new Vector2(14f, 2f);
+                labelRect.offsetMax = new Vector2(-14f, -2f);
+                TextMeshProUGUI label =
+                    labelRect.gameObject.AddComponent<TextMeshProUGUI>();
                 label.alignment = TextAlignmentOptions.Center;
                 label.fontSize = labelFontSize;
                 label.enableAutoSizing = true;
                 label.fontSizeMin = 18f;
                 label.fontSizeMax = labelFontSize;
                 label.fontStyle = FontStyles.Bold;
-                label.color = ApostleColors.Get(apostle.Id);
+                label.color = seatColor;
                 label.raycastTarget = false;
                 seat.Label = label;
+                CreateSwapMark(seat);
 
                 IReadOnlyList<ArcanaId> hand = match.GetHand(apostle.Id);
                 for (int c = 0; c < hand.Count; c++)
@@ -355,6 +404,7 @@ namespace SoulBind.UI
             }
 
             _builtFor = match;
+            _lastSwapNumber = match.LastSwap.Number; // a rebuild never replays an old swap
             _builtViewer = viewer;
             UpdateGlows(match);
             _lastDiscardCount = match.Deck.DiscardCount;
@@ -372,8 +422,7 @@ namespace SoulBind.UI
             IReadOnlyList<ArcanaId> discards = deck.DiscardPile;
             for (int i = Mathf.Max(0, discards.Count - discardGrowth); i < discards.Count; i++)
                 _newDiscards[(int)discards[i]]++;
-            // Wheel of Fortune played as part of an attack swaps a card with the target: shown below.
-            bool wheelPlayed = _newDiscards[(int)ArcanaId.WheelOfFortune] > 0;
+            
 
             // Cards drawn in this action. If the discard pile was shuffled in, every new card was drawn.
             int drawsLeft = deck.DrawCount < _lastDrawCount ? _lastDrawCount - deck.DrawCount
@@ -444,11 +493,14 @@ namespace SoulBind.UI
 
             if (toPile > 0 && discardPile != null)
                 discardPile.HoldTop(toPile);
-            // Who it swapped with: recorded by the match (or, on a joined player's copy, the attack target).
-            int swappedWith = match.LastSwapTargetId != 0 ? match.LastSwapTargetId
-                : match.Engagement == EngagementState.Engaged ? match.EngagedTargetId : 0;
-            if (wheelPlayed && swappedWith != 0 && match.CurrentApostle != null)
-                ShowSwap(match.CurrentApostle.Id, swappedWith);
+            // A new wheel of fortune swap (its Number went up): show which two cards changed hands.
+            CardSwap swap = match.LastSwap;
+            if (swap.Number != _lastSwapNumber)
+            {
+                _lastSwapNumber = swap.Number;
+                if (swap.Number > 0)
+                    ShowSwap(swap);
+            }
             _lastDiscardCount = deck.DiscardCount;
             _lastDrawCount = deck.DrawCount;
         }
@@ -510,11 +562,14 @@ namespace SoulBind.UI
             seat.Tray.anchoredPosition = new Vector2(0f, RowY(seat));
             FitGlow(seat.TurnGlow, seat.Tray, 64f);
             FitGlow(seat.DefenseGlow, seat.Tray, 42f);
+            PlaceSwapMark(seat, total);
 
             ApostleState apostle = FindApostle(match, seat.ApostleId);
             int count = Mathf.Max(0, seat.Shown.Count - seat.Arriving);
-            string who = seat.IsYours ? $"You (A{seat.ApostleId})" : $"A{seat.ApostleId}";
-            seat.Label.text = apostle != null && apostle.IsEliminated ? $"{who}  OUT" : $"{who}  {count} cards";
+            string who = seat.IsYours ? "You" : PlayerNames.Get(seat.ApostleId);
+            string state = apostle != null && apostle.IsEliminated ? "OUT" : count == 1 ? "1 card" : $"{count} cards";
+            // The name in the Apostle's colour, the count dimmer.
+            seat.Label.text = $"{who}  <color=#FFFFFFB0>{state}</color>";
         }
 
         // Cards sit toward the board, leaving the outer edge for the name.
@@ -566,6 +621,14 @@ namespace SoulBind.UI
             back.sizeDelta = new Vector2(CardWidth, CardHeight);
             back.localScale = Vector3.one;
             back.localRotation = Quaternion.identity;
+
+            // edged in the owner's colour, so each card shows whose hand it belongs to.
+            if (back.GetComponent<Image>() != null)
+            {
+                Outline ring = back.gameObject.AddComponent<Outline>();
+                ring.effectColor = ApostleColors.Get(seat.ApostleId);
+                ring.effectDistance = new Vector2(5f, -5f);
+            }
             return back;
         }
 
@@ -573,6 +636,8 @@ namespace SoulBind.UI
 
         private void Update()
         {
+            TickSwapMarks(Time.unscaledDeltaTime);
+
             if (_pendingRebuild && (_flights == null || _flights.ActiveCount == 0))
             {
                 Match match = matchController.CurrentMatch;
@@ -886,24 +951,101 @@ namespace SoulBind.UI
 
         // ---- Wheel of Fortune's swap ----
 
-        // Two face-down cards cross between the two hands, so the swap can be seen.
-        private void ShowSwap(int playerId, int targetId)
+        // Wheel of Fortune: the glow and tag around the card that was just swapped in this hand.
+        private void ShowSwap(CardSwap swap)
         {
-            Seat player = FindSeat(playerId);
-            Seat target = FindSeat(targetId);
-            if (_flights == null || player == null || target == null)
+            Seat player = FindSeat(swap.PlayerId);
+            Seat target = FindSeat(swap.TargetId);
+            if (player == null || target == null)
                 return;
-            if (!TrySeatSpot(player, out Vector2 a, out float aPixels, out float aAngle)
-                || !TrySeatSpot(target, out Vector2 b, out float bPixels, out float bAngle))
-                return;
-            float time = drawFlightTime * 1.6f;
-            _flights.Fly(default, a, aAngle, _flights.ScaleForPixels(aPixels), b, bAngle, _flights.ScaleForPixels(bPixels),
-                true, true, time, null);
-            _flights.Fly(default, b, bAngle, _flights.ScaleForPixels(bPixels), a, aAngle, _flights.ScaleForPixels(aPixels),
-                true, true, time, null);
-            Debug.Log($"TableHandsView: Wheel of Fortune swapped a card between Apostle {playerId} and Apostle {targetId}.");
+
+            MarkSwap(player, swap.PlayerIndex);
+            MarkSwap(target, swap.TargetIndex);
+
+            int viewer = matchController.ViewerId;
+            bool known = swap.CardsKnown && (viewer == swap.PlayerId || viewer == swap.TargetId);
+            if (_flights != null && TrySeatSpot(player, out Vector2 a, out float aPixels, out float aAngle) && TrySeatSpot(target, out Vector2 b, out float bPixels, out float bAngle))
+            {
+                float time = drawFlightTime * 1.6f;
+                // the card the player gave flies to the target; the one it got flies back.
+                _flights.Fly(known ? swap.Given : default, a, aAngle, _flights.ScaleForPixels(aPixels), b, bAngle, _flights.ScaleForPixels(bPixels), !known, !known, time, null);
+                _flights.Fly(known ? swap.Received : default, b, bAngle, _flights.ScaleForPixels(bPixels), a, aAngle, _flights.ScaleForPixels(aPixels), !known, !known, time, null);
+            }
+            Debug.Log($"TableHandsView: Wheel of Fortune swapped card {swap.PlayerIndex + 1} of Apostle {swap.PlayerId} " + $"with card {swap.TargetIndex + 1} of Apostle {swap.TargetId}.");
         }
 
+        // The glow behind the card, a little bigger than it, with a SWAPPED tag above it. Made once per hand.
+        private void CreateSwapMark(Seat seat)
+        {
+            seat.SwapMark = CreateGlow("SwapMark", seat.Root, swapMarkColor, 0.3f);
+
+            RectTransform tagRect = CreateRect("SwapTag", seat.SwapMark.rectTransform);
+            tagRect.anchorMin = tagRect.anchorMax = new Vector2(0.5f, 1f);
+            tagRect.pivot = new Vector2(0.5f, 0f);
+            tagRect.anchoredPosition = new Vector2(0f, -10f);
+            tagRect.sizeDelta = new Vector2(CardWidth * 1.4f, 44f);
+            TextMeshProUGUI tag = tagRect.gameObject.AddComponent<TextMeshProUGUI>();
+            tag.text = "SWAPPED";
+            tag.alignment = TextAlignmentOptions.Center;
+            tag.fontSize = 34f;
+            tag.fontStyle = FontStyles.Bold;
+            tag.color = swapMarkColor;
+            tag.raycastTarget = false;
+            seat.SwapTag = tag;
+        }
+
+        private void MarkSwap(Seat seat, int index)
+        {
+            if (seat.SwapMark == null)
+                return;
+            seat.SwapIndex = index;
+            seat.SwapHandSize = seat.Shown.Count;
+            seat.SwapTimeLeft = swapMarkSeconds;
+            PlaceSwapMark(seat, seat.SlotCount(maxCardsShown));
+        }
+
+        // Keeps the mark on its card while the row moves. It goes away once the hand changes (a card played
+        // or drawn moves the others), or if that card isn't drawn (an opponent's long hand shows only some).
+        private void PlaceSwapMark(Seat seat, int total)
+        {
+            if (seat.SwapMark == null)
+                return;
+            bool show = seat.SwapTimeLeft > 0f && seat.SwapIndex >= 0 && seat.SwapIndex < total && seat.Shown.Count == seat.SwapHandSize;
+            if (!show)
+            {
+                seat.SwapTimeLeft = 0f;
+                seat.SwapMark.gameObject.SetActive(false);
+                return;
+            }
+            RectTransform rect = seat.SwapMark.rectTransform;
+            rect.sizeDelta = new Vector2(CardWidth, CardHeight) * seat.CardScale + new Vector2(70f, 70f);
+            rect.anchoredPosition = SlotPosition(seat, seat.SwapIndex, total);
+            seat.SwapMark.gameObject.SetActive(true);
+        }
+
+        // pulses the marks and fades them out at the end
+        private void TickSwapMarks(float delta)
+        {
+            float pulse = (Mathf.Sin(Time.unscaledTime * Mathf.PI * 2f / 0.8f) + 1f) / 2f;
+            for (int i = 0; i < _seats.Count; i++)
+            {
+                Seat seat = _seats[i];
+                if (seat.SwapMark == null || seat.SwapTimeLeft <= 0f)
+                    continue;
+                seat.SwapTimeLeft -= delta;
+                if (seat.SwapTimeLeft <= 0f)
+                {
+                    seat.SwapMark.gameObject.SetActive(false);
+                    continue;
+                }
+                float alpha = Mathf.Lerp(0.55f, 1f, pulse) * Mathf.Clamp01(seat.SwapTimeLeft / 0.6f);
+                Color color = swapMarkColor;
+                color.a *= alpha;
+                seat.SwapMark.color = color;
+                if (seat.SwapTag != null)
+                    seat.SwapTag.alpha = Mathf.Clamp01(seat.SwapTimeLeft / 0.6f);
+            }
+        }
         private Seat FindSeat(int apostleId)
         {
             for (int i = 0; i < _seats.Count; i++)

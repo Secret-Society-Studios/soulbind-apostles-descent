@@ -102,6 +102,18 @@ namespace SoulBind.Tests.EditMode
         }
 
         [Test]
+        public void AddSouls_StopsAtTheSoulsNeededToAwaken()
+        {
+            var a = Make();
+
+            Assert.AreEqual(GameConstants.SoulsToAwaken - 10, a.AddSouls(50));
+            Assert.AreEqual(GameConstants.SoulsToAwaken, a.Souls);
+            Assert.IsTrue(a.HasMaxSouls);
+            Assert.AreEqual(0, a.AddSouls(1), "Nothing more fits");
+            Assert.AreEqual(GameConstants.SoulsToAwaken, a.Souls);
+        }
+        
+        [Test]
         public void AddSouls_WhileSoullocked_GainsNothing()
         {
             var a = Make();

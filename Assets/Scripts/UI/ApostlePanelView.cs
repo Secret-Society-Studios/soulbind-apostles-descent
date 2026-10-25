@@ -1,4 +1,5 @@
 using System;
+using SoulBind.Utility;
 using SoulBind.Core;
 using TMPro;
 using UnityEngine;
@@ -51,7 +52,7 @@ namespace SoulBind.UI
             if (colorStripe != null)
                 colorStripe.color = color;
             if (nameText != null)
-                nameText.text = $"Apostle {apostleId}";
+                nameText.text = PlayerNames.Get(ApostleId);
             if (portraitText != null)
                 portraitText.text = $"A{apostleId}";
 

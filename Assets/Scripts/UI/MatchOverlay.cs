@@ -76,6 +76,7 @@ namespace SoulBind.UI
         private int _lastAwakenedId;
         private int _lastDrawCount;
         private int _lastDiscardCount;
+        private int _lastSwapNumber;
         private Match _seenMatch;
 
         public static MatchOverlay Create(Canvas canvas, MatchController controller)
@@ -122,6 +123,7 @@ namespace SoulBind.UI
                 _lastAwakenedId = match.Ascension.AwakenedId;
                 _lastDrawCount = match.Deck.DrawCount;
                 _lastDiscardCount = match.Deck.DiscardCount;
+                _lastSwapNumber = match.LastSwap.Number;
                 _endShown = false;
                 _endScreenTimer = -1f;
                 _endScreen.SetActive(false);
@@ -158,6 +160,14 @@ namespace SoulBind.UI
                 QueueBanner("Draw pile empty: the discard pile is shuffled into a new draw pile");
             _lastDrawCount = drawCount;
             _lastDiscardCount = discardCount;
+            // Wheel of Fortune: say what changed hands (the cards only to the two Apostles involved).
+            CardSwap swap = match.LastSwap;
+            if (swap.Number != _lastSwapNumber)
+            {
+                _lastSwapNumber = swap.Number;
+                if (swap.Number > 0)
+                    QueueBanner(SwapText(swap, viewer));
+            }
 
             if (match.IsOver && !_endShown && _endScreenTimer < 0f)
                 _endScreenTimer = EndScreenDelay;
@@ -217,12 +227,12 @@ namespace SoulBind.UI
             int picker = _controller.SpawnPickerId;
             if (_controller.IsLocalSpawnPick)
             {
-                _guideTitle.text = _controller.BotsPlayOthers ? "Pick an edge tile" : $"Apostle {picker}: pick an edge tile";
+                _guideTitle.text = _controller.BotsPlayOthers ? "Pick an edge tile" : Name(picker) + ": pick an edge tile";
                 _guideText.text = "Click a highlighted tile on the edge of the board to choose where you start.";
             }
             else
             {
-                _guideTitle.text = $"Apostle {picker} is choosing";
+                _guideTitle.text = Name(picker) + " is choosing";
                 _guideText.text = "Each Apostle picks a starting tile on the edge, in turn order.";
             }
         }
@@ -336,8 +346,10 @@ namespace SoulBind.UI
             {
                 ApostleState apostle = apostles[i];
                 string color = ColorUtility.ToHtmlStringRGB(ApostleColors.Get(apostle.Id));
-                string name = apostle.Id == viewer ? $"A{apostle.Id} (you)" : $"A{apostle.Id}";
+                string name = Fit(Name(apostle.Id), 11);
                 string status = apostle.Id == match.WinnerId ? "  winner" : apostle.IsEliminated ? "  out" : string.Empty;
+                if (apostle.Id == viewer)
+                    status += "  (you)";
                 text.Append("<color=#").Append(color).Append('>').Append(name.PadRight(12)).Append("</color>")
                     .Append(apostle.Vessel.ToString().PadLeft(7))
                     .Append(apostle.Souls.ToString().PadLeft(7))
@@ -383,9 +395,23 @@ namespace SoulBind.UI
             _showResultButton.SetActive(false);
         }
 
-        private static string Name(int id) => $"Apostle {id}";
+        private static string Name(int id) => PlayerNames.Get(id);
 
-        private static string Possessive(int id, int viewer) => id == viewer ? "Your" : $"Apostle {id}'s";
+        // cuts a long name so the result table stays lined up.
+        private static string Fit(string name, int max) => name.Length <= max ? name : name.Substring(0, max - 1) + ".";
+
+        private static string SwapText(CardSwap swap, int viewer)
+        {
+            bool known = swap.CardsKnown && (viewer == swap.PlayerId || viewer == swap.TargetId);
+            if (viewer == swap.PlayerId)
+                return known ? $"Wheel of Fortune: gave {CardName(swap.Given)}, got {CardName(swap.Received)}" : $"Wheel of Fortune: you swapped a card with {Name(swap.TargetId)}";
+            if (viewer == swap.TargetId)
+                return known ? $"{Name(swap.PlayerId)} took {CardName(swap.Received)}, gave you {CardName(swap.Given)}" : $"{Name(swap.PlayerId)} swapped a card with you";
+            return $"{Name(swap.PlayerId)} swapped a card with {Name(swap.TargetId)}";
+        }
+
+        private static string CardName(ArcanaId card) => CardCatalog.Get(card).Name;
+        private static string Possessive(int id, int viewer) => id == viewer ? "Your" : Name(id) + "'s";
 
         // ---- Building the UI (once, at runtime) ----
 

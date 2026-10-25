@@ -16,7 +16,7 @@ namespace SoulBind.Core
         /// <summary>Stands in for every card the viewer is not allowed to see.</summary>
         public const ArcanaId HiddenCard = (ArcanaId)0;
 
-        private const byte FormatVersion = 1;
+        private const byte FormatVersion = 2;
 
         public sealed class Apostle
         {
@@ -77,6 +77,8 @@ namespace SoulBind.Core
         public bool IsOver;
         public int WinnerId;
         public MatchEndReason EndReason;
+        /// <summary>The last Wheel of Fortune swap, as this viewer may see it (cards only if they took part).</summary>
+        public CardSwap LastSwap;
 
         // ---- Bytes ----
 
@@ -157,6 +159,15 @@ namespace SoulBind.Core
                 w.Write(IsOver);
                 w.Write((byte)WinnerId);
                 w.Write((byte)EndReason);
+
+                w.Write((short)LastSwap.Number);
+                w.Write((byte)LastSwap.PlayerId);
+                w.Write((byte)LastSwap.TargetId);
+                w.Write((byte)LastSwap.PlayerIndex);
+                w.Write((byte)LastSwap.TargetIndex);
+                w.Write((byte)LastSwap.Given);
+                w.Write((byte)LastSwap.Received);
+                w.Write(LastSwap.CardsKnown);
                 w.Flush();
                 return stream.ToArray();
             }
@@ -251,6 +262,18 @@ namespace SoulBind.Core
                     s.IsOver = r.ReadBoolean();
                     s.WinnerId = r.ReadByte();
                     s.EndReason = (MatchEndReason)r.ReadByte();
+
+                    int swapNumber = r.ReadInt16();
+                    int swapPlayer = r.ReadByte();
+                    int swapTarget = r.ReadByte();
+                    int swapPlayerIndex = r.ReadByte();
+                    int swapTargetIndex = r.ReadByte();
+                    byte given = r.ReadByte();
+                    byte received = r.ReadByte();
+                    bool known = r.ReadBoolean();
+                    if (given >= CardCatalog.All.Count || received >= CardCatalog.All.Count)
+                        throw new EndOfStreamException("Unknown card.");
+                    s.LastSwap = new CardSwap(swapNumber, swapPlayer, swapTarget, swapPlayerIndex, swapTargetIndex, (ArcanaId)given, (ArcanaId)received, known);
                     return s;
                 }
             }

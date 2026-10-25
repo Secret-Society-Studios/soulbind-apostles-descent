@@ -150,6 +150,29 @@ namespace SoulBind.Tests.EditMode
         }
 
         [Test]
+        public void Soul_AtTheSoulsNeededToAwaken_GivesNothingAndStaysActive()
+        {
+            SpecialTiles specials = OneTile(SpecialTileType.Soul);
+            var apostle = new ApostleState(1, Spot, GameConstants.SoulsToAwaken);
+
+            Assert.IsFalse(specials.TryTrigger(apostle));
+            Assert.AreEqual(GameConstants.SoulsToAwaken, apostle.Souls);
+            Assert.IsTrue(specials.Active.ContainsKey(Spot));
+        }
+
+        [Test]
+        public void Soul_NearTheSoulsNeededToAwaken_StopsThere()
+        {
+            SpecialTiles specials = OneTile(SpecialTileType.Soul);
+            var apostle = new ApostleState(1, Spot, GameConstants.SoulsToAwaken - 1);
+
+            Assert.IsTrue(specials.TryTrigger(apostle));
+            Assert.AreEqual(GameConstants.SoulsToAwaken, apostle.Souls, "3 Souls, but only 1 fits");
+            Assert.IsFalse(specials.Active.ContainsKey(Spot));
+        }
+
+
+        [Test]
         public void OrdinaryTile_DoesNothing()
         {
             var specials = new SpecialTiles();

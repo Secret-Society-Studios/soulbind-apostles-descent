@@ -3,7 +3,9 @@ using SoulBind.Core;
 using SoulBind.Managers;
 using SoulBind.Utility;
 using TMPro;
+using Unity.GraphToolkit.Editor;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace SoulBind.UI
 {
@@ -36,6 +38,9 @@ namespace SoulBind.UI
         [SerializeField, Range(1f, 2f)] private float mobilePortraitScale = 1.25f;
         [Tooltip("Tick to see the phone portrait size while testing in the Editor.")]
         [SerializeField] private bool previewMobileInEditor;
+        [Tooltip("On phones the opponents' portraits start this " + "far in from the left (canvas pixels), clear of " + "rounded corners. A camera notch is added on top.")]
+        [SerializeField, Range(0f, 200f)]
+        private float mobileEdgeInset = 50f;
 
         private readonly List<ApostlePanelView> _panels = new List<ApostlePanelView>(GameConstants.MaxPlayers);
         private readonly Vector3[] _corners = new Vector3[4]; // reused every frame, so nothing is allocated
@@ -68,8 +73,10 @@ namespace SoulBind.UI
                 Debug.LogError("MatchHud: assign the Match Controller in the Inspector.", this);
             else if (_canvas != null)
             {
-                if (Application.isMobilePlatform || (Application.isEditor && previewMobileInEditor))
+                bool phone = Application.isMobilePlatform || (Application.isEditor && previewMobileInEditor);
+                if (phone)
                     EnlargePortraits(mobilePortraitScale);
+                KeepClearOfScreenEdges(phone);
                 // Banners and the end-of-match screen.
                 MatchOverlay overlay = MatchOverlay.Create(_canvas.rootCanvas, matchController);
                 // The dark gothic look, over what Build Match HUD made (nothing in the scene is rebuilt).
@@ -129,7 +136,7 @@ namespace SoulBind.UI
         {
             if (scale <= 1.001f)
                 return;
-            ScaleFromCorner(opponentRow, new Vector2(0.5f, 1f), scale);
+            ScaleFromCorner(opponentRow, new Vector2(0f, 1f), scale);
             ScaleFromCorner(playerSlot, new Vector2(1f, 0f), scale);
         }
 
@@ -143,6 +150,20 @@ namespace SoulBind.UI
             rect.pivot = pivot;
             rect.anchoredPosition += new Vector2(shift.x * size.x, shift.y * size.y);
             rect.localScale = new Vector3(scale, scale, 1f);
+        }
+
+        // The opponents' row starts at the safe area's left edge
+        // (right of a camera notch), plus a margin on phones for
+        // the rounded corners.
+        private void KeepClearOfScreenEdges(bool phone)
+        {
+            if (opponentRow == null || Screen.width <= 0)
+                return;
+            float left = Screen.safeArea.xMin / Screen.width;
+            opponentRow.anchorMin = new Vector2(left, opponentRow.anchorMin.y);
+            opponentRow.anchorMax = new Vector2(left, opponentRow.anchorMax.y);
+            if (phone)
+                opponentRow.anchoredPosition += new Vector2(mobileEdgeInset, 0f);
         }
 
         private void CreatePanels(Match match)
@@ -161,6 +182,15 @@ namespace SoulBind.UI
                 if (apostleArt != null)
                     panel.SetPortrait(apostleArt.GetPortrait(apostle.Id));
                 GothicTheme.StylePortrait(panel); // after the portrait art, so the gold frame sits on top
+
+                // a ring in the apostle's colour around the portrait: the same colour as their disc and their hand
+                Transform portrait = panel.transform.Find("Portrait");
+                if (portrait != null && portrait.GetComponent<Graphic>() != null)
+                {
+                    Outline ring = portrait.gameObject.AddComponent<Outline>();
+                    ring.effectColor = ApostleColors.Get(apostle.Id);
+                    ring.effectDistance = new Vector2(4f, -4f);
+                }
                 panel.Clicked += OnPortraitClicked;
                 _panels.Add(panel);
             }
@@ -184,11 +214,11 @@ namespace SoulBind.UI
             if (turnText != null)
             {
                 if (match.IsOver)
-                    turnText.text = match.WinnerId == 0 ? "Match over: no winner" : $"Apostle {match.WinnerId} wins!";
+                    turnText.text = match.WinnerId == 0 ? "Match over: no winner" : PlayerNames.Get(match.WinnerId) + " wins!";
                 else if (match.IsAwaitingPhaseStart)
-                    turnText.text = $"Apostle {match.GetNextPhaseChooserId()} chooses direction";
-                else
-                    turnText.text = $"Apostle {match.CurrentApostle.Id}'s turn";
+                    turnText.text = PlayerNames.Get(match.GetNextPhaseChooserId()) + " chooses direction";
+                else 
+                    turnText.text = PlayerNames.Get(match.CurrentApostle.Id) + "'s turn";
             }
 
             if (capacityText != null)

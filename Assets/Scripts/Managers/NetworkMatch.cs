@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using SoulBind.Core;
 using SoulBind.Managers;
+using SoulBind.Utility;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -26,6 +27,7 @@ namespace SoulBind.Online
 
         private readonly Dictionary<ulong, int> _seatByClient = new Dictionary<ulong, int>(GameConstants.MaxPlayers);
         private readonly HashSet<ulong> _ready = new HashSet<ulong>();
+        private readonly Dictionary<ulong, string> _nameByClient = new Dictionary<ulong, string>(GameConstants.MaxPlayers);
         private readonly List<int> _remoteSeats = new List<int>(GameConstants.MaxPlayers);
         private readonly byte[] _commandBytes = new byte[MatchCommand.EncodedSize];
         private bool _started;
@@ -48,7 +50,7 @@ namespace SoulBind.Online
             else
             {
                 controller.CommandSubmitted += SendCommand;
-                ClientReadyRpc();
+                ClientReadyRpc(PlayerNames.LocalName);
             }
         }
 
@@ -80,6 +82,17 @@ namespace SoulBind.Online
         {
             _started = true;
             int seats = Mathf.Clamp(Mathf.Max(MatchSettings.PlayerCount, _ready.Count + 1), 2, GameConstants.MaxPlayers);
+
+
+            // Names: The host's own, then each player's. Bots keep "Apostle N". Sent before the seats, so every screen shows them from the first frame.
+            PlayerNames.Clear();
+            PlayerNames.Set(1, PlayerNames.LocalName);
+            foreach (KeyValuePair<ulong, int> seat in _seatByClient)
+            {
+                if (_nameByClient.TryGetValue(seat.Key, out string playerName))
+                    PlayerNames.Set(seat.Value, playerName);
+            }
+            NamesRpc(PlayerNames.Pack());
 
             // Seats in the order the players connected. The host is seat 1.
             int next = 2;
@@ -135,20 +148,28 @@ namespace SoulBind.Online
         private void SnapshotRpc(byte[] bytes, RpcParams rpcParams)
         {
             controller.ReceiveSnapshot(bytes);
+            
         }
 
         // ---- Players to host ----
 
         [Rpc(SendTo.Server)]
-        private void ClientReadyRpc(RpcParams rpcParams = default)
+        private void ClientReadyRpc(string playerName, RpcParams rpcParams = default)
         {
             ulong sender = rpcParams.Receive.SenderClientId;
+            _nameByClient[sender] = PlayerNames.Clean(playerName);
             if (_started)
             {
                 AssignSeatRpc(0, 0, RpcTarget.Single(sender, RpcTargetUse.Temp));
                 return;
             }
             _ready.Add(sender);
+        }
+
+        [Rpc(SendTo.NotServer)]
+        private void NamesRpc(string packed)
+        {
+            PlayerNames.Unpack(packed);
         }
 
         private void SendCommand(MatchCommand command)
@@ -177,6 +198,7 @@ namespace SoulBind.Online
         private void OnClientDisconnected(ulong clientId)
         {
             _ready.Remove(clientId);
+            _nameByClient.Remove(clientId);
             if (_seatByClient.TryGetValue(clientId, out int seat))
             {
                 _seatByClient.Remove(clientId);
