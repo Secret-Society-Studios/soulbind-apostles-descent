@@ -1,9 +1,12 @@
 using SoulBind.Managers;
 using SoulBind.Online;
+using SoulBind.Utility;
 using TMPro;
+using Unity.Services.Lobbies.Models;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+
 
 namespace SoulBind.UI
 {
@@ -37,6 +40,7 @@ namespace SoulBind.UI
         private GameObject _choicesScreen;
         private GameObject _roomScreen;
         private TMP_InputField _codeField;
+        private TMP_InputField _nameField;
         private TMP_Text _onlineStatus;
         private TMP_Text _roomCode;
         private TMP_Text _roomPlayers;
@@ -104,8 +108,15 @@ namespace SoulBind.UI
                 : "Everyone takes turns on this screen; the view follows whoever's turn it is.";
         }
 
+        private void SaveName()
+        {
+            if (_nameField != null)
+                PlayerNames.LocalName = _nameField.text;
+        }
+
         private void Play()
         {
+            SaveName();
             MatchSettings.Set(_players, _bots, true);
             SceneManager.LoadScene(gameSceneName);
         }
@@ -235,6 +246,13 @@ namespace SoulBind.UI
             _choicesScreen = CreateRect("Choices", root).gameObject;
             Stretch((RectTransform)_choicesScreen.transform);
             var choices = (RectTransform)_choicesScreen.transform;
+
+            // Your name: shown in matches, remembered on this device
+            _nameField = CreateInputField("Name", choices, "Your Name", new Vector2(0f, 172f), new Vector2(460f, 52f));
+            _nameField.characterLimit = PlayerNames.MaxLength;
+            _nameField.onValidateInput = (string _, int __, char c) => PlayerNames.IsAllowed(c) ? c : '\0';
+            _nameField.text = PlayerNames.LocalName;
+            _nameField.onEndEdit.AddListener(value => PlayerNames.LocalName = value);
 
             RectTransform panel = CreateRect("Panel", choices);
             Place(panel, new Vector2(-400f, -40f), new Vector2(760f, 360f));

@@ -227,12 +227,12 @@ namespace SoulBind.UI
             int picker = _controller.SpawnPickerId;
             if (_controller.IsLocalSpawnPick)
             {
-                _guideTitle.text = _controller.BotsPlayOthers ? "Pick an edge tile" : $"Apostle {picker}: pick an edge tile";
+                _guideTitle.text = _controller.BotsPlayOthers ? "Pick an edge tile" : Name(picker) + ": pick an edge tile";
                 _guideText.text = "Click a highlighted tile on the edge of the board to choose where you start.";
             }
             else
             {
-                _guideTitle.text = $"Apostle {picker} is choosing";
+                _guideTitle.text = Name(picker) + " is choosing";
                 _guideText.text = "Each Apostle picks a starting tile on the edge, in turn order.";
             }
         }
@@ -346,8 +346,10 @@ namespace SoulBind.UI
             {
                 ApostleState apostle = apostles[i];
                 string color = ColorUtility.ToHtmlStringRGB(ApostleColors.Get(apostle.Id));
-                string name = apostle.Id == viewer ? $"A{apostle.Id} (you)" : $"A{apostle.Id}";
+                string name = Fit(Name(apostle.Id), 11);
                 string status = apostle.Id == match.WinnerId ? "  winner" : apostle.IsEliminated ? "  out" : string.Empty;
+                if (apostle.Id == viewer)
+                    status += "  (you)";
                 text.Append("<color=#").Append(color).Append('>').Append(name.PadRight(12)).Append("</color>")
                     .Append(apostle.Vessel.ToString().PadLeft(7))
                     .Append(apostle.Souls.ToString().PadLeft(7))
@@ -393,7 +395,10 @@ namespace SoulBind.UI
             _showResultButton.SetActive(false);
         }
 
-        private static string Name(int id) => $"Apostle {id}";
+        private static string Name(int id) => PlayerNames.Get(id);
+
+        // cuts a long name so the result table stays lined up.
+        private static string Fit(string name, int max) => name.Length <= max ? name : name.Substring(0, max - 1) + ".";
 
         private static string SwapText(CardSwap swap, int viewer)
         {
@@ -406,7 +411,7 @@ namespace SoulBind.UI
         }
 
         private static string CardName(ArcanaId card) => CardCatalog.Get(card).Name;
-        private static string Possessive(int id, int viewer) => id == viewer ? "Your" : $"Apostle {id}'s";
+        private static string Possessive(int id, int viewer) => id == viewer ? "Your" : Name(id) + "'s";
 
         // ---- Building the UI (once, at runtime) ----
 

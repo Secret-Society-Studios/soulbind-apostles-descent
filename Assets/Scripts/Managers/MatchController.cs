@@ -6,6 +6,7 @@ using SoulBind.Utility;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.Composites;
 
 namespace SoulBind.Managers
 {
@@ -241,6 +242,16 @@ namespace SoulBind.Managers
 
             localApostleId = Mathf.Clamp(localApostleId, 1, playerCount);
             _lastViewerId = localApostleId;
+
+            // Offline: your typed name goes on your own seat.
+            // (Online, NetworkMatch sets everyone's names.)
+            if (!online)
+            {
+                PlayerNames.Clear();
+                if (botsPlayOthers)
+                    PlayerNames.Set(localApostleId, PlayerNames.LocalName);
+            }
+
             // Seed 0 means a new match every time. The seed actually used is logged, so an interesting match
             // can be played again by typing that number into Seed.
             int usedSeed = seed != 0 ? seed : (System.Environment.TickCount & int.MaxValue) | 1;
@@ -956,12 +967,12 @@ namespace SoulBind.Managers
                 boardView.SetHighlights(_legalDestinations);
                 Hint = botsPlayOthers
                     ? "Choose your starting tile: click a highlighted tile on the edge of the board."
-                    : $"Apostle {picker}: choose your starting tile on the edge of the board.";
+                    : PlayerNames.Get(picker) + ": choose your starting tile on the edge";
             }
             else
             {
                 boardView.ClearHighlights();
-                Hint = $"Apostle {picker} is choosing a starting tile...";
+                Hint = PlayerNames.Get(picker) + " is choosing a starting tile...";
             }
             StateChanged?.Invoke();
         }
@@ -1300,9 +1311,8 @@ namespace SoulBind.Managers
             {
                 if (match.CurrentApostle == null)
                     return string.Empty;
-                return _lastBotAction.Length > 0
-                    ? $"Apostle {match.CurrentApostle.Id} {_lastBotAction}"
-                    : $"Apostle {match.CurrentApostle.Id} is playing...";
+                string who = PlayerNames.Get(match.CurrentApostle.Id);
+                return _lastBotAction.Length > 0 ? $"{who} {_lastBotAction}" : $"{who} is playing...";
             }
             if (IsChoosingComboTarget)
                 return _comboCard == ArcanaId.WheelOfFortune

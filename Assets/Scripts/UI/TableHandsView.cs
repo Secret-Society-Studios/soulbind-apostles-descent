@@ -534,7 +534,7 @@ namespace SoulBind.UI
 
             ApostleState apostle = FindApostle(match, seat.ApostleId);
             int count = Mathf.Max(0, seat.Shown.Count - seat.Arriving);
-            string who = seat.IsYours ? $"You (A{seat.ApostleId})" : $"A{seat.ApostleId}";
+            string who = seat.IsYours ? "You" : PlayerNames.Get(seat.ApostleId);
             seat.Label.text = apostle != null && apostle.IsEliminated ? $"{who}  OUT" : $"{who}  {count} cards";
         }
 
