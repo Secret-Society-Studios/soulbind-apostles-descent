@@ -72,17 +72,23 @@ namespace SoulBind.Core
             return healed;
         }
 
-        /// <summary>Gains Souls unless Soullocked. Returns how many Souls were actually gained.</summary>
+        /// <summary>
+        /// Gains Souls unless Soullocked, but never above the Souls needed to Awaken (20): anything over
+        /// that is lost. Returns how many Souls were actually gained.
+        /// </summary>
         public int AddSouls(int amount)
         {
             RequireNonNegative(amount, nameof(amount));
             if (IsSoullocked)
                 return 0;
 
-            Souls += amount;
-            return amount;
+            int gained = Math.Max(0, Math.Min(amount, GameConstants.SoulsToAwaken - Souls));
+            Souls += gained;
+            return gained;
         }
 
+        /// <summary>True when this Apostle holds the most Souls it can (the Souls needed to Awaken).</summary>
+        public bool HasMaxSouls => Souls >= GameConstants.SoulsToAwaken;
         /// <summary>
         /// Loses Souls (never below 0). Returns how many were actually lost.
         /// Reaching 0 from a positive amount immediately adds Corruption.

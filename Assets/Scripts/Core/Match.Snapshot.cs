@@ -77,6 +77,7 @@ namespace SoulBind.Core
             s.IsOver = IsOver;
             s.WinnerId = WinnerId;
             s.EndReason = EndReason;
+            s.LastSwap = LastSwap.SeenBy(viewerId);
             return s;
         }
 
@@ -161,6 +162,7 @@ namespace SoulBind.Core
             IsOver = snapshot.IsOver;
             WinnerId = snapshot.WinnerId;
             EndReason = snapshot.EndReason;
+            LastSwap = snapshot.LastSwap;
         }
     }
 }

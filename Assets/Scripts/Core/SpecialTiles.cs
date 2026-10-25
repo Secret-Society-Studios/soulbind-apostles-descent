@@ -147,7 +147,9 @@ namespace SoulBind.Core
                     apostle.ReduceCorruption(GameConstants.PurifyTileAmount);
                     break;
                 case SpecialTileType.Soul:
-                    if (apostle.IsSoullocked)
+                    // Stays on the board for someone who can use it: a Soullocked Apostle gains nothing,
+                    // and one already at the Souls needed to Awaken can't hold more.
+                    if (apostle.IsSoullocked || apostle.HasMaxSouls)
                         return false;
                     apostle.AddSouls(GameConstants.SoulTileAmount);
                     break;

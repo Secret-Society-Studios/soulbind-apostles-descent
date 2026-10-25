@@ -142,6 +142,27 @@ namespace SoulBind.Tests.EditMode
             Assert.AreEqual(3, CountOf(playerHand, playerFiller), "The player gave one of its cards away");
             Assert.AreEqual(1, CountOf(targetHand, playerFiller), "The target received it");
         }
+
+        
+        [Test]
+        public void WheelOfFortune_RecordsWhichCardsChangedHands()
+        {
+            Match match = MatchWithHands(SunHand, MoonHand);
+            ApostleState player = match.CurrentApostle;
+            ApostleState target = OpponentNextToCurrent(match);
+            int before = match.LastSwap.Number;
+
+            Play(match, ArcanaId.WheelOfFortune, target.Id);
+
+            CardSwap swap = match.LastSwap;
+            Assert.AreEqual(before + 1, swap.Number);
+            Assert.AreEqual(player.Id, swap.PlayerId);
+            Assert.AreEqual(target.Id, swap.TargetId);
+            Assert.IsTrue(swap.CardsKnown);
+            Assert.AreEqual(swap.Received, match.GetHand(player.Id)[swap.PlayerIndex], "The player's new card sits where the old one was");
+            Assert.AreEqual(swap.Given, match.GetHand(target.Id)[swap.TargetIndex], "The target's new card sits where the old one was");
+            Assert.AreNotEqual(swap.Given, swap.Received, "A Sun went one way and a Moon the other");
+        }
         // ---- The World ----
 
         [Test]

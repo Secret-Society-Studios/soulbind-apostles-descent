@@ -7,13 +7,13 @@ namespace SoulBind.Core
     /// </summary>
     public sealed class HangedManEffect : CardEffect
     {
-        public const int AttackBonus = 5;
+        public const int Bonus = 5;
         public const int DurationTurns = 2;
 
         public override void OnPlayed(CardPlayContext context)
         {
             if (HasLowestVessel(context))
-                context.Player.AddTimedEffect(TimedEffectKind.Attack, AttackBonus, DurationTurns);
+                context.Player.AddTimedEffect(TimedEffectKind.Attack, Bonus, DurationTurns);
         }
 
         private static bool HasLowestVessel(CardPlayContext context)

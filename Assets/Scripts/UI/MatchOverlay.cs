@@ -76,6 +76,7 @@ namespace SoulBind.UI
         private int _lastAwakenedId;
         private int _lastDrawCount;
         private int _lastDiscardCount;
+        private int _lastSwapNumber;
         private Match _seenMatch;
 
         public static MatchOverlay Create(Canvas canvas, MatchController controller)
@@ -122,6 +123,7 @@ namespace SoulBind.UI
                 _lastAwakenedId = match.Ascension.AwakenedId;
                 _lastDrawCount = match.Deck.DrawCount;
                 _lastDiscardCount = match.Deck.DiscardCount;
+                _lastSwapNumber = match.LastSwap.Number;
                 _endShown = false;
                 _endScreenTimer = -1f;
                 _endScreen.SetActive(false);
@@ -158,6 +160,14 @@ namespace SoulBind.UI
                 QueueBanner("Draw pile empty: the discard pile is shuffled into a new draw pile");
             _lastDrawCount = drawCount;
             _lastDiscardCount = discardCount;
+            // Wheel of Fortune: say what changed hands (the cards only to the two Apostles involved).
+            CardSwap swap = match.LastSwap;
+            if (swap.Number != _lastSwapNumber)
+            {
+                _lastSwapNumber = swap.Number;
+                if (swap.Number > 0)
+                    QueueBanner(SwapText(swap, viewer));
+            }
 
             if (match.IsOver && !_endShown && _endScreenTimer < 0f)
                 _endScreenTimer = EndScreenDelay;
@@ -385,6 +395,17 @@ namespace SoulBind.UI
 
         private static string Name(int id) => $"Apostle {id}";
 
+        private static string SwapText(CardSwap swap, int viewer)
+        {
+            bool known = swap.CardsKnown && (viewer == swap.PlayerId || viewer == swap.TargetId);
+            if (viewer == swap.PlayerId)
+                return known ? $"Wheel of Fortune: gave {CardName(swap.Given)}, got {CardName(swap.Received)}" : $"Wheel of Fortune: you swapped a card with {Name(swap.TargetId)}";
+            if (viewer == swap.TargetId)
+                return known ? $"{Name(swap.PlayerId)} took {CardName(swap.Received)}, gave you {CardName(swap.Given)}" : $"{Name(swap.PlayerId)} swapped a card with you";
+            return $"{Name(swap.PlayerId)} swapped a card with {Name(swap.TargetId)}";
+        }
+
+        private static string CardName(ArcanaId card) => CardCatalog.Get(card).Name;
         private static string Possessive(int id, int viewer) => id == viewer ? "Your" : $"Apostle {id}'s";
 
         // ---- Building the UI (once, at runtime) ----
