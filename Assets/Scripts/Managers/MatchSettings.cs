@@ -37,7 +37,7 @@ namespace SoulBind.Managers
             PlayerCount = Mathf.Clamp(playerCount, 2, 6);
             BotsPlayOthers = true;
             LocalApostleId = 1;
-            ChooseSpawns = false; // picking starting tiles online comes later
+            ChooseSpawns = true; // picking starting tiles online comes later
             IsOnline = true;
             IsSet = true;
         }

@@ -78,6 +78,12 @@ namespace SoulBind.Managers
 
         /// <summary>On a player who joined online: an action to send to the host.</summary>
         public event System.Action<MatchCommand> CommandSubmitted;
+        
+        /// <summary>Host: a starting tile was picked (NetworkMatch tells the players).</summary>
+        public event System.Action DraftChanged;
+
+        /// <summary>On a player who joined online: their starting tile, to send to the host.</summary>
+        public event System.Action<HexCoord> SpawnSubmitted;
 
         private enum OnlineRole { Offline, Waiting, Host, Client }
         private OnlineRole _online = OnlineRole.Offline;
@@ -88,6 +94,7 @@ namespace SoulBind.Managers
         private int _pendingSeat;
         private int _pendingSeats;
         private byte[] _pendingSnapshot;
+        private int[] _pendingDraft;
 
         /// <summary>True in an online match (as host or as a player who joined).</summary>
         public bool IsOnline => _online != OnlineRole.Offline;
@@ -274,6 +281,9 @@ namespace SoulBind.Managers
                 ShowOnlineMessage("Waiting for every player to arrive...");
                 if (_pendingSeat > 0)
                     StartOnlineClient(_pendingSeat, _pendingSeats);
+                if (_pendingDraft != null)
+                    ReceiveDraft(_pendingDraft);
+                _pendingDraft = null;
                 if (_pendingSnapshot != null)
                     ReceiveSnapshot(_pendingSnapshot);
                 _pendingSnapshot = null;
@@ -347,10 +357,20 @@ namespace SoulBind.Managers
             for (int i = 0; i < remoteSeats.Count; i++)
                 _remoteSeat[remoteSeats[i]] = true;
 
-            Debug.Log($"MatchController: hosting online. {remoteSeats.Count + 1} players and " +
-                      $"{playerCount - remoteSeats.Count - 1} bots.");
+            Debug.Log($"MatchController: hosting online. {remoteSeats.Count + 1} players and " + $"{playerCount - remoteSeats.Count - 1} bots.");
             CreateViews();
-            StartMatch(SpawnPlanner.PickSpread(boardView.Board, playerCount), null);
+            if (!chooseSpawns)
+            {
+                StartMatch(SpawnPlanner.PickSpread(boardView.Board, playerCount), null);
+                return;
+            }
+
+            // everyone picks a starting tile in turn order, as offline.
+            _seatOrder = TurnTracker.CreateRandomSeatOrder(playerCount, _random);
+            _draft = new SpawnDraft(boardView.Board, _seatOrder);
+            _botWait = botTurnStartDelay + botActionDelay;
+            AfterDraftChange();
+            DraftChanged?.Invoke();
         }
 
         /// <summary>Player who joined: this screen is Apostle seat. The match arrives with the host's first snapshot.</summary>
@@ -395,6 +415,8 @@ namespace SoulBind.Managers
                 return;
             _lastSequence = snapshot.Sequence;
 
+            // the match has started, so the tile is over.
+            _draft = null;
             if (CurrentMatch == null)
                 CurrentMatch = Match.FromSnapshot(boardView.Board, snapshot);
             else
@@ -437,6 +459,73 @@ namespace SoulBind.Managers
             _botTurnOwner = -1;
             Debug.Log($"MatchController: Apostle {seat}'s player left. A bot plays that seat now.");
         }
+
+        /// <summary>Host: the pick as numbers to send: pick order, then Q and R of each pick so far.</summary>
+        public int[] GetDraftData()
+        {
+            if (_draft == null || _seatOrder == null)
+                return null;
+            int count = _seatOrder.Length;
+            var data = new List<int>(count * 3);
+            for (int i = 0; i < count; i++)
+                data.Add(_seatOrder[i]);
+            for (int i = 0; i < count; i ++)
+            {
+                if (!_draft.TryGetPick(_seatOrder[i], out HexCoord tile))
+                    break;
+                data.Add(tile.Q);
+                data.Add(tile.R);
+            }
+            return data.ToArray();
+        }
+        /// <summary>Player who joined: rebuilds the host's pick from its order and the picks so far.</summary>
+        public void ReceiveDraft(int[] data)
+        {
+            if (_online != OnlineRole.Client)
+            {
+                if (_online == OnlineRole.Offline)
+                    _pendingDraft = data;
+                return;
+            }
+            // once the match exists, snapshots take over.
+            if (CurrentMatch != null || data == null || data.Length < playerCount)
+                return;
+            
+            _seatOrder = new int[playerCount];
+            System.Array.Copy(data, _seatOrder, playerCount);
+            _draft = new SpawnDraft(boardView.Board, _seatOrder);
+            for (int i = playerCount; i + 1 < data.Length; i += 2)
+            {
+                int picker = _draft.CurrentPickerId;
+                var tile = new HexCoord(data[i], data[i + 1]);
+                if (!_draft.TryPick(tile))
+                    return;
+                PlaceDisc(picker, tile);
+            }
+
+            if (_draft.IsComplete)
+            {
+                // the host's first snapshot starts the match.
+                _draft = null;
+                boardView.ClearHighlights();
+                ShowOnlineMessage("Starting...");
+                return;
+            }
+            AfterDraftChange();
+        }
+
+        /// <summary>Host: a starting tile sent by the player in this seat. False if it is not their pick or not allowed.</summary>
+        public bool ApplyRemoteSpawn(int seat, HexCoord tile)
+        {
+            if (_online != OnlineRole.Host || _draft == null)
+                return false;
+            if (_draft.CurrentPickerId != seat || !_draft.CanPick(tile))
+                return false;
+            PickSpawn(tile);
+            return true;
+        }
+
+        
 
         /// <summary>Shows a line in the hint area while there is no match to describe.</summary>
         public void ShowOnlineMessage(string message)
@@ -888,12 +977,16 @@ namespace SoulBind.Managers
         // Whoever picks now: a person clicks a highlighted edge tile; a bot picks a random one after a pause.
         private void UpdateSpawnDraft()
         {
+            
             int picker = _draft.CurrentPickerId;
             if (picker == 0)
                 return;
 
             if (botsPlayOthers && picker != localApostleId)
             {
+                // online, people pick for themselves: wait for them.
+                if (_online == OnlineRole.Client || IsRemoteSeat(picker))
+                    return;
                 _botWait -= Time.deltaTime;
                 if (_botWait > 0f)
                     return;
@@ -908,7 +1001,13 @@ namespace SoulBind.Managers
                 return;
             if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
                 return;
-            if (boardView.TryPickTile(screenPoint, _legalDestinations, out HexCoord tile) && _draft.CanPick(tile))
+            if (!boardView.TryPickTile(screenPoint, _legalDestinations, out HexCoord tile))
+                return;
+            if (!_draft.CanPick(tile))
+                return;
+            if (_online == OnlineRole.Client)
+                SpawnSubmitted?.Invoke(tile);
+            else
                 PickSpawn(tile);
         }
 
@@ -931,14 +1030,8 @@ namespace SoulBind.Managers
             if (!_draft.TryPick(tile))
                 return;
 
-            // The disc appears on its tile straight away.
-            int index = picker - 1;
-            Vector3 position = boardView.GetWorldPosition(tile);
-            _discTargets[index] = position;
-            _discPositions[index] = position;
-            _views[index].transform.position = position;
-            _views[index].gameObject.SetActive(true);
-            Debug.Log($"MatchController: Apostle {picker} starts at ({tile.Q},{tile.R}).");
+            PlaceDisc(picker, tile);
+            DraftChanged?.Invoke();
 
             if (_draft.IsComplete)
             {
@@ -951,6 +1044,18 @@ namespace SoulBind.Managers
             }
             _botWait = botActionDelay;
             AfterDraftChange();
+        }
+
+        // the disc appears on its tile straight away.
+        private void PlaceDisc(int picker, HexCoord tile)
+        {
+            int index = picker - 1;
+            Vector3 position = boardView.GetWorldPosition(tile);
+            _discTargets[index] = position;
+            _discPositions[index] = position;
+            _views[index].transform.position = position;
+            _views[index].gameObject.SetActive(true);
+            Debug.Log($"MatchController: Apostle {picker} starts at ({tile.Q}, {tile.R}).");
         }
 
         // Highlights the tiles the person picking may choose, and says whose pick it is.

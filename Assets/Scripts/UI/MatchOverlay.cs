@@ -78,6 +78,7 @@ namespace SoulBind.UI
         private int _lastDiscardCount;
         private int _lastSwapNumber;
         private Match _seenMatch;
+        private int _lastTurnId;
 
         public static MatchOverlay Create(Canvas canvas, MatchController controller)
         {
@@ -125,6 +126,7 @@ namespace SoulBind.UI
                 _lastDiscardCount = match.Deck.DiscardCount;
                 _lastSwapNumber = match.LastSwap.Number;
                 _endShown = false;
+                _lastTurnId = 0; // so the first turn gets a banner too
                 _endScreenTimer = -1f;
                 _endScreen.SetActive(false);
                 _showResultButton.SetActive(false);
@@ -169,6 +171,11 @@ namespace SoulBind.UI
                     QueueBanner(SwapText(swap, viewer));
             }
 
+            // a new turn: say whose it is.
+            int turnId = match.CurrentApostle != null ? match.CurrentApostle.Id : 0;
+            if (turnId != 0 && turnId != _lastTurnId && !match.IsOver)
+                QueueBanner(turnId == viewer ? "Your turn" : $"{Name(turnId)}'s turn");
+            _lastTurnId = turnId;
             if (match.IsOver && !_endShown && _endScreenTimer < 0f)
                 _endScreenTimer = EndScreenDelay;
 
