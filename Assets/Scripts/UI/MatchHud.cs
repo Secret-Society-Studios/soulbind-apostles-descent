@@ -216,7 +216,9 @@ namespace SoulBind.UI
                     turnText.text = match.WinnerId == 0 ? "Match over: no winner" : PlayerNames.Get(match.WinnerId) + " wins!";
                 else if (match.IsAwaitingPhaseStart)
                     turnText.text = PlayerNames.Get(match.GetNextPhaseChooserId()) + " chooses direction";
-                else 
+                else if (matchController != null && matchController.IsLocalTurn)
+                    turnText.text = "Your Turn";
+                else
                     turnText.text = PlayerNames.Get(match.CurrentApostle.Id) + "'s turn";
             }
 

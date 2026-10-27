@@ -45,11 +45,13 @@ namespace SoulBind.Online
             if (IsServer)
             {
                 controller.MatchChanged += SendSnapshots;
+                controller.DraftChanged += SendDraft;
                 NetworkManager.OnClientDisconnectCallback += OnClientDisconnected;
             }
             else
             {
                 controller.CommandSubmitted += SendCommand;
+                controller.SpawnSubmitted += SendSpawn;
                 ClientReadyRpc(PlayerNames.LocalName);
             }
         }
@@ -60,6 +62,8 @@ namespace SoulBind.Online
             {
                 controller.MatchChanged -= SendSnapshots;
                 controller.CommandSubmitted -= SendCommand;
+                controller.DraftChanged -= SendDraft;
+                controller.SpawnSubmitted -= SendSpawn;
             }
             if (NetworkManager != null)
                 NetworkManager.OnClientDisconnectCallback -= OnClientDisconnected;
@@ -155,6 +159,20 @@ namespace SoulBind.Online
             
         }
 
+        // the host and the bots pick on the host, so it sends every pick to everyone.
+        private void SendDraft()
+        {
+            int[] data = controller.GetDraftData();
+            if (data != null)
+                DraftRpc(data);
+        }
+
+        [Rpc(SendTo.NotServer)]
+        private void DraftRpc(int[] data)
+        {
+            controller.ReceiveDraft(data);
+        }
+
         // ---- Players to host ----
 
         [Rpc(SendTo.Server)]
@@ -197,6 +215,22 @@ namespace SoulBind.Online
                 _sequence++;
                 SendSnapshot(sender, seat);
             }
+        }
+
+        private void SendSpawn(HexCoord tile)
+        {
+            PickSpawnRpc(tile.Q, tile.R);
+        }
+
+        // the seat comes from the connection, never from the message.
+        [Rpc(SendTo.Server)]
+        private void PickSpawnRpc(int q, int r, RpcParams rpcParams = default)
+        {
+            ulong sender = rpcParams.Receive.SenderClientId;
+            if (!_seatByClient.TryGetValue(sender, out int seat))
+                return;
+            if (!controller.ApplyRemoteSpawn(seat, new HexCoord(q, r)))
+                Debug.Log($"NetworkMatch: APostle {seat}'s starting tile was refused.");
         }
 
         private void OnClientDisconnected(ulong clientId)
