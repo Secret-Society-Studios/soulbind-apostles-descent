@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using SoulBind.Core;
 using SoulBind.Managers;
+using SoulBind.Utility;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
 using Unity.Services.Authentication;
@@ -37,6 +39,38 @@ namespace SoulBind.Online
         public bool InSession => _session != null;
         public bool IsHost => _session != null && _session.IsHost;
         public string Code => _session != null ? _session.Code : string.Empty;
+
+        /// <summary>
+        /// One player in the room, for the lobby screen. Name is
+        /// the name they typed on their device ("" if none).
+        /// </summary>
+        public readonly struct RoomPlayer
+        {
+            public readonly string Name;
+            public readonly bool IsHost;
+            public readonly bool IsYou;
+
+            public RoomPlayer(string name, bool isHost, bool isYou)
+            {
+                Name = name;
+                IsHost = isHost;
+                IsYou = isYou;
+            }
+        }
+
+        // Names
+        // The session player property that holds the typed name.
+        private const string NameKey = "name";
+
+        // This device's name, packed as a property for the room.
+        private static Dictionary<string, PlayerProperty> NameProperty()
+        {
+            var name = new PlayerProperty(PlayerNames.LocalName, VisibilityPropertyOptions.Member);
+            return new Dictionary<string, PlayerProperty>
+            {
+                { NameKey, name},
+            };
+        }
 
         /// <summary>True once the match scene has loaded for this room.</summary>
         public bool MatchStarted { get; private set; }
@@ -211,8 +245,7 @@ namespace SoulBind.Online
             SceneManager.sceneLoaded -= OnSceneLoaded;
             SceneManager.sceneLoaded += OnSceneLoaded;
             if (NetworkManager.Singleton != null && !NetworkManager.Singleton.IsListening)
-                Debug.LogWarning("OnlineSession: the room exists but Netcode did not start. Check that Relay and Lobby are " +
-                                 "enabled for this project in the Unity Cloud dashboard.");
+                Debug.LogWarning("OnlineSession: the room exists but Netcode did not start. Check that Relay and Lobby are " + "enabled for this project in the Unity Cloud dashboard.");
         }
 
         // The menu is scene 0; any other scene is the match.

@@ -560,6 +560,7 @@ MonoBehaviour:
   capacityText: {fileID: 1895934297}
   mobilePortraitScale: 1.25
   previewMobileInEditor: 0
+  mobileEdgeInset: 50
 --- !u!1 &331999870
 GameObject:
   m_ObjectHideFlags: 0
@@ -1438,6 +1439,7 @@ MonoBehaviour:
   cardGap: 10
   trayColor: {r: 0.04, g: 0.04, b: 0.07, a: 0.8}
   trayPadding: 12
+  nameTagOnBoardSide: 1
   maxCardsShown: 10
   turnGlowColor: {r: 1, g: 0.8, b: 0.42, a: 1}
   defenseGlowColor: {r: 0.45, g: 0.7, b: 1, a: 1}
@@ -1448,6 +1450,8 @@ MonoBehaviour:
   playFlightTime: 0.4
   drawFlightTime: 0.5
   arcHeight: 60
+  swapMarkSeconds: 6
+  swapMarkColor: {r: 0.4, g: 0.75, b: 0.95, a: 1}
 --- !u!114 &549267691
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -84,16 +84,6 @@ namespace SoulBind.Online
             int seats = Mathf.Clamp(Mathf.Max(MatchSettings.PlayerCount, _ready.Count + 1), 2, GameConstants.MaxPlayers);
 
 
-            // Names: The host's own, then each player's. Bots keep "Apostle N". Sent before the seats, so every screen shows them from the first frame.
-            PlayerNames.Clear();
-            PlayerNames.Set(1, PlayerNames.LocalName);
-            foreach (KeyValuePair<ulong, int> seat in _seatByClient)
-            {
-                if (_nameByClient.TryGetValue(seat.Key, out string playerName))
-                    PlayerNames.Set(seat.Value, playerName);
-            }
-            NamesRpc(PlayerNames.Pack());
-
             // Seats in the order the players connected. The host is seat 1.
             int next = 2;
             _remoteSeats.Clear();
@@ -110,6 +100,20 @@ namespace SoulBind.Online
                 _remoteSeats.Add(next);
                 next++;
             }
+
+            // Names, once the seats exist. Bots keep "Apostle N".
+            // Sent before AssignSeatRpc, so the first frame has them.
+            PlayerNames.Clear();
+            PlayerNames.Set(1, PlayerNames.LocalName);
+            foreach (KeyValuePair<ulong, int> seat in _seatByClient)
+            {
+                if (_nameByClient.TryGetValue(seat.Key, out string playerName))
+                    PlayerNames.Set(seat.Value, playerName);
+            }
+            NamesRpc(PlayerNames.Pack());
+
+            
+
 
             // Seats first, so each player knows who they are before the first snapshot arrives.
             foreach (KeyValuePair<ulong, int> pair in _seatByClient)

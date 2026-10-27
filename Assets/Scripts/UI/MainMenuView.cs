@@ -2,8 +2,6 @@ using SoulBind.Managers;
 using SoulBind.Online;
 using SoulBind.Utility;
 using TMPro;
-using Unity.Services.Lobbies.Models;
-using UnityEditor.Build.Profile;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
