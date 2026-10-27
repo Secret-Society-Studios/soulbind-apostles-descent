@@ -58,7 +58,19 @@ namespace SoulBind.Online
             }
         }
 
-        
+        // Names
+        // The session player property that holds the typed name.
+        private const string NameKey = "name";
+
+        // This device's name, packed as a property for the room.
+        private static Dictionary<string, PlayerProperty> NameProperty()
+        {
+            var name = new PlayerProperty(PlayerNames.LocalName, VisibilityPropertyOptions.Member);
+            return new Dictionary<string, PlayerProperty>
+            {
+                { NameKey, name},
+            };
+        }
 
         /// <summary>True once the match scene has loaded for this room.</summary>
         public bool MatchStarted { get; private set; }
