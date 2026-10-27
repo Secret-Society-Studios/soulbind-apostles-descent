@@ -518,14 +518,17 @@ namespace SoulBind.UI
 
             // After View Board: a small button to bring the result back.
             RectTransform again = CreateRect("ShowResult", root);
-            again.anchorMin = again.anchorMax = new Vector2(0.5f, 1f);
-            again.pivot = new Vector2(0.5f, 1f);
-            again.anchoredPosition = new Vector2(0f, -150f);
-            again.sizeDelta = new Vector2(260f, 52f);
+            // Where Quit sat (Quit hides once the match is over).
+            again.anchorMin = again.anchorMax = new Vector2(1f, 1f);
+            again.pivot = new Vector2(1f, 1f);
+            again.anchoredPosition = new Vector2(-20f, -QuitButtonTop);
+            again.sizeDelta = new Vector2(200f, 56f);
             _showResultButton = again.gameObject;
             AddImage(again, ButtonColor, true);
-            again.gameObject.AddComponent<Button>().onClick.AddListener(ShowResultAgain);
-            TMP_Text label = CreateText("Label", again, 22f, FontStyles.Bold);
+            Button againButton = again.gameObject.AddComponent<Button>();
+            againButton.onClick.AddListener(ShowResultAgain);
+            GothicTheme.StyleButton(againButton);
+            TMP_Text label = CreateText("Label", again, 24f, FontStyles.Bold);
             Stretch(label.rectTransform);
             label.text = "Show Result";
             _showResultButton.SetActive(false);
