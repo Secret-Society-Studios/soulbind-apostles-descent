@@ -10,7 +10,7 @@ using UnityEngine.UI;
 namespace SoulBind.UI
 {
     /// <summary>
-    /// A name plate floating above every Apostle's piece, like a MOBA health bar: a Souls badge,
+    /// A name plate floating above every Apostle's hand of cards, like a MOBA health bar: a Souls badge,
     /// the name, the Vessel bar, a thin Corruption bar and DEF. They replace the opponents' portrait
     /// row at the top. While a combo target is being picked, a plate can be tapped to pick that Apostle.
     /// MatchHud creates it at runtime, so it needs no setup. Bars use UiSkin art when it is there.
@@ -56,6 +56,7 @@ namespace SoulBind.UI
         private MatchController _controller;
         private RectTransform _root;
         private Canvas _canvas;
+        private TableHandsView _hands;
 
         public static NamePlates Create(RectTransform hudRoot, MatchController controller)
         {
@@ -99,16 +100,36 @@ namespace SoulBind.UI
                 if (plate.Piece == null)
                     plate.Piece = _controller.GetPieceView(plate.ApostleId);
 
-                bool onBoard = plate.Piece != null && plate.Piece.gameObject.activeInHierarchy;
-                Vector3 screen = onBoard ? cam.WorldToScreenPoint(plate.Piece.TopPoint) : Vector3.zero;
-                bool visible = onBoard && screen.z > 0f && IsAlive(plate.ApostleId);
+                // Above the Apostle's cards on the table; above its piece if it has no hand there.
+                if (_hands == null)
+                    _hands = FindFirstObjectByType<TableHandsView>();
+                Vector3 screen;
+                bool placed;
+                if (_hands != null && _hands.TryGetHandTop(plate.ApostleId, cam, out Vector2 handTop))
+                {
+                    screen = handTop;
+                    placed = true;
+                }
+                else
+                {
+                    placed = plate.Piece != null && plate.Piece.gameObject.activeInHierarchy;
+                    screen = placed ? cam.WorldToScreenPoint(plate.Piece.TopPoint) : Vector3.zero;
+                    placed &= screen.z > 0f;
+                }
+                bool visible = placed && IsAlive(plate.ApostleId);
                 if (plate.Rect.gameObject.activeSelf != visible)
                     plate.Rect.gameObject.SetActive(visible);
                 if (!visible)
                     continue;
 
                 RectTransformUtility.ScreenPointToLocalPointInRectangle(_root, screen, uiCamera, out Vector2 local);
-                plate.Rect.anchoredPosition = local + new Vector2(0f, GapAbovePiece);
+                // Kept fully on screen: hands at the top edge would push their plates off it.
+                Rect area = _root.rect;
+                float scale = plate.Rect.localScale.y;
+                Vector2 spot = local + new Vector2(0f, GapAbovePiece);
+                spot.x = Mathf.Clamp(spot.x, area.xMin + Width * scale / 2f, area.xMax - Width * scale / 2f);
+                spot.y = Mathf.Min(spot.y, area.yMax - Height * scale);
+                plate.Rect.anchoredPosition = spot;
             }
         }
 
