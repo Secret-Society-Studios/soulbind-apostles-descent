@@ -3,6 +3,7 @@ using SoulBind.Core;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using Element = SoulBind.Core.Element;
 
 namespace SoulBind.UI
 {
