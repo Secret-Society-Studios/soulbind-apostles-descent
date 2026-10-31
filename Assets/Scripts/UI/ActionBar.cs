@@ -103,7 +103,8 @@ namespace SoulBind.UI
             bool engaged = canAct && match.Engagement == EngagementState.Engaged;
             bool choosingDirection = running && matchController.IsLocalPhaseChooser;
 
-            SetVisible(strikeButton, engaged);
+            // The play queue's ATTACK button strikes now.
+            SetVisible(strikeButton, false);    
             if (engaged && strikeLabel != null)
                 strikeLabel.text = $"Strike  (ATK {match.PendingAttack})";
 

@@ -83,8 +83,9 @@ namespace SoulBind.UI
                 GothicTheme.ApplyToOverlay(overlay.transform);
                 GothicTheme.ApplyToTable(matchController.BoardView);
                 // Which element combos are building up or active this turn, under the turn info.
-                ComboTracker.Create((RectTransform)transform, matchController,
-                    roundText != null ? roundText.transform.parent as RectTransform : null);
+                
+                // The cards of the attack in progress, on the right edge.
+                PlayQueue.Create((RectTransform)transform, matchController);
             }
             Refresh();
         }
