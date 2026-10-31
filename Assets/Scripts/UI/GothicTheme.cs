@@ -164,6 +164,7 @@ namespace SoulBind.UI
 
             StyleBar(root.Find("VesselBar"));
             StyleBar(root.Find("CorruptionBar"));
+            StyleBar(root.Find("SoulsBar"));
 
             Transform name = root.Find("NameText");
             if (name != null)
@@ -174,6 +175,11 @@ namespace SoulBind.UI
             Transform stats = root.Find("StatsText");
             if (stats != null && stats.GetComponent<TMP_Text>() != null)
                 stats.GetComponent<TMP_Text>().color = TextColor;
+
+            // Real bar art, where the UiSkin asset has any, goes over the drawn look.
+            UiSkin skin = UiSkin.Current;
+            if (skin != null)
+                skin.ApplyToPortrait(root);
         }
 
         /// <summary>The Apostle whose turn it is: a bright gold frame and a soft glow around the box.</summary>
