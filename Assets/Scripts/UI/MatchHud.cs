@@ -82,6 +82,8 @@ namespace SoulBind.UI
                 GothicTheme.ApplyToHud(transform);
                 GothicTheme.ApplyToOverlay(overlay.transform);
                 GothicTheme.ApplyToTable(matchController.BoardView);
+                // The island, fire sea and sky around the board (art slots in Resources/MapSkin).
+                MapBackdrop.Create(matchController.BoardView);
                 // Which element combos are building up or active this turn, under the turn info.
                 
                 // The cards of the attack in progress, on the right edge.
