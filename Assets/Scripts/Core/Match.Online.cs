@@ -6,11 +6,20 @@ namespace SoulBind.Core
     // before sending a command to the host.
     public sealed partial class Match
     {
-        /// <summary>How many cards of this element the current Apostle has played this turn.</summary>
-        public int GetElementsPlayedThisTurn(Element element) => _elementsPlayedThisTurn[(int)element];
+        /// <summary>Cards of this element played this turn, counting the ones waiting in the queue.</summary>
+        public int GetElementsPlayedThisTurn(Element element)
+        {
+            int count = _elementsPlayedThisTurn[(int)element];
+            for (int i = 0; i < _queuedCards.Count; i++)
+            {
+                if (CardCatalog.Get(_queuedCards[i]).Element == element)
+                    count++;
+            }
+            return count;
+        }
                 
-        /// <summary>The cards played into the attack in progress, in order (empty when not Engaged).</summary>
-        public IReadOnlyList<ArcanaId> AttackCards => _attackCards;
+        /// <summary>The cards waiting in the attack queue, in order (empty when not Engaged).</summary>
+        public IReadOnlyList<ArcanaId> AttackCards => _queuedCards;
 
         /// <summary>
         /// True if playing this card now (with this attack target, 0 = not attacking) needs the player

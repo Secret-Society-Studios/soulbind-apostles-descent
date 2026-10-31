@@ -51,6 +51,7 @@ namespace SoulBind.UI
             public TMP_Text Stats;
             public GameObject ComboTag;
             public Image ComboTagImage;
+            public Button Back;
         }
 
         private sealed class Chip
@@ -158,6 +159,14 @@ namespace SoulBind.UI
             row.Edge = row.Rect.gameObject.AddComponent<Outline>();
             row.Edge.effectDistance = new Vector2(2f, -2f);
 
+            // Tapping a row takes that card back into the hand.
+            row.Background.raycastTarget = true;
+            row.Back = row.Rect.gameObject.AddComponent<Button>();
+            row.Back.targetGraphic = row.Background;
+            row.Back.transition = Selectable.Transition.None;
+            int slot = index;
+            row.Back.onClick.AddListener(() => _controller.ReturnQueuedCard(slot));
+
             // The number in a small gold-rimmed badge.
             RectTransform badge = NewRect("Badge", row.Rect);
             Place(badge, 10f, (RowHeight - 28f) / 2f, 28f, 28f);
@@ -257,6 +266,7 @@ namespace SoulBind.UI
                 CardDefinition card = CardCatalog.Get(cards[i]);
                 capacity += card.Cap;
                 ShowRow(row, i, card, CardAttack.Of(cards[i]), match.IsComboTriggered(card.Element));
+                row.Back.interactable = yours && _controller.IsLocalTurn;
                 Place(row.Rect, Pad, y, inner, RowHeight);
                 y += RowHeight + RowGap;
             }
@@ -264,11 +274,15 @@ namespace SoulBind.UI
             _title.text = yours ? "PLAY QUEUE" : PlayerNames.Get(match.CurrentApostle.Id).ToUpperInvariant();
             _info.text = shown == 1 ? $"1 card · {capacity} Capacity" : $"{shown} cards · {capacity} Capacity";
 
-            // Nothing queued yet: one line saying how to start.
-            _empty.gameObject.SetActive(shown == 0);
-            if (shown == 0)
+            // Empty: how to start. Your own queue: how to take a card back.
+            bool canReturn = shown > 0 && yours && _controller.IsLocalTurn;
+            _empty.gameObject.SetActive(shown == 0 || canReturn);
+            if (shown == 0 || canReturn)
             {
-                _empty.text = yours ? "Drag a card onto an enemy to attack" : "No attack yet";
+                if (canReturn)
+                    _empty.text = "Tap a card to take it back";
+                else
+                    _empty.text = yours ? "Drag a card onto an enemy to attack" : "No attack yet";
                 Place(_empty.rectTransform, Pad, y, inner, 40f);
                 y += 40f + RowGap;
             }

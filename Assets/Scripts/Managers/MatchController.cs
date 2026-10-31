@@ -917,6 +917,17 @@ namespace SoulBind.Managers
             Debug.Log($"MatchController: Apostle {attacker.Id} gained {attacker.Corruption - corruptionBefore} Corruption from the attack.");
         }
 
+        /// <summary>Takes queued card number index back into the hand (a tap on the play queue).</summary>
+        public void ReturnQueuedCard(int index)
+        {
+            if (!IsLocalTurn)
+                return;
+
+            Submit(MatchCommand.ReturnCard(index));
+            if (IsOnlineClient)
+                AfterStateChange();
+        }
+
         public void EndTurn()
         {
             if (!IsLocalTurn)
