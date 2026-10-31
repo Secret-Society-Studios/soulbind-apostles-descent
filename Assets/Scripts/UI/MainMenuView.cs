@@ -108,7 +108,6 @@ namespace SoulBind.UI
         {
             string count = _players.ToString();
             _mainPlayers.text = count;
-            _hostPlayers.text = count;
             _botsLine.text = $"You play Apostle 1 · bots play the other {_players - 1}";
         }
 
