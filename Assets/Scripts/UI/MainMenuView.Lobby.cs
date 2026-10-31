@@ -234,13 +234,13 @@ namespace SoulBind.UI
                 TextAlignmentOptions.Left);
             Kit.At(codeLabel.rectTransform, 128f, 38f, 300f, 18f);
             codeLabel.characterSpacing = 20f;
-            _lobbyCode = Kit.Label(frame, "Code", "", 44f, Kit.CinzelBlack, Kit.Title, TextAlignmentOptions.Left);
+            _lobbyCode = Kit.Label(frame, "Code", "", 44f, Kit.DisplayHeavy, Kit.Title, TextAlignmentOptions.Left);
             Kit.At(_lobbyCode.rectTransform, 128f, 56f, 270f, 54f);
             _lobbyCode.characterSpacing = 20f;
             _copyLabel = Kit.Button(frame, "Copy", "Copy", Kit.ButtonStyle.Secondary, CopyCode, 14f, 8f);
             Kit.At((RectTransform)_copyLabel.transform.parent, 408f, 62f, 100f, 44f);
 
-            _seatsTaken = Kit.Label(frame, "SeatsTaken", "", 22f, Kit.Cinzel, Kit.Text, TextAlignmentOptions.Right);
+            _seatsTaken = Kit.Label(frame, "SeatsTaken", "", 22f, Kit.Display, Kit.Text, TextAlignmentOptions.Right);
             Kit.At(_seatsTaken.rectTransform, 724f, 46f, 500f, 30f);
             _seatsHint = Kit.Label(frame, "SeatsHint", "", 13f, Kit.Inter, Kit.Muted, TextAlignmentOptions.Right);
             Kit.At(_seatsHint.rectTransform, 724f, 82f, 500f, 20f);
@@ -272,7 +272,7 @@ namespace SoulBind.UI
             Kit.At(ring, 22f, 38f, 64f, 64f);
             card.Ring = ring.GetComponent<Image>();
             card.RingBorder = ring.Find("Border").GetComponent<Image>();
-            card.Initial = Kit.Label(ring, "Initial", "", 26f, Kit.Cinzel, Kit.Background);
+            card.Initial = Kit.Label(ring, "Initial", "", 26f, Kit.Display, Kit.Background);
             Kit.Stretch(card.Initial.rectTransform);
 
             card.Name = Kit.Label(rect, "Name", "", 18f, Kit.InterBold, Kit.Text, TextAlignmentOptions.Left);
@@ -299,7 +299,7 @@ namespace SoulBind.UI
             RectTransform panel = Kit.Box(frame, "MatchPanel", Kit.Panel, Kit.GoldLine, 14f);
             Kit.At(panel, 894f, 150f, 330f, 486f);
 
-            TMP_Text title = Kit.Label(panel, "Title", "Match", 22f, Kit.Cinzel, Kit.Text, TextAlignmentOptions.Left);
+            TMP_Text title = Kit.Label(panel, "Title", "Match", 22f, Kit.Display, Kit.Text, TextAlignmentOptions.Left);
             Kit.At(title.rectTransform, 26f, 24f, 278f, 30f);
 
             _lobbyApostles = InfoRow(panel, "Apostles", 70f);

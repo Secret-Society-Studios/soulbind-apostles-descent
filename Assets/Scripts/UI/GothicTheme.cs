@@ -9,7 +9,7 @@ namespace SoulBind.UI
     /// so nothing in the scene is rebuilt and hand-made tweaks stay. Every frame, gradient and glow is
     /// drawn in code here: dark panels with thin gold double borders, gradient bars, dark buttons with gold
     /// edges that brighten on hover, a pool of light over the table with darkness around it, and an
-    /// optional serif title font (Cinzel, in Resources/Fonts) for names, titles and buttons.
+    /// title font (Montserrat, in Resources/Fonts) for names, titles and buttons.
     /// </summary>
     public static class GothicTheme
     {
@@ -39,7 +39,7 @@ namespace SoulBind.UI
             _titleFont = null;
         }
 
-        /// <summary>The serif title font: Cinzel SDF if one was made, else Cinzel-Bold.ttf from Resources/Fonts; null if neither.</summary>
+        /// <summary>The title font: Montserrat Bold from Resources/Fonts (UiKit.Display); null if it is missing.</summary>
         public static TMP_FontAsset TitleFont
         {
             get
@@ -47,12 +47,7 @@ namespace SoulBind.UI
                 if (!_fontLooked)
                 {
                     _fontLooked = true;
-                    _titleFont = Resources.Load<TMP_FontAsset>("Fonts/Cinzel SDF");
-                    if (_titleFont == null)
-                        _titleFont = Resources.Load<TMP_FontAsset>("Cinzel SDF");
-                    // Otherwise the Cinzel .ttf in Resources/Fonts, made into a font at runtime.
-                    if (_titleFont == null)
-                        _titleFont = UiKit.Cinzel;
+                    _titleFont = UiKit.Display;
                 }
                 return _titleFont;
             }

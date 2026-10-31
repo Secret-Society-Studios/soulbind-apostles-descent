@@ -175,10 +175,10 @@ namespace SoulBind.UI
             RectTransform inner = Kit.Circle(ring, "Inner", 36f, Color.clear, Kit.GoldLine, 2f);
             Kit.At(inner, 14f, 14f, 36f, 36f);
 
-            TMP_Text title = Kit.Label(frame, "Title", "SoulBind", 92f, Kit.CinzelBlack, Kit.Title);
+            TMP_Text title = Kit.Label(frame, "Title", "SoulBind", 92f, Kit.DisplayHeavy, Kit.Title);
             Kit.At(title.rectTransform, 0f, 164f, 1280f, 100f);
             title.characterSpacing = 4f;
-            TMP_Text subtitle = Kit.Label(frame, "Subtitle", "APOSTLE'S DESCENT", 24f, Kit.Cinzel, Kit.Soft);
+            TMP_Text subtitle = Kit.Label(frame, "Subtitle", "APOSTLE'S DESCENT", 24f, Kit.Display, Kit.Soft);
             Kit.At(subtitle.rectTransform, 0f, 268f, 1280f, 34f);
             subtitle.characterSpacing = 33f;
 
@@ -186,7 +186,7 @@ namespace SoulBind.UI
             RectTransform column = Kit.At(Kit.CreateRect("Column", frame), 430f, 356f, 420f, 300f);
             RectTransform stepper = Kit.Box(column, "Apostles", Kit.Panel, Kit.Line, 10f);
             Kit.At(stepper, 0f, 0f, 420f, 60f);
-            TMP_Text label = Kit.Label(stepper, "Label", "APOSTLES", 16f, Kit.Cinzel, Kit.Soft,
+            TMP_Text label = Kit.Label(stepper, "Label", "APOSTLES", 16f, Kit.Display, Kit.Soft,
                 TextAlignmentOptions.Left);
             Kit.At(label.rectTransform, 20f, 0f, 200f, 60f);
             label.characterSpacing = 12f;
@@ -221,7 +221,7 @@ namespace SoulBind.UI
         {
             TMP_Text fewer = Kit.Button(parent, "Fewer", "‹", Kit.ButtonStyle.Secondary, () => change(-1), 26f, 8f);
             Kit.At((RectTransform)fewer.transform.parent, x, y, 44f, 44f);
-            TMP_Text count = Kit.Label(parent, "Count", "4", 28f, Kit.Cinzel, Kit.Text);
+            TMP_Text count = Kit.Label(parent, "Count", "4", 28f, Kit.Display, Kit.Text);
             Kit.At(count.rectTransform, x + 50f, y, 44f, 44f);
             TMP_Text more = Kit.Button(parent, "More", "›", Kit.ButtonStyle.Secondary, () => change(1), 26f, 8f);
             Kit.At((RectTransform)more.transform.parent, x + 100f, y, 44f, 44f);
@@ -250,7 +250,7 @@ namespace SoulBind.UI
             RectTransform avatar = Kit.Circle(card, "Avatar", 52f, Kit.Gold, Kit.GoldBright, 2f);
             Kit.At(avatar, 10f, 10f, 52f, 52f);
             avatar.GetComponent<Image>().raycastTarget = false;
-            _profileInitial = Kit.Label(avatar, "Initial", "?", 24f, Kit.Cinzel, Kit.Background);
+            _profileInitial = Kit.Label(avatar, "Initial", "?", 24f, Kit.Display, Kit.Background);
             Kit.Stretch(_profileInitial.rectTransform);
 
             _profileName = Kit.Label(card, "Name", "", 18f, Kit.InterBold, Kit.Text, TextAlignmentOptions.Left);
@@ -277,7 +277,7 @@ namespace SoulBind.UI
             RectTransform panel = Kit.Box(frame, "Panel", Kit.Panel, Kit.GoldLine, 14f);
             Kit.At(panel, 340f, 220f, 600f, 280f);
 
-            TMP_Text title = Kit.Label(panel, "Title", "Your name", 30f, Kit.Cinzel, Kit.Title);
+            TMP_Text title = Kit.Label(panel, "Title", "Your name", 30f, Kit.Display, Kit.Title);
             Kit.At(title.rectTransform, 0f, 28f, 600f, 40f);
 
             _nameField = CreateInputField(panel, "NameField", "Type your name", 26f, Kit.InterSemiBold, 0f);

@@ -116,7 +116,9 @@ namespace SoulBind.UI
                     screen = placed ? cam.WorldToScreenPoint(plate.Piece.TopPoint) : Vector3.zero;
                     placed &= screen.z > 0f;
                 }
-                bool visible = placed && IsAlive(plate.ApostleId);
+                // Your own plate would sit on your Capacity bar; your panel already shows the same.
+                bool yours = plate.ApostleId == _controller.ViewerId;
+                bool visible = placed && !yours && IsAlive(plate.ApostleId);
                 if (plate.Rect.gameObject.activeSelf != visible)
                     plate.Rect.gameObject.SetActive(visible);
                 if (!visible)
