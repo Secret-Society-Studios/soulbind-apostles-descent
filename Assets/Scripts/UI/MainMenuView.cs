@@ -275,6 +275,13 @@ namespace SoulBind.UI
             BuildRoomScreen(root);
             CreateButton("Quit", root, "Quit", new Vector2(0f, -330f), new Vector2(220f, 60f), ButtonColor, Quit);
             BuildProfile(root);
+
+            // A small ? in the top-right corner opens How to Play.
+            TMP_Text help = CreateButton("HelpButton", root, "?", Vector2.zero, new Vector2(80f, 80f), ButtonColor,
+                () => HelpPopup.Open(transform));
+            var helpRect = (RectTransform)help.transform.parent;
+            helpRect.anchorMin = helpRect.anchorMax = helpRect.pivot = new Vector2(1f, 1f);
+            helpRect.anchoredPosition = new Vector2(-30f, -30f);
         }
 
         

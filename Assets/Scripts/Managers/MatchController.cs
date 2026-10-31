@@ -109,6 +109,17 @@ namespace SoulBind.Managers
 
         public BoardView BoardView => boardView;
 
+        /// <summary>This Apostle's piece on the board, or null (name plates follow it).</summary>
+        public ApostleView GetPieceView(int apostleId)
+        {
+            for (int i = 0; i < _views.Count; i++)
+            {
+                if (_views[i].ApostleId == apostleId)
+                    return _views[i];
+            }
+            return null;
+        }
+
         // ---- Hand play state (read by the HUD) ----
 
         /// <summary>True while an ATK card is selected and waiting for a target click.</summary>
