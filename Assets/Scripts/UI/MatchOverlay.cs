@@ -20,7 +20,8 @@ namespace SoulBind.UI
     /// (the Ascension tile appears), an Apostle loses Awakened status.
     /// End screen: who won and how, every Apostle's final Vessel, Souls and Corruption, and
     /// Play Again / View Board buttons.
-    /// During the match: a Quit button in the top-right corner, which asks before leaving to the main menu.
+    /// During the match: a Menu button in the top-right corner (Resume, How to Play, Leave Match;
+    /// leaving asks first).
     /// MatchHud creates it at runtime on its Canvas, so it needs no setup. Display only.
     /// </summary>
     public sealed class MatchOverlay : MonoBehaviour
@@ -66,7 +67,9 @@ namespace SoulBind.UI
         private float _endScreenTimer = -1f;
         // quit button and its "are you sure?" box
         private const float QuitButtonTop = 124f;
-        private GameObject _quitButton;
+        private GameObject _quitButton;   // the Menu button
+        private GameObject _menu;         // Resume / How to Play / Leave Match
+        private GameObject _leaveButton;
         private GameObject _quitConfirm;
         private TMP_Text _quitText;
         private bool _endShown;
@@ -185,18 +188,37 @@ namespace SoulBind.UI
 
         // ---- Quit ----
 
-        // Quit is there while the match runs; at the end the result screen has its own Main Menu button.
-        // Like that button, it needs the menu scene to be first in the Build Settings.
+        // Menu is there while the match runs; at the end the result screen has its own Main Menu button.
+        // Leave Match, like that button, needs the menu scene to be first in the Build Settings.
         private void RefreshQuit(Match match)
         {
-            bool canQuit = !match.IsOver && SceneManager.GetActiveScene().buildIndex > 0;
-            _quitButton.SetActive(canQuit);
-            if (!canQuit)
+            bool running = !match.IsOver;
+            _quitButton.SetActive(running);
+            _leaveButton.SetActive(SceneManager.GetActiveScene().buildIndex > 0);
+            if (!running)
+            {
+                _menu.SetActive(false);
                 _quitConfirm.SetActive(false);
+            }
+        }
+
+        private void OpenMenu()
+        {
+            _menu.transform.SetAsLastSibling();
+            _menu.SetActive(true);
+        }
+
+        private void CloseMenu() => _menu.SetActive(false);
+
+        private void OpenHelp()
+        {
+            _menu.SetActive(false);
+            HelpPopup.Open(transform);
         }
 
         private void AskToQuit()
         {
+            _menu.SetActive(false);
             _quitText.text = _controller != null && _controller.IsOnline ? "You will leave the online match and go back to the main menu." : "This match will end and you will go back to the main menu.";
             _quitConfirm.transform.SetAsLastSibling();
             _quitConfirm.SetActive(true);
@@ -538,20 +560,22 @@ namespace SoulBind.UI
 
         private void BuildQuit(RectTransform root)
         {
-            // The small Quit button, top-right, left of the turn info box.
-            RectTransform quit = CreateRect("QuitButton", root);
+            // The small Menu button, top-right, under the turn info box.
+            RectTransform quit = CreateRect("MenuButton", root);
             quit.anchorMin = quit.anchorMax = new Vector2(1f, 1f);
             quit.pivot = new Vector2(1f, 1f);
             quit.anchoredPosition = new Vector2(-20f, -QuitButtonTop);
-            quit.sizeDelta = new Vector2(100f, 56f);
+            quit.sizeDelta = new Vector2(120f, 56f);
             AddImage(quit, ButtonColor, true);
             Button quitButton = quit.gameObject.AddComponent<Button>();
-            quitButton.onClick.AddListener(AskToQuit);
+            quitButton.onClick.AddListener(OpenMenu);
             TMP_Text quitLabel = CreateText("Label", quit, 24f, FontStyles.Bold);
             Stretch(quitLabel.rectTransform);
-            quitLabel.text = "Quit";
+            quitLabel.text = "Menu";
             GothicTheme.StyleButton(quitButton);
             _quitButton = quit.gameObject;
+
+            BuildMenu(root);
 
             // "Leave the match?": dims everything and blocks clicks. Tapping outside the box means Stay.
             RectTransform confirm = CreateRect("QuitConfirm", root);
@@ -589,6 +613,54 @@ namespace SoulBind.UI
             CreateButton("StayButton", box, "Stay", new Vector2(-125f, 0f), CancelQuit);
             CreateButton("LeaveButton", box, "Leave", new Vector2(125f, 0f), MainMenu);
             _quitConfirm.SetActive(false);
+        }
+
+        // The Menu: dims everything; tapping outside the box means Resume.
+        private void BuildMenu(RectTransform root)
+        {
+            RectTransform menu = CreateRect("Menu", root);
+            Stretch(menu);
+            AddImage(menu, DimColor, true);
+            Button outside = menu.gameObject.AddComponent<Button>();
+            outside.transition = Selectable.Transition.None;
+            outside.onClick.AddListener(CloseMenu);
+            _menu = menu.gameObject;
+
+            RectTransform box = CreateRect("Box", menu);
+            box.anchorMin = box.anchorMax = new Vector2(0.5f, 0.5f);
+            box.sizeDelta = new Vector2(480f, 420f);
+            AddImage(box, PanelColor, true);
+            Outline edge = box.gameObject.AddComponent<Outline>();
+            edge.effectColor = GoldColor;
+            edge.effectDistance = new Vector2(3f, -3f);
+
+            TMP_Text title = CreateText("Title", box, 40f, FontStyles.Bold);
+            Row(title.rectTransform, 24f, 56f);
+            title.text = "Menu";
+            title.color = GoldColor;
+
+            MenuButton(box, "ResumeButton", "Resume", 100f, CloseMenu);
+            MenuButton(box, "HelpButton", "How to Play", 190f, OpenHelp);
+            _leaveButton = MenuButton(box, "LeaveButton", "Leave Match", 280f, AskToQuit);
+            _menu.SetActive(false);
+        }
+
+        private GameObject MenuButton(RectTransform box, string name, string label, float top,
+            UnityEngine.Events.UnityAction onClick)
+        {
+            RectTransform rect = CreateRect(name, box);
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 1f);
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.anchoredPosition = new Vector2(0f, -top);
+            rect.sizeDelta = new Vector2(320f, 70f);
+            AddImage(rect, ButtonColor, true);
+            Button button = rect.gameObject.AddComponent<Button>();
+            button.onClick.AddListener(onClick);
+            TMP_Text text = CreateText("Label", rect, 28f, FontStyles.Bold);
+            Stretch(text.rectTransform);
+            text.text = label;
+            GothicTheme.StyleButton(button);
+            return rect.gameObject;
         }
 
         private GameObject CreateButton(string name, RectTransform parent, string label, Vector2 position,
