@@ -229,6 +229,19 @@ namespace SoulBind.UI
                 AddFrame(image.transform, "ThemeFrame", GoldDim, 0f);
         }
 
+        /// <summary>
+        /// Gives a runtime-built bar (back Image, "Fill" child) the same look as the portrait bars:
+        /// dark back, sheen on the fill, faint gold frame.
+        /// </summary>
+        public static void StyleRuntimeBar(Transform bar) => StyleBar(bar);
+
+        /// <summary>A thin gold double frame over this rect, named "ThemeFrame". Returns its Image.</summary>
+        public static Image AddThemeFrame(Transform parent, Color color)
+        {
+            AddFrame(parent, "ThemeFrame", color, 0f);
+            return (Image)parent.Find("ThemeFrame").GetComponent(typeof(Image));
+        }
+
         private static void StyleBar(Transform bar)
         {
             if (bar == null)

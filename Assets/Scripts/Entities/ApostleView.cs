@@ -24,6 +24,9 @@ namespace SoulBind.Entities
         private SpriteRenderer _renderer;
         private SpriteRenderer _halo;
 
+        // The standee's renderers, found once, so TopPoint allocates nothing each frame.
+        private Renderer[] _pieceRenderers;
+
         public int ApostleId { get; private set; }
 
         public void Initialize(int apostleId, Sprite sprite, Color color)
@@ -42,6 +45,28 @@ namespace SoulBind.Entities
             _renderer.sortingOrder = SortingOrder;
 
             SpawnPiece(apostleId);
+        }
+
+        /// <summary>
+        /// The top of the piece in world space: the point nearest the camera, since the board faces -Z
+        /// and pieces stand toward it. Name plates float just above this.
+        /// </summary>
+        public Vector3 TopPoint
+        {
+            get
+            {
+                Vector3 position = transform.position;
+                float top = position.z + pieceLift;
+                if (_pieceRenderers != null)
+                {
+                    for (int i = 0; i < _pieceRenderers.Length; i++)
+                    {
+                        if (_pieceRenderers[i] != null)
+                            top = Mathf.Min(top, _pieceRenderers[i].bounds.min.z);
+                    }
+                }
+                return new Vector3(position.x, position.y, top);
+            }
         }
 
         /// <summary>The Apostle whose turn it is is drawn larger.</summary>
@@ -78,7 +103,8 @@ namespace SoulBind.Entities
             piece.transform.localRotation = Quaternion.Euler(-90f, 0f, 0f) * Quaternion.Euler(0f, pieceYaw, 0f);
             piece.transform.localScale = Vector3.one * pieceScale;
 
-            foreach (Renderer r in piece.GetComponentsInChildren<Renderer>())
+            _pieceRenderers = piece.GetComponentsInChildren<Renderer>();
+            foreach (Renderer r in _pieceRenderers)
                 r.sortingOrder = PieceSortingOrder;
         }
 

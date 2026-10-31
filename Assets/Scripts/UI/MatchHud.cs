@@ -10,7 +10,7 @@ namespace SoulBind.UI
 {
     /// <summary>
     /// The match HUD, laid out like a digital card game seen from the current player's seat:
-    /// opponents' portraits along the top, this screen's player's portrait in the bottom-right
+    /// name plates above every piece (the opponents' portrait row is hidden), this screen's player's portrait in the bottom-right
     /// corner, the hand along the bottom, and turn info in the top-right. Whoever's turn it is
     /// is highlighted. With bots off (hot-seat testing), "you" follows the turn.
     /// Display only: it reads the Match after every change, and keeps the board clear of the HUD.
@@ -86,6 +86,11 @@ namespace SoulBind.UI
                 
                 // The cards of the attack in progress, on the right edge.
                 PlayQueue.Create((RectTransform)transform, matchController);
+                // A plate above every piece: name, Souls, Vessel, Corruption and DEF.
+                // They take over from the opponents' portrait row, which is hidden.
+                NamePlates.Create((RectTransform)transform, matchController);
+                if (opponentRow != null)
+                    opponentRow.gameObject.SetActive(false);
             }
             Refresh();
         }
