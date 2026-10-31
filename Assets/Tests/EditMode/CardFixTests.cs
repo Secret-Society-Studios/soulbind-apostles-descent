@@ -150,6 +150,7 @@ namespace SoulBind.Tests.EditMode
             Assert.IsTrue(match.NeedsComboTarget(ArcanaId.WheelOfFortune, 0), "Outside an attack, the player picks who");
             Assert.AreEqual(CardPlayResult.ComboTargetRequired, match.PlayCard(ArcanaId.WheelOfFortune, 0));
             Assert.AreEqual(CardPlayResult.Success, match.PlayCard(ArcanaId.WheelOfFortune, 0, other.Id));
+            Assert.IsTrue(match.PlayQueued());
 
             Assert.AreEqual(1, CountOf(match, player.Id, ArcanaId.Moon), "The player received one of their cards");
             Assert.AreEqual(1, CountOf(match, other.Id, ArcanaId.Sun), "They received one of the player's");

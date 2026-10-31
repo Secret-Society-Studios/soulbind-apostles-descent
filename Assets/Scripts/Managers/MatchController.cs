@@ -928,6 +928,17 @@ namespace SoulBind.Managers
                 AfterStateChange();
         }
 
+        /// <summary>Resolves the cards waiting in the queue outside an attack (the queue's PLAY button).</summary>
+        public void PlayQueued()
+        {
+            if (!IsLocalTurn)
+                return;
+
+            Submit(MatchCommand.PlayQueued());
+            if (IsOnlineClient)
+                AfterStateChange();
+        }
+
         public void EndTurn()
         {
             if (!IsLocalTurn)

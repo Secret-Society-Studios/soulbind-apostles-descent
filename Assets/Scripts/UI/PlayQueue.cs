@@ -141,13 +141,25 @@ namespace SoulBind.UI
             buttonImage.color = GothicTheme.StrikeButtonColor;
             _attack = button.gameObject.AddComponent<Button>();
             _attack.targetGraphic = buttonImage;
-            _attack.onClick.AddListener(_controller.Strike);
+            _attack.onClick.AddListener(OnButton);
             GothicTheme.StyleButton(_attack);
             _attackLabel = NewText("Label", button, "ATTACK", 26f, FontStyles.Bold);
             Stretch(_attackLabel.rectTransform);
             _attackLabel.alignment = TextAlignmentOptions.Center;
             _attackLabel.color = GothicTheme.GoldBright;
             _attackLabel.characterSpacing = 6f;
+        }
+
+        // ATTACK strikes in an attack; PLAY resolves cards played without one.
+        private void OnButton()
+        {
+            Match match = _controller.CurrentMatch;
+            if (match == null)
+                return;
+            if (match.Engagement == EngagementState.Engaged)
+                _controller.Strike();
+            else
+                _controller.PlayQueued();
         }
 
         private Row BuildRow(RectTransform root, int index)
@@ -251,7 +263,7 @@ namespace SoulBind.UI
             bool yours = match.CurrentApostle.Id == _controller.ViewerId;
             bool engaged = match.Engagement == EngagementState.Engaged;
             var cards = match.AttackCards;
-            int shown = engaged ? Mathf.Min(cards.Count, MaxRows) : 0;
+            int shown = Mathf.Min(cards.Count, MaxRows);
             float inner = Width - 2f * Pad;
             float y = Pad + HeaderHeight + 8f;
 
@@ -282,7 +294,7 @@ namespace SoulBind.UI
                 if (canReturn)
                     _empty.text = "Tap a card to take it back";
                 else
-                    _empty.text = yours ? "Drag a card onto an enemy to attack" : "No attack yet";
+                    _empty.text = yours ? "Play a card, or drag one onto an enemy" : "No cards yet";
                 Place(_empty.rectTransform, Pad, y, inner, 40f);
                 y += 40f + RowGap;
             }
@@ -300,11 +312,13 @@ namespace SoulBind.UI
                 y += TotalHeight + 6f;
             }
 
-            // Only the attacker sees ATTACK, and only once there is something to strike with.
-            bool canStrike = yours && engaged && _controller.IsLocalTurn;
+            // Only the player sees the button: ATTACK in an attack, PLAY for cards played without one.
+            bool canStrike = yours && shown > 0 && _controller.IsLocalTurn;
             _attack.gameObject.SetActive(canStrike);
             if (canStrike)
             {
+                _attackLabel.text = engaged ? "ATTACK" : "PLAY";
+                ((Image)_attack.targetGraphic).color = engaged ? GothicTheme.StrikeButtonColor : GothicTheme.ButtonColor;
                 Place((RectTransform)_attack.transform, Pad, y, inner, ButtonHeight);
                 y += ButtonHeight;
             }

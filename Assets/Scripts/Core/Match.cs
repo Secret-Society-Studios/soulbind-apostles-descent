@@ -239,10 +239,12 @@ namespace SoulBind.Core
         }
 
         /// <summary>
-        /// Plays a card from the current Apostle's hand. Every played card costs its CAP, goes to
-        /// the discard pile and adds its DEF to the shield.
-        /// While Free: pass a targetId to attack with a card that has ATK; this engages that target.
-        /// Pass 0 to play it without attacking (its ATK is lost).
+        /// Plays a card from the current Apostle's hand into the queue: its CAP is held and it leaves
+        /// the hand, and ReturnQueuedCard takes it back. Its DEF, ATK, effect and combo happen when the
+        /// queue resolves: on Strike in an attack, otherwise on PlayQueued (or End Turn).
+        /// While Free: pass a targetId to attack with a card that has ATK; this engages that target
+        /// (cards already waiting resolve first, as plain plays). Pass 0 to play it without attacking
+        /// (its ATK is lost).
         /// While Engaged: the card's ATK adds to the attack; targetId must be 0 or the engaged target.
         /// While Disengaged: no more cards can be played this turn.
         /// comboTargetId picks who the Nocturne combo hits, if this card triggers it: any living
@@ -288,90 +290,22 @@ namespace SoulBind.Core
                 }
             }
 
-            // An attack card waits in the queue: Capacity is held, the rest happens on Strike.
+            // An attack card waits in the attack queue: the rest happens on Strike.
             if (engagesNow || Engagement == EngagementState.Engaged)
-                return QueueCard(card, targetId, comboTargetId, engagesNow);
+                return QueueAttackCard(card, targetId, comboTargetId, engagesNow);
 
-            // Nocturne combo: if this card is the turn's 2nd Nocturne, work out who it hits now,
-            // so an invalid or missing pick changes nothing.
-            int nocturneVictimId = 0;
+            // Not attacking: the card waits in the queue too, until PlayQueued (or End Turn).
+            // The 2nd Nocturne of the turn needs an opponent picked for its combo.
             if (definition.Element == Element.Nocturne
-                && _elementsPlayedThisTurn[(int)Element.Nocturne] == ElementCombo.CardsNeeded - 1)
-            {
-                if (comboTargetId != 0)
-                {
-                    ApostleState picked = TryFindApostle(comboTargetId);
-                    if (picked == null || picked == CurrentApostle || picked.IsEliminated)
-                        return CardPlayResult.InvalidComboTarget;
-                    nocturneVictimId = comboTargetId;
-                }
-                else if (Engagement == EngagementState.Engaged)
-                {
-                    nocturneVictimId = EngagedTargetId;
-                }
-                else if (engagesNow)
-                {
-                    nocturneVictimId = targetId;
-                }
-                else
-                {
-                    return CardPlayResult.ComboTargetRequired;
-                }
-            }
+                && GetElementsPlayedThisTurn(Element.Nocturne) == ElementCombo.CardsNeeded - 1
+                && comboTargetId == 0)
+                return CardPlayResult.ComboTargetRequired;
 
-            // Wheel of Fortune swaps with any living opponent, adjacent or not: the picked one, or the
-            // attack target when it is part of an attack and nobody was picked.
-            int pickedId = 0;
-            if (card == ArcanaId.WheelOfFortune)
-            {
-                if (comboTargetId != 0)
-                {
-                    ApostleState picked = TryFindApostle(comboTargetId);
-                    if (picked == null || picked == CurrentApostle || picked.IsEliminated)
-                        return CardPlayResult.InvalidComboTarget;
-                    pickedId = comboTargetId;
-                }
-                else if (Engagement != EngagementState.Engaged && !engagesNow)
-                {
-                    return CardPlayResult.ComboTargetRequired;
-                }
-            }
+            // Wheel of Fortune outside an attack needs someone to swap with.
+            if (card == ArcanaId.WheelOfFortune && comboTargetId == 0)
+                return CardPlayResult.ComboTargetRequired;
 
-            // Every check passed: apply the card.
-            _nocturneVictimId = nocturneVictimId;
-            _pickedTargetId = pickedId;
-            LastSwapTargetId = 0;
-            if (definition.Cap > 0)
-                CurrentCapacity.Spend(definition.Cap);
-            hand.Remove(card);
-            Deck.Discard(card);
-            CurrentApostle.AddShield(definition.Defense);
-
-            if (engagesNow)
-            {
-                Engagement = EngagementState.Engaged;
-                EngagedTargetId = targetId;
-                // ATK bonuses already running (The Hierophant, The Hanged Man, Temperance) join the
-                // attack as it starts, so the player sees them in the attack's total straight away.
-                PendingAttack = CardAttack.Of(card) + CurrentApostle.GetTimedTotal(TimedEffectKind.Attack);
-            }
-            else if (Engagement == EngagementState.Engaged)
-            {
-                PendingAttack += CardAttack.Of(card);
-            }
-            // While Free with no target, the card's ATK is lost and only its DEF applies.
-
-            RunEffectAndCombo(card, definition);
-
-            // Temperance: the turn ends now, exactly as if End Turn had been pressed.
-            if (_endTurnRequested)
-            {
-                _endTurnRequested = false;
-                if (!IsOver)
-                    EndTurn();
-            }
-
-            return CardPlayResult.Success;
+            return QueueCard(card, comboTargetId);
         }
 
         // The card's effect, the attack list and the element combo: the part of
@@ -419,9 +353,48 @@ namespace SoulBind.Core
             }
         }
 
-        // Puts an attack card in the queue: its Capacity is held and it leaves the hand.
-        // DEF, ATK, effect and combo wait for Strike (see ResolveQueue).
-        private CardPlayResult QueueCard(ArcanaId card, int targetId, int pickId, bool engagesNow)
+        // Starts or joins an attack with this card. Cards already waiting outside an attack
+        // resolve first, as plain plays (their ATK is lost, as before).
+        private CardPlayResult QueueAttackCard(ArcanaId card, int targetId, int pickId, bool engagesNow)
+        {
+            if (engagesNow && _queuedCards.Count > 0)
+            {
+                ResolveQueue();
+                if (IsOver)
+                    return CardPlayResult.Success;
+                // A Wheel of Fortune among them may have swapped this very card away.
+                if (!_hands[IndexOf(CurrentApostle.Id)].Contains(card))
+                    return CardPlayResult.NotInHand;
+                // Or changed who can be attacked.
+                switch (CheckTarget(targetId, out _))
+                {
+                    case AttackResult.Resolved:
+                        break;
+                    case AttackResult.OutOfRange:
+                        return CardPlayResult.TargetOutOfRange;
+                    default:
+                        return CardPlayResult.InvalidTarget;
+                }
+            }
+
+            CardPlayResult result = QueueCard(card, pickId);
+            if (result != CardPlayResult.Success)
+                return result;
+
+            if (engagesNow)
+            {
+                Engagement = EngagementState.Engaged;
+                EngagedTargetId = targetId;
+                // A new attack: the last one's hits are old news.
+                _lastStrikeHits.Clear();
+            }
+            UpdateAttackPreview();
+            return CardPlayResult.Success;
+        }
+
+        // Puts a card in the queue: its Capacity is held and it leaves the hand.
+        // DEF, ATK, effect and combo wait until the queue resolves (see ResolveQueue).
+        private CardPlayResult QueueCard(ArcanaId card, int pickId)
         {
             CardDefinition definition = CardCatalog.Get(card);
             bool usesPick = card == ArcanaId.WheelOfFortune || definition.Element == Element.Nocturne;
@@ -439,16 +412,28 @@ namespace SoulBind.Core
             _hands[IndexOf(CurrentApostle.Id)].Remove(card);
             _queuedCards.Add(card);
             _queuedPicks.Add(pickId);
-
-            if (engagesNow)
-            {
-                Engagement = EngagementState.Engaged;
-                EngagedTargetId = targetId;
-                // A new attack: the last one's hits are old news.
-                _lastStrikeHits.Clear();
-            }
-            UpdateAttackPreview();
             return CardPlayResult.Success;
+        }
+
+        /// <summary>
+        /// Resolves the cards waiting in the queue outside an attack, in order: DEF, effect, combo
+        /// (their ATK is lost). Returns false, and changes nothing, if not Free or nothing waits.
+        /// A Temperance among them ends the turn afterwards.
+        /// </summary>
+        public bool PlayQueued()
+        {
+            RequireActiveTurn();
+            if (Engagement != EngagementState.Free || _queuedCards.Count == 0)
+                return false;
+
+            ResolveQueue();
+            if (_endTurnRequested)
+            {
+                _endTurnRequested = false;
+                if (!IsOver)
+                    EndTurn();
+            }
+            return true;
         }
 
         /// <summary>
@@ -458,7 +443,7 @@ namespace SoulBind.Core
         public bool ReturnQueuedCard(int index)
         {
             RequireActiveTurn();
-            if (Engagement != EngagementState.Engaged)
+            if (Engagement == EngagementState.Disengaged)
                 return false;
             if (index < 0 || index >= _queuedCards.Count)
                 return false;
@@ -472,6 +457,8 @@ namespace SoulBind.Core
             if (cap > 0)
                 CurrentCapacity.RestoreRemaining(CurrentCapacity.Remaining + cap);
 
+            if (Engagement != EngagementState.Engaged)
+                return true;
             if (_queuedCards.Count == 0)
                 ResetEngagement();
             else
@@ -516,7 +503,8 @@ namespace SoulBind.Core
         // If the match ends partway, the rest just go to the discard pile.
         private void ResolveQueue()
         {
-            PendingAttack = CurrentApostle.GetTimedTotal(TimedEffectKind.Attack);
+            if (Engagement == EngagementState.Engaged)
+                PendingAttack = CurrentApostle.GetTimedTotal(TimedEffectKind.Attack);
             for (int i = 0; i < _queuedCards.Count; i++)
             {
                 if (IsOver)
@@ -529,7 +517,7 @@ namespace SoulBind.Core
         }
 
         // One queued card: discard, DEF, ATK, then effect and combo.
-        // With no pick, Nocturne and Wheel use the attack target.
+        // With no pick, Nocturne and Wheel use the attack target (none outside an attack).
         private void ResolveCard(ArcanaId card, int pickId)
         {
             CardDefinition definition = CardCatalog.Get(card);
@@ -538,7 +526,9 @@ namespace SoulBind.Core
             LastSwapTargetId = 0;
             Deck.Discard(card);
             CurrentApostle.AddShield(definition.Defense);
-            PendingAttack += CardAttack.Of(card);
+            // Outside an attack the card's ATK is lost and only its DEF applies.
+            if (Engagement == EngagementState.Engaged)
+                PendingAttack += CardAttack.Of(card);
             RunEffectAndCombo(card, definition);
         }
 
@@ -828,6 +818,15 @@ namespace SoulBind.Core
         public TurnEvent EndTurn()
         {
             RequireActiveTurn();
+
+            // Cards still waiting outside an attack resolve before the turn ends.
+            if (Engagement == EngagementState.Free && _queuedCards.Count > 0)
+            {
+                ResolveQueue();
+                _endTurnRequested = false;
+                if (IsOver)
+                    return TurnEvent.NextTurn;
+            }
 
             if (Engagement == EngagementState.Engaged)
             {

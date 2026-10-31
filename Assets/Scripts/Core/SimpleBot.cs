@@ -82,7 +82,12 @@ namespace SoulBind.Core
                 case BotActionKind.Move:
                     return match.Move(action.Destination) == MoveResult.Success;
                 case BotActionKind.PlayCard:
-                    return match.PlayCard(action.Card, action.TargetId, action.ComboTargetId) == CardPlayResult.Success;
+                    if (match.PlayCard(action.Card, action.TargetId, action.ComboTargetId) != CardPlayResult.Success)
+                        return false;
+                    // Bots never take cards back, so a plain play resolves at once.
+                    if (match.Engagement == EngagementState.Free && match.AttackCards.Count > 0)
+                        match.PlayQueued();
+                    return true;
                 case BotActionKind.Strike:
                     return match.Strike(out _);
                 case BotActionKind.EndTurn:
