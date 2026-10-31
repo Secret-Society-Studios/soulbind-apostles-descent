@@ -155,6 +155,15 @@ namespace SoulBind.UI
         private ArcanaId _pinned;
         private CanvasGroup _previewGroup;
         private Camera _previewCamera;
+        // Your Capacity, like an XP bar just above your hand: one pip per point, lit while unspent.
+        private const int MaxCapacityPips = 16;
+        private const float CapacityBarHeight = 22f;
+        private const float CapacityGap = 16f; // between the tray and the bar
+        private static readonly Color CapacityLit = new Color(0.45f, 0.85f, 0.35f, 1f);
+        private static readonly Color CapacitySpent = new Color(0.10f, 0.08f, 0.13f, 0.9f);
+        private readonly List<UnityEngine.UI.Image> _capacityPips = new List<UnityEngine.UI.Image>(MaxCapacityPips);
+        private RectTransform _capacityBar;
+        private TMP_Text _capacityText;
         // Under a pinned preview: a tap anywhere else closes it, and never reacher the board.
         private GameObject _previewBlocker;
         private int _pinnedFrame = -1; // the frame a card was pinned, so that same tap doesn't close it
@@ -344,6 +353,8 @@ namespace SoulBind.UI
 
             ApplyChanges(match);
             UpdateGlows(match);
+            if (_yours != null)
+                ShowCapacity(_yours, match);
 
             // The screen now belongs to someone else (hot-seat testing): let cards land, then turn the table.
             if (viewer != _builtViewer)
@@ -474,7 +485,10 @@ namespace SoulBind.UI
                     seat.Shown.Add(hand[c]);
                 _seats.Add(seat);
                 if (seat.IsYours)
+                {
                     _yours = seat;
+                    CreateCapacityBar(seat);
+                }
                 Layout(seat, match, true);
             }
 
@@ -638,6 +652,8 @@ namespace SoulBind.UI
             FitGlow(seat.TurnGlow, seat.Tray, 64f);
             FitGlow(seat.DefenseGlow, seat.Tray, 42f);
             PlaceSwapMark(seat, total);
+            if (seat.IsYours)
+                ShowCapacity(seat, match);
 
             ApostleState apostle = FindApostle(match, seat.ApostleId);
             int count = Mathf.Max(0, seat.Shown.Count - seat.Arriving);
@@ -706,6 +722,75 @@ namespace SoulBind.UI
             }
             return back;
         }
+
+        // ---- Capacity bar ----
+
+        // The bar, its pips and its number, made once per seat build.
+        // ShowCapacity sizes and fills them.
+        private void CreateCapacityBar(Seat seat)
+        {
+            _capacityPips.Clear();
+            _capacityBar = CreateRect("CapacityBar", seat.Root);
+            for (int i = 0; i < MaxCapacityPips; i++)
+            {
+                RectTransform pip = CreateRect("Pip" + (i + 1), _capacityBar);
+                var image = (Image)pip.gameObject.AddComponent(typeof(Image));
+                image.raycastTarget = false;
+                _capacityPips.Add(image);
+            }
+
+            RectTransform textRect = CreateRect("Text", _capacityBar);
+            var text = (TextMeshProUGUI)textRect.gameObject.AddComponent(typeof(TextMeshProUGUI));
+            text.fontSize = 30f;
+            text.fontStyle = FontStyles.Bold;
+            text.alignment = TextAlignmentOptions.Bottom;
+            text.color = CapacityLit;
+            text.raycastTarget = false;
+            _capacityText = text;
+        }
+
+        // Fills the bar from the turn in progress. It only shows on your own turn.
+        private void ShowCapacity(Seat seat, Match match)
+        {
+            if (_capacityBar == null)
+                return;
+            TurnCapacity capacity = match.CurrentCapacity;
+            bool show = capacity != null && !match.IsOver && match.CurrentApostle != null
+                        && match.CurrentApostle.Id == seat.ApostleId;
+            _capacityBar.gameObject.SetActive(show);
+            if (!show)
+                return;
+
+            // Just above the tray, as wide as it.
+            float width = seat.Tray.sizeDelta.x;
+            float top = seat.Tray.anchoredPosition.y + seat.Tray.sizeDelta.y / 2f;
+            _capacityBar.sizeDelta = new Vector2(width, CapacityBarHeight);
+            _capacityBar.anchoredPosition = new Vector2(0f, top + CapacityGap + CapacityBarHeight / 2f);
+
+            int pips = Mathf.Clamp(capacity.Maximum, 1, MaxCapacityPips);
+            float gap = 6f;
+            float pipWidth = (width - gap * (pips - 1)) / pips;
+            for (int i = 0; i < _capacityPips.Count; i++)
+            {
+                Image pip = _capacityPips[i];
+                bool used = i < pips;
+                pip.gameObject.SetActive(used);
+                if (!used)
+                    continue;
+                RectTransform rect = pip.rectTransform;
+                rect.sizeDelta = new Vector2(pipWidth, CapacityBarHeight);
+                float x = -width / 2f + pipWidth / 2f + i * (pipWidth + gap);
+                rect.anchoredPosition = new Vector2(x, 0f);
+                pip.color = i < capacity.Remaining ? CapacityLit : CapacitySpent;
+            }
+
+            // The number sits above the middle of the bar, like Minecraft's level.
+            RectTransform textRect = _capacityText.rectTransform;
+            textRect.sizeDelta = new Vector2(width, 40f);
+            textRect.anchoredPosition = new Vector2(0f, CapacityBarHeight / 2f + 24f);
+            _capacityText.text = $"CAPACITY {capacity.Remaining}/{capacity.Maximum}";
+        }
+
 
         // ---- Your cards: lifting, hovering, clicking and dragging ----
 
