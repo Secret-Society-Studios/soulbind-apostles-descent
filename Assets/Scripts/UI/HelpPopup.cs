@@ -6,6 +6,9 @@ using UnityEngine.UI;
 
 namespace SoulBind.UI
 {
+    // Inside the namespace, so it wins over the old SoulBind.Element in Card.cs.
+    using Element = SoulBind.Core.Element;
+
     /// <summary>
     /// The How to Play popup, opened from the main menu's ? button and the match's Menu.
     /// Tabs across the top (Goal, Turn, Cards, Combos, Corruption, Tiles); each has a small
