@@ -62,6 +62,8 @@ namespace SoulBind.UI
         [SerializeField] private float trayPadding = 12f;
         [Tooltip("Opponents' name tags sit on the board side of " + "their cards, where the screen edge can't cut " + "them off. Untick for the old outer-edge spot.")]
         [SerializeField] private bool nameTagOnBoardSide = true;
+        [Tooltip("The old name and card-count tag on each hand. Off: the name plates above the cards say who it is.")]
+        [SerializeField] private bool showNameTags;
         [Tooltip("Opponents' hands bigger than this show this many face-down cards (the label still gives the real count). Your own hand always shows every card.")]
         [SerializeField, Range(1, 15)] private int maxCardsShown = 10;
 
@@ -441,49 +443,52 @@ namespace SoulBind.UI
                 edge.effectDistance = new Vector2(6f, -6f);
                 seat.Edge = edge;
 
-                // The name tag: name and card count on a dark plate
-                // edged in the Apostle's colour, always upright.
-                // Opponents' tags sit on the board side of their
-                // cards, where the screen edge can't cut them off.
-                RectTransform tagRect = CreateRect("NameTag", seat.Root);
-                tagRect.sizeDelta = new Vector2(
-                    Mathf.Max(300f, seat.Root.sizeDelta.x * 0.5f),
-                    LabelHeight);
-                bool onBoardSide = nameTagOnBoardSide && !seat.IsYours;
-                float boardSide = RowY(seat)
-                    + CardHeight * seat.CardScale / 2f
-                    + trayPadding + 8f + LabelHeight / 2f;
-                float outerEdge = -seat.Root.sizeDelta.y / 2f
-                    + LabelHeight / 2f;
-                tagRect.anchoredPosition = new Vector2(0f,
-                    onBoardSide ? boardSide : outerEdge);
-                tagRect.localRotation =
-                    Quaternion.Euler(0f, 0f, -rotation);
+                if (showNameTags)
+                {
+                    // The name tag: name and card count on a dark plate
+                    // edged in the Apostle's colour, always upright.
+                    // Opponents' tags sit on the board side of their
+                    // cards, where the screen edge can't cut them off.
+                    RectTransform tagRect = CreateRect("NameTag", seat.Root);
+                    tagRect.sizeDelta = new Vector2(
+                        Mathf.Max(300f, seat.Root.sizeDelta.x * 0.5f),
+                        LabelHeight);
+                    bool onBoardSide = nameTagOnBoardSide && !seat.IsYours;
+                    float boardSide = RowY(seat)
+                        + CardHeight * seat.CardScale / 2f
+                        + trayPadding + 8f + LabelHeight / 2f;
+                    float outerEdge = -seat.Root.sizeDelta.y / 2f
+                        + LabelHeight / 2f;
+                    tagRect.anchoredPosition = new Vector2(0f,
+                        onBoardSide ? boardSide : outerEdge);
+                    tagRect.localRotation =
+                        Quaternion.Euler(0f, 0f, -rotation);
 
-                Image plate = tagRect.gameObject.AddComponent<Image>();
-                plate.color = new Color(0.05f, 0.04f, 0.08f, 0.85f);
-                plate.raycastTarget = false;
-                Outline plateEdge =
-                    tagRect.gameObject.AddComponent<Outline>();
-                plateEdge.effectColor = seatColor;
-                plateEdge.effectDistance = new Vector2(3f, -3f);
+                    Image plate = tagRect.gameObject.AddComponent<Image>();
+                    plate.color = new Color(0.05f, 0.04f, 0.08f, 0.85f);
+                    plate.raycastTarget = false;
+                    Outline plateEdge =
+                        tagRect.gameObject.AddComponent<Outline>();
+                    plateEdge.effectColor = seatColor;
+                    plateEdge.effectDistance = new Vector2(3f, -3f);
 
-                RectTransform labelRect = CreateRect("Label", tagRect);
-                labelRect.anchorMin = Vector2.zero;
-                labelRect.anchorMax = Vector2.one;
-                labelRect.offsetMin = new Vector2(14f, 2f);
-                labelRect.offsetMax = new Vector2(-14f, -2f);
-                TextMeshProUGUI label =
-                    labelRect.gameObject.AddComponent<TextMeshProUGUI>();
-                label.alignment = TextAlignmentOptions.Center;
-                label.fontSize = labelFontSize;
-                label.enableAutoSizing = true;
-                label.fontSizeMin = 18f;
-                label.fontSizeMax = labelFontSize;
-                label.fontStyle = FontStyles.Bold;
-                label.color = seatColor;
-                label.raycastTarget = false;
-                seat.Label = label;
+                    RectTransform labelRect = CreateRect("Label", tagRect);
+                    labelRect.anchorMin = Vector2.zero;
+                    labelRect.anchorMax = Vector2.one;
+                    labelRect.offsetMin = new Vector2(14f, 2f);
+                    labelRect.offsetMax = new Vector2(-14f, -2f);
+                    TextMeshProUGUI label =
+                        labelRect.gameObject.AddComponent<TextMeshProUGUI>();
+                    label.alignment = TextAlignmentOptions.Center;
+                    label.fontSize = labelFontSize;
+                    label.enableAutoSizing = true;
+                    label.fontSizeMin = 18f;
+                    label.fontSizeMax = labelFontSize;
+                    label.fontStyle = FontStyles.Bold;
+                    label.color = seatColor;
+                    label.raycastTarget = false;
+                    seat.Label = label;
+                }
                 CreateSwapMark(seat);
 
                 IReadOnlyList<ArcanaId> hand = match.GetHand(apostle.Id);
@@ -661,6 +666,8 @@ namespace SoulBind.UI
             if (seat.IsYours)
                 ShowCapacity(seat, match);
 
+            if (seat.Label == null)
+                return;
             ApostleState apostle = FindApostle(match, seat.ApostleId);
             int count = Mathf.Max(0, seat.Shown.Count - seat.Arriving);
             string who = seat.IsYours ? "You" : PlayerNames.Get(seat.ApostleId);
@@ -671,6 +678,58 @@ namespace SoulBind.UI
 
         // Cards sit toward the board, leaving the outer edge for the name.
         private static float RowY(Seat seat) => LabelHeight / 2f;
+
+        // ---------- Where a hand is on screen (for the name plates) ----------
+
+        private static readonly Vector3[] Corners = new Vector3[4];
+
+        /// <summary>
+        /// The screen point just above an Apostle's hand: the middle of the hand across,
+        /// and the highest point of its tray and cards (and your Capacity bar) up.
+        /// False if that Apostle has no hand on the table.
+        /// </summary>
+        public bool TryGetHandTop(int apostleId, Camera cam, out Vector2 screen)
+        {
+            screen = Vector2.zero;
+            Seat seat = null;
+            for (int i = 0; i < _seats.Count; i++)
+            {
+                if (_seats[i].ApostleId == apostleId)
+                    seat = _seats[i];
+            }
+            if (seat == null || cam == null || seat.Tray == null)
+                return false;
+
+            float top = float.MinValue;
+            seat.Tray.GetWorldCorners(Corners);
+            Vector3 middle = (Corners[0] + Corners[2]) * 0.5f;
+            screen.x = cam.WorldToScreenPoint(middle).x;
+            top = Mathf.Max(top, HighestOnScreen(seat.Tray, cam));
+            // Standing cards rise above their tray.
+            for (int k = 0; k < seat.Backs.Count; k++)
+            {
+                if (seat.Backs[k].gameObject.activeSelf)
+                    top = Mathf.Max(top, HighestOnScreen(seat.Backs[k], cam));
+            }
+            for (int k = 0; k < seat.Faces.Count; k++)
+            {
+                if (seat.Faces[k].gameObject.activeSelf)
+                    top = Mathf.Max(top, HighestOnScreen(seat.Faces[k].Rect, cam));
+            }
+            if (seat.IsYours && _capacityBar != null && _capacityBar.gameObject.activeInHierarchy)
+                top = Mathf.Max(top, HighestOnScreen(_capacityBar, cam));
+            screen.y = top;
+            return true;
+        }
+
+        private static float HighestOnScreen(RectTransform rect, Camera cam)
+        {
+            rect.GetWorldCorners(Corners);
+            float top = float.MinValue;
+            for (int i = 0; i < 4; i++)
+                top = Mathf.Max(top, cam.WorldToScreenPoint(Corners[i]).y);
+            return top;
+        }
 
         private Vector2 SlotPosition(Seat seat, int slot, int total)
         {
