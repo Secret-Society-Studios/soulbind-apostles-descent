@@ -15,6 +15,8 @@ namespace SoulBind.Core
             return 1;
         }
 
+        public override int GetAttackPreview(int phase, int sameBefore) => GetBonus(phase);
+
         public override void OnPlayed(CardPlayContext context)
         {
             if (context.IsAttacking)

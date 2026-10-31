@@ -244,10 +244,11 @@ namespace SoulBind.Tests.EditMode
             BothAdjacent(match, out ApostleState primary, out ApostleState other);
 
             Play(match, ArcanaId.Devil, primary.Id);
+            match.Strike(out _);
 
             Assert.AreEqual(3, primary.Corruption);
             Assert.AreEqual(0, other.Corruption);
-            Assert.AreEqual(1, player.Corruption);
+            Assert.AreEqual(1 + GameConstants.AttackCorruption, player.Corruption, "The Devil's 1, plus 1 for breaking DEF");
         }
 
         [Test]

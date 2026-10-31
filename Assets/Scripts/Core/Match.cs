@@ -479,14 +479,37 @@ namespace SoulBind.Core
             return true;
         }
 
-        // ATK shown before Strike: printed ATK plus running ATK bonuses.
-        // Effect bonuses and the Crimson combo join when the queue resolves.
+        // ATK shown before Strike: printed ATK, running ATK bonuses, the ATK effects
+        // (Magician, Chariot, Lovers) and the Crimson combo if the queue completes it.
         private void UpdateAttackPreview()
         {
             int total = CurrentApostle.GetTimedTotal(TimedEffectKind.Attack);
             for (int i = 0; i < _queuedCards.Count; i++)
-                total += CardAttack.Of(_queuedCards[i]);
+            {
+                ArcanaId card = _queuedCards[i];
+                total += CardAttack.Of(card);
+                CardEffect effect = CardEffects.Get(card);
+                if (effect != null)
+                    total += effect.GetAttackPreview(Turns.Phase, CountQueuedBefore(card, i));
+            }
+
+            int crimsonResolved = _elementsPlayedThisTurn[(int)Element.Crimson];
+            int crimsonAll = GetElementsPlayedThisTurn(Element.Crimson);
+            if (crimsonResolved < ElementCombo.CardsNeeded && crimsonAll >= ElementCombo.CardsNeeded)
+                total += ElementCombo.CrimsonAttack;
             PendingAttack = total;
+        }
+
+        // How many copies of this card sit before position index in the queue.
+        private int CountQueuedBefore(ArcanaId card, int index)
+        {
+            int count = 0;
+            for (int i = 0; i < index; i++)
+            {
+                if (_queuedCards[i] == card)
+                    count++;
+            }
+            return count;
         }
 
         // Plays out the queued cards in order, as if each were played now.

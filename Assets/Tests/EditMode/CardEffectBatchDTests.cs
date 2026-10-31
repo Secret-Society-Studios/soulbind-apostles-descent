@@ -112,6 +112,10 @@ namespace SoulBind.Tests.EditMode
             Play(match, ArcanaId.Magician, target.Id); // 3 ATK
 
             Play(match, ArcanaId.Temperance);
+            Assert.AreSame(player, match.CurrentApostle, "Temperance waits in the queue");
+            Assert.AreEqual(50, target.Vessel);
+
+            match.Strike(out _);
 
             Assert.AreEqual(47, target.Vessel);
             Assert.AreNotSame(player, match.CurrentApostle);
@@ -134,6 +138,7 @@ namespace SoulBind.Tests.EditMode
             ArcanaId playerFiller = playerHasSuns ? ArcanaId.Sun : ArcanaId.Moon;
 
             Play(match, ArcanaId.WheelOfFortune, target.Id);
+            match.Strike(out _);
 
             IReadOnlyList<ArcanaId> playerHand = match.GetHand(player.Id);
             IReadOnlyList<ArcanaId> targetHand = match.GetHand(target.Id);
@@ -153,6 +158,7 @@ namespace SoulBind.Tests.EditMode
             int before = match.LastSwap.Number;
 
             Play(match, ArcanaId.WheelOfFortune, target.Id);
+            match.Strike(out _);
 
             CardSwap swap = match.LastSwap;
             Assert.AreEqual(before + 1, swap.Number);

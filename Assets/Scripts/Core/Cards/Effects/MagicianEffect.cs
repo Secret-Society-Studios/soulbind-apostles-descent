@@ -8,6 +8,8 @@ namespace SoulBind.Core
     {
         public const int BonusAttack = 1;
 
+        public override int GetAttackPreview(int phase, int sameBefore) => BonusAttack;
+
         public override void OnPlayed(CardPlayContext context)
         {
             if (context.IsAttacking)

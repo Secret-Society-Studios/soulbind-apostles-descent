@@ -180,9 +180,12 @@ namespace SoulBind.Tests.EditMode
             PlaceNextTo(match, target, player);
 
             Play(match, ArcanaId.Devil, target.Id);
+            Assert.AreEqual(0, target.Corruption, "Waits in the queue until Strike");
 
-            Assert.AreEqual(3, target.Corruption, "Applied when played, before Strike");
-            Assert.AreEqual(1, player.Corruption);
+            match.Strike(out _);
+
+            Assert.AreEqual(3, target.Corruption);
+            Assert.AreEqual(1 + GameConstants.AttackCorruption, player.Corruption, "The Devil's 1, plus 1 for breaking DEF");
         }
 
         [Test]

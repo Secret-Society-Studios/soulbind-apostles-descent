@@ -20,6 +20,12 @@ namespace SoulBind.Core
         public virtual int AttackBonus => 0;
 
         /// <summary>
+        /// ATK the effect will add once the card resolves in an attack, so the play queue can show
+        /// the total before Strike. sameBefore is how many copies of this card come earlier in the attack.
+        /// </summary>
+        public virtual int GetAttackPreview(int phase, int sameBefore) => 0;
+
+        /// <summary>
         /// Called right after the card is played: its CAP is paid, it is in the discard pile,
         /// its DEF is on the shield, and engaging (if any) has happened.
         /// </summary>
