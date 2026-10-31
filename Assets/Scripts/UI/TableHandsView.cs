@@ -739,6 +739,21 @@ namespace SoulBind.UI
                 _capacityPips.Add(image);
             }
 
+            // An optional frame around the pips, from UiSkin.
+            UiSkin skin = UiSkin.Current;
+            if (skin != null && skin.CapacityFrame != null)
+            {
+                RectTransform frame = CreateRect("Frame", _capacityBar);
+                frame.anchorMin = Vector2.zero;
+                frame.anchorMax = Vector2.one;
+                frame.offsetMin = new Vector2(-8f, -8f);
+                frame.offsetMax = new Vector2(8f, 8f);
+                var frameImage = (Image)frame.gameObject.AddComponent(typeof(Image));
+                frameImage.sprite = skin.CapacityFrame;
+                frameImage.type = Image.Type.Sliced;
+                frameImage.raycastTarget = false;
+            }
+
             RectTransform textRect = CreateRect("Text", _capacityBar);
             var text = (TextMeshProUGUI)textRect.gameObject.AddComponent(typeof(TextMeshProUGUI));
             text.fontSize = 30f;
@@ -749,17 +764,28 @@ namespace SoulBind.UI
             _capacityText = text;
         }
 
-        // Fills the bar from the turn in progress. It only shows on your own turn.
+        // Fills the bar. On your turn it shows what is left; on other turns, dimmed,
+        // the Capacity your next turn starts with, so the bar never disappears.
         private void ShowCapacity(Seat seat, Match match)
         {
             if (_capacityBar == null)
                 return;
-            TurnCapacity capacity = match.CurrentCapacity;
-            bool show = capacity != null && !match.IsOver && match.CurrentApostle != null
-                        && match.CurrentApostle.Id == seat.ApostleId;
+            bool show = !match.IsOver;
             _capacityBar.gameObject.SetActive(show);
             if (!show)
                 return;
+
+            bool yourTurn = match.CurrentApostle != null && match.CurrentCapacity != null
+                            && match.CurrentApostle.Id == seat.ApostleId;
+            int maximum = yourTurn ? match.CurrentCapacity.Maximum : match.GetCapacityPreview(seat.ApostleId);
+            int remaining = yourTurn ? match.CurrentCapacity.Remaining : maximum;
+            Color lit = yourTurn ? CapacityLit : Color.Lerp(CapacityLit, CapacitySpent, 0.45f);
+
+            // Real pip art (UiSkin) shows its own colours; off-turn it is only dimmed.
+            UiSkin skin = UiSkin.Current;
+            Sprite litSprite = skin != null ? skin.CapacityPipLit : null;
+            Sprite spentSprite = skin != null ? skin.CapacityPipSpent : null;
+            Color dim = yourTurn ? Color.white : new Color(0.6f, 0.6f, 0.6f, 1f);
 
             // Just above the tray, as wide as it.
             float width = seat.Tray.sizeDelta.x;
@@ -767,7 +793,7 @@ namespace SoulBind.UI
             _capacityBar.sizeDelta = new Vector2(width, CapacityBarHeight);
             _capacityBar.anchoredPosition = new Vector2(0f, top + CapacityGap + CapacityBarHeight / 2f);
 
-            int pips = Mathf.Clamp(capacity.Maximum, 1, MaxCapacityPips);
+            int pips = Mathf.Clamp(maximum, 1, MaxCapacityPips);
             float gap = 6f;
             float pipWidth = (width - gap * (pips - 1)) / pips;
             for (int i = 0; i < _capacityPips.Count; i++)
@@ -781,14 +807,21 @@ namespace SoulBind.UI
                 rect.sizeDelta = new Vector2(pipWidth, CapacityBarHeight);
                 float x = -width / 2f + pipWidth / 2f + i * (pipWidth + gap);
                 rect.anchoredPosition = new Vector2(x, 0f);
-                pip.color = i < capacity.Remaining ? CapacityLit : CapacitySpent;
+                bool on = i < remaining;
+                Sprite art = on ? litSprite : spentSprite;
+                pip.sprite = art;
+                if (art != null)
+                    pip.color = dim;
+                else
+                    pip.color = on ? lit : CapacitySpent;
             }
 
             // The number sits above the middle of the bar, like Minecraft's level.
             RectTransform textRect = _capacityText.rectTransform;
             textRect.sizeDelta = new Vector2(width, 40f);
             textRect.anchoredPosition = new Vector2(0f, CapacityBarHeight / 2f + 24f);
-            _capacityText.text = $"CAPACITY {capacity.Remaining}/{capacity.Maximum}";
+            _capacityText.text = $"CAPACITY {remaining}/{maximum}";
+            _capacityText.color = lit;
         }
 
 

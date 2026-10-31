@@ -22,6 +22,21 @@ namespace SoulBind.Core
         public IReadOnlyList<ArcanaId> AttackCards => _queuedCards;
 
         /// <summary>
+        /// The Capacity this Apostle's next turn would start with, as things stand now: the Phase's
+        /// Capacity plus or minus running timed effects (The Hermit, The Tower). Shown off-turn.
+        /// </summary>
+        public int GetCapacityPreview(int apostleId)
+        {
+            int phase = PhaseRules.GetBaseCapacityForRound(Turns.RoundNumber);
+            ApostleState apostle = TryFindApostle(apostleId);
+            if (apostle == null)
+                return phase;
+            int change = apostle.GetTimedTotal(TimedEffectKind.MaxCapacity)
+                       - apostle.GetTimedTotal(TimedEffectKind.CapacityPenalty);
+            return System.Math.Max(0, phase + change);
+        }
+
+        /// <summary>
         /// True if playing this card now (with this attack target, 0 = not attacking) needs the player
         /// to pick an opponent first: Wheel of Fortune played outside an attack (who to swap with), or
         /// the Nocturne combo triggered with nobody to hit. PlayCard returns ComboTargetRequired in
