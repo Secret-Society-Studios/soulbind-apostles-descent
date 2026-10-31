@@ -8,7 +8,7 @@ namespace SoulBind.UI
 {
     /// <summary>
     /// The look from the SoulBind UI Screens design canvas, in one place: the colours, the two
-    /// fonts (Cinzel for titles and big buttons, Inter for everything else), rounded panels with a
+    /// fonts (Montserrat for titles and big buttons, Inter for everything else), rounded panels with a
     /// thin border, and the four button styles. Menus build themselves from these helpers.
     /// Positions are in design pixels on a 1280 x 720 frame (see CreateFrame), measured from the
     /// frame's top-left corner, so numbers can be copied straight from the design.
@@ -40,10 +40,10 @@ namespace SoulBind.UI
 
         public enum ButtonStyle
         {
-            Primary,   // gold, Cinzel capitals: the main action on a screen
+            Primary,   // gold, Montserrat capitals: the main action on a screen
             Secondary, // dark purple, gold border, Inter
             Ghost,     // no fill, quiet border, Inter
-            Outline    // dark purple, bright gold border, Cinzel capitals
+            Outline    // dark purple, bright gold border, Montserrat capitals
         }
 
         public static Color Hex(uint rgb) => new Color(
@@ -51,8 +51,8 @@ namespace SoulBind.UI
 
         // ---------- Fonts ----------
 
-        private static TMP_FontAsset _cinzel;
-        private static TMP_FontAsset _cinzelBlack;
+        private static TMP_FontAsset _display;
+        private static TMP_FontAsset _displayHeavy;
         private static TMP_FontAsset _inter;
         private static TMP_FontAsset _interSemiBold;
         private static TMP_FontAsset _interBold;
@@ -69,23 +69,24 @@ namespace SoulBind.UI
             Rings.Clear();
         }
 
-        /// <summary>Cinzel Bold: titles, names and the big buttons. Null if the font is missing.</summary>
-        public static TMP_FontAsset Cinzel { get { LoadFonts(); return _cinzel; } }
-        public static TMP_FontAsset CinzelBlack { get { LoadFonts(); return _cinzelBlack; } }
+        /// <summary>Montserrat Bold: titles, names and the big buttons. Null if the font is missing.</summary>
+        public static TMP_FontAsset Display { get { LoadFonts(); return _display; } }
+        /// <summary>Montserrat ExtraBold: the biggest titles.</summary>
+        public static TMP_FontAsset DisplayHeavy { get { LoadFonts(); return _displayHeavy; } }
         /// <summary>Inter: body text. Null if the font is missing (TextMesh Pro's default is used).</summary>
         public static TMP_FontAsset Inter { get { LoadFonts(); return _inter; } }
         public static TMP_FontAsset InterSemiBold { get { LoadFonts(); return _interSemiBold; } }
         public static TMP_FontAsset InterBold { get { LoadFonts(); return _interBold; } }
 
         // The .ttf files in Resources/Fonts become TextMesh Pro fonts at runtime, so no font asset
-        // has to be made by hand. A ready-made "Cinzel SDF" asset, if there is one, still wins.
+        // has to be made by hand.
         private static void LoadFonts()
         {
             if (_fontsLoaded)
                 return;
             _fontsLoaded = true;
-            _cinzel = Resources.Load<TMP_FontAsset>("Fonts/Cinzel SDF") ?? Make("Fonts/Cinzel-Bold");
-            _cinzelBlack = Make("Fonts/Cinzel-Black") ?? _cinzel;
+            _display = Make("Fonts/Montserrat-Bold");
+            _displayHeavy = Make("Fonts/Montserrat-ExtraBold") ?? _display;
             _inter = Make("Fonts/Inter-Regular");
             _interSemiBold = Make("Fonts/Inter-SemiBold") ?? _inter;
             _interBold = Make("Fonts/Inter-Bold") ?? _interSemiBold;
@@ -231,10 +232,10 @@ namespace SoulBind.UI
             switch (style)
             {
                 case ButtonStyle.Primary:
-                    fill = PlayFill; border = GoldBright; ink = PlayText; font = Cinzel; borderWidth = 2f;
+                    fill = PlayFill; border = GoldBright; ink = PlayText; font = Display; borderWidth = 2f;
                     break;
                 case ButtonStyle.Outline:
-                    fill = Raised; border = Gold; ink = Link; font = Cinzel; borderWidth = 2f;
+                    fill = Raised; border = Gold; ink = Link; font = Display; borderWidth = 2f;
                     break;
                 case ButtonStyle.Ghost:
                     fill = new Color(0f, 0f, 0f, 0f); border = Line; ink = Soft; font = Inter;
