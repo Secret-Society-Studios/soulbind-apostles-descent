@@ -102,7 +102,7 @@ namespace SoulBind.UI
 
                 // Above the Apostle's cards on the table; above its piece if it has no hand there.
                 if (_hands == null)
-                    _hands = FindFirstObjectByType<TableHandsView>();
+                    _hands = FindAnyObjectByType<TableHandsView>();
                 Vector3 screen;
                 bool placed;
                 if (_hands != null && _hands.TryGetHandTop(plate.ApostleId, cam, out Vector2 handTop))
