@@ -18,7 +18,7 @@ namespace SoulBind.Core
             return count;
         }
                 
-        /// <summary>The cards waiting in the attack queue, in order (empty when not Engaged).</summary>
+        /// <summary>The cards waiting in the queue, in order: an attack's while Engaged, plain plays while Free.</summary>
         public IReadOnlyList<ArcanaId> AttackCards => _queuedCards;
 
         /// <summary>
@@ -33,7 +33,8 @@ namespace SoulBind.Core
                 return false;
             if (card == ArcanaId.WheelOfFortune)
                 return true;
-            return CardCatalog.Get(card).Element == Element.Nocturne && _elementsPlayedThisTurn[(int)Element.Nocturne] == ElementCombo.CardsNeeded - 1;
+            return CardCatalog.Get(card).Element == Element.Nocturne
+                && GetElementsPlayedThisTurn(Element.Nocturne) == ElementCombo.CardsNeeded - 1;
         }
     }
 }

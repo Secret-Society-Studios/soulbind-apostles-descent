@@ -55,6 +55,9 @@ namespace SoulBind.Tests.EditMode
         private static void Play(Match match, ArcanaId card, int targetId = 0, int comboTargetId = 0)
         {
             Assert.AreEqual(CardPlayResult.Success, match.PlayCard(card, targetId, comboTargetId), $"Playing {card}");
+            // Cards played outside an attack wait in the queue: confirm them, like the PLAY button.
+            if (match.Engagement == EngagementState.Free && match.AttackCards.Count > 0)
+                match.PlayQueued();
         }
 
         // ---- Radiance: +2 DEF ----

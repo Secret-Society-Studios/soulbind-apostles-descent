@@ -9,7 +9,8 @@ namespace SoulBind.Core
         PlayCard,
         Strike,
         EndTurn,
-        ReturnCard
+        ReturnCard,
+        PlayQueued
     }
 
     public enum CommandResult : byte
@@ -71,6 +72,10 @@ namespace SoulBind.Core
         public static MatchCommand ReturnCard(int index) =>
             new MatchCommand(CommandKind.ReturnCard, default, default, index, 0, default);
 
+        // Resolves the cards waiting in the queue outside an attack.
+        public static MatchCommand PlayQueued() =>
+            new MatchCommand(CommandKind.PlayQueued, default, default, 0, 0, default);
+
         /// <summary>Writes the command into buffer at offset (EncodedSize bytes).</summary>
         public void Encode(byte[] buffer, int offset)
         {
@@ -98,7 +103,7 @@ namespace SoulBind.Core
             byte kind = buffer[offset];
             byte card = buffer[offset + 5];
             byte direction = buffer[offset + 8];
-            if (kind > (byte)CommandKind.ReturnCard || card >= CardCatalog.All.Count
+            if (kind > (byte)CommandKind.PlayQueued || card >= CardCatalog.All.Count
                 || !Enum.IsDefined(typeof(TurnDirection), Enum.ToObject(typeof(TurnDirection), direction)))
                 return false;
 
@@ -182,6 +187,8 @@ namespace SoulBind.Core
                     return match.ReturnQueuedCard(command.TargetId)
                         ? CommandResult.Applied
                         : CommandResult.Refused;
+                case CommandKind.PlayQueued:
+                    return match.PlayQueued() ? CommandResult.Applied : CommandResult.Refused;
                 default:
                     return CommandResult.Malformed;
             }

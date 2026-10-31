@@ -98,6 +98,9 @@ namespace SoulBind.Tests.EditMode
             ApostleState current = match.CurrentApostle;
 
             Assert.AreEqual(CardPlayResult.Success, match.PlayCard(ArcanaId.Star, 0));
+            Assert.AreEqual(0, current.Shield, "It waits in the queue");
+            Assert.AreEqual(0, match.Deck.DiscardCount);
+            Assert.IsTrue(match.PlayQueued());
 
             Assert.AreEqual(6, current.Shield);
             Assert.AreEqual(GameConstants.Phase1Capacity - 4, match.CurrentCapacity.Remaining);
@@ -112,6 +115,7 @@ namespace SoulBind.Tests.EditMode
             Match match = NewMatch();
 
             match.PlayCard(ArcanaId.Magician, 0);
+            match.PlayQueued();
 
             Assert.AreEqual(EngagementState.Free, match.Engagement);
             Assert.AreEqual(0, match.PendingAttack);
@@ -123,6 +127,7 @@ namespace SoulBind.Tests.EditMode
         {
             Match match = NewMatch();
             match.PlayCard(ArcanaId.Death, 0); // 8 - 5 = 3 left
+            match.PlayQueued();
 
             Assert.AreEqual(CardPlayResult.NotEnoughCapacity, match.PlayCard(ArcanaId.Star, 0));
             Assert.AreEqual(4, match.GetHand(match.CurrentApostle.Id).Count);
@@ -199,6 +204,94 @@ namespace SoulBind.Tests.EditMode
             Match match = EngagedMatch(out _);
 
             Assert.AreEqual(CardPlayResult.WrongTarget, match.PlayCard(ArcanaId.Death, 99));
+            Assert.AreEqual(3, match.PendingAttack);
+        }
+
+        // ---- The queue: cards wait, and can be taken back ----
+
+        [Test]
+        public void ReturnQueuedCard_GivesTheCardAndItsCapacityBack()
+        {
+            Match match = NewMatch();
+            ApostleState current = match.CurrentApostle;
+            match.PlayCard(ArcanaId.Star, 0);
+
+            Assert.IsTrue(match.ReturnQueuedCard(0));
+
+            Assert.AreEqual(5, match.GetHand(current.Id).Count);
+            Assert.AreEqual(GameConstants.Phase1Capacity, match.CurrentCapacity.Remaining);
+            Assert.AreEqual(0, match.AttackCards.Count);
+            Assert.AreEqual(0, current.Shield, "Nothing resolved");
+        }
+
+        [Test]
+        public void ReturnQueuedCard_BadIndex_ChangesNothing()
+        {
+            Match match = NewMatch();
+            match.PlayCard(ArcanaId.Star, 0);
+
+            Assert.IsFalse(match.ReturnQueuedCard(1));
+            Assert.IsFalse(match.ReturnQueuedCard(-1));
+            Assert.AreEqual(1, match.AttackCards.Count);
+        }
+
+        [Test]
+        public void ReturnQueuedCard_LastAttackCard_CallsTheAttackOff()
+        {
+            Match match = EngagedMatch(out ApostleState target);
+
+            Assert.IsTrue(match.ReturnQueuedCard(0));
+
+            Assert.AreEqual(EngagementState.Free, match.Engagement);
+            Assert.AreEqual(0, match.EngagedTargetId);
+            Assert.AreEqual(0, match.PendingAttack);
+            Assert.AreEqual(50, target.Vessel);
+        }
+
+        [Test]
+        public void ReturnQueuedCard_MiddleOfAnAttack_LowersTheTotal()
+        {
+            Match match = EngagedMatch(out _);
+            match.PlayCard(ArcanaId.Death, 0); // 3 + 7
+
+            Assert.IsTrue(match.ReturnQueuedCard(1));
+
+            Assert.AreEqual(EngagementState.Engaged, match.Engagement);
+            Assert.AreEqual(3, match.PendingAttack);
+            Assert.AreEqual(GameConstants.Phase1Capacity - 1, match.CurrentCapacity.Remaining);
+        }
+
+        [Test]
+        public void PlayQueued_WithNothingWaiting_ReturnsFalse()
+        {
+            Match match = NewMatch();
+
+            Assert.IsFalse(match.PlayQueued());
+        }
+
+        [Test]
+        public void EndTurn_ResolvesCardsStillWaiting()
+        {
+            Match match = NewMatch();
+            match.PlayCard(ArcanaId.Fool, 0);
+
+            match.EndTurn();
+
+            Assert.AreEqual(1, match.Deck.DiscardCount);
+        }
+
+        [Test]
+        public void Engaging_ResolvesWaitingCardsFirst_TheirAtkIsLost()
+        {
+            Match match = NewMatch();
+            ApostleState target = Opponent(match);
+            target.MoveTo(FreeNeighbor(match, match.CurrentApostle.Position));
+            match.PlayCard(ArcanaId.Star, 0);
+
+            Assert.AreEqual(CardPlayResult.Success, match.PlayCard(ArcanaId.Magician, target.Id));
+
+            Assert.AreEqual(6, match.CurrentApostle.Shield, "The Star resolved as a plain play");
+            Assert.AreEqual(1, match.AttackCards.Count, "Only the Magician waits");
             Assert.AreEqual(3, match.PendingAttack);
         }
 

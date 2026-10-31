@@ -162,6 +162,7 @@ namespace SoulBind.Tests.EditMode
             player.TakeDamage(10);
 
             match.PlayCard(ArcanaId.Star, 0);
+            match.PlayQueued();
 
             Assert.AreEqual(42, player.Vessel);
         }
@@ -173,6 +174,7 @@ namespace SoulBind.Tests.EditMode
             ApostleState player = match.CurrentApostle;
 
             match.PlayCard(ArcanaId.Star, 0);
+            match.PlayQueued();
             Assert.AreEqual(10, player.Defense, "6 shield + 4 timed");
 
             match.EndTurn(); // opponent's turn
