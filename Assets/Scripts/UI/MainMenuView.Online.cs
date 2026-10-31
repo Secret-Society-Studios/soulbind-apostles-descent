@@ -7,12 +7,13 @@ using Kit = SoulBind.UI.UiKit;
 
 namespace SoulBind.UI
 {
-    // The Play Online screen from the design: Host a Room on the left (Apostles, Public or Private,
-    // Create Room) and Join a Room on the right (a code box, Join, and the open public rooms).
+    // The Play Online screen: Open Rooms is the main panel (the open public rooms, plus a box to
+    // join with a friend's code), and Host a Room sits beside it (Public or Private, Create Room).
+    // The number of Apostles is picked afterwards, in the Lobby's Match panel.
     public sealed partial class MainMenuView
     {
         // Open rooms listed at once. More than this show as "and N more".
-        private const int MaxRoomRows = 3;
+        private const int MaxRoomRows = 4;
         // Seconds between room list refreshes while the screen is open (Lobby has rate limits).
         private const float RoomRefreshSeconds = 6f;
 
@@ -25,7 +26,6 @@ namespace SoulBind.UI
 
         private GameObject _onlineScreen;
         private TMP_Text _playingAs;
-        private TMP_Text _hostPlayers;
         private TMP_Text[] _privacy;
         private TMP_Text _privacyHint;
         private TMP_InputField _codeField;
@@ -156,11 +156,16 @@ namespace SoulBind.UI
             else
                 _roomListInfo.text = string.Empty;
             // The note sits under the rows when there are some, in their place when there are none.
-            float y = 312f + Mathf.Min(_rooms.Count, MaxRoomRows) * 46f;
-            Kit.At(_roomListInfo.rectTransform, 32f, error == null ? y : 312f, 504f, 36f);
+            float y = RowsTop + Mathf.Min(_rooms.Count, MaxRoomRows) * RowStep;
+            Kit.At(_roomListInfo.rectTransform, 32f, error == null ? y : RowsTop, RoomsWidth - 64f, 36f);
         }
 
         // ---------- Layout ----------
+
+        // The Open Rooms panel and its list, in design pixels.
+        private const float RoomsWidth = 776f;
+        private const float RowsTop = 226f;
+        private const float RowStep = 54f;
 
         private void BuildOnline()
         {
@@ -176,97 +181,99 @@ namespace SoulBind.UI
             _playingAs = Kit.Label(frame, "PlayingAs", "", 14f, Kit.Inter, Kit.Muted, TextAlignmentOptions.Right);
             Kit.At(_playingAs.rectTransform, 724f, 44f, 500f, 52f);
 
+            BuildRoomsCard(frame);
             BuildHostCard(frame);
-            BuildJoinCard(frame);
         }
 
-        private RectTransform BuildCard(RectTransform frame, string name, float x, string heading, string sub)
+        private static RectTransform BuildCard(RectTransform frame, string name, float x, float width,
+            string heading, string sub)
         {
             RectTransform card = Kit.Box(frame, name, Kit.Panel, Kit.GoldLine, 14f);
-            Kit.At(card, x, 140f, 568f, 470f);
+            Kit.At(card, x, 140f, width, 470f);
             TMP_Text title = Kit.Label(card, "Heading", heading, 26f, Kit.Cinzel, Kit.Text,
                 TextAlignmentOptions.Left);
-            Kit.At(title.rectTransform, 32f, 28f, 504f, 36f);
-            TMP_Text hint = Kit.Label(card, "Sub", sub, 14f, Kit.Inter, Kit.Muted, TextAlignmentOptions.Left);
-            Kit.At(hint.rectTransform, 32f, 66f, 504f, 20f);
+            Kit.At(title.rectTransform, 32f, 28f, width - 64f, 36f);
+            TMP_Text hint = Kit.Label(card, "Sub", sub, 14f, Kit.Inter, Kit.Muted, TextAlignmentOptions.TopLeft);
+            Kit.At(hint.rectTransform, 32f, 66f, width - 64f, 40f);
             return card;
         }
 
-        private void BuildHostCard(RectTransform frame)
+        // The main panel: the open rooms, with a code box at the top for private rooms.
+        private void BuildRoomsCard(RectTransform frame)
         {
-            RectTransform card = BuildCard(frame, "HostCard", 56f, "Host a Room",
-                "Get a code to share. Bots take any empty seats.");
+            RectTransform card = BuildCard(frame, "RoomsCard", 56f, RoomsWidth, "Open Rooms",
+                "Pick a room to join, or type the code a friend shared.");
+            TMP_Text refresh = Kit.Button(card, "Refresh", "Refresh", Kit.ButtonStyle.Ghost,
+                () => _nextRoomRefresh = 0f, 13f, 8f);
+            Kit.At((RectTransform)refresh.transform.parent, RoomsWidth - 132f, 32f, 100f, 32f);
 
-            TMP_Text apostles = Kit.Label(card, "ApostlesLabel", "Apostles", 15f, Kit.InterSemiBold, Kit.Soft,
-                TextAlignmentOptions.Left);
-            Kit.At(apostles.rectTransform, 32f, 118f, 200f, 44f);
-            _hostPlayers = BuildStepper(card, 392f, 118f, ChangePlayers);
-
-            TMP_Text type = Kit.Label(card, "TypeLabel", "Room", 15f, Kit.InterSemiBold, Kit.Soft,
-                TextAlignmentOptions.Left);
-            Kit.At(type.rectTransform, 32f, 186f, 200f, 24f);
-            _privacy = BuildSegmented(card, 32f, 218f, 504f, "Public", "Private", PickPrivacy);
-            _privacyHint = Kit.Label(card, "TypeHint", "", 13f, Kit.Inter, Kit.Muted, TextAlignmentOptions.Left);
-            Kit.At(_privacyHint.rectTransform, 32f, 280f, 504f, 40f);
-
-            TMP_Text create = Kit.Button(card, "Create", "Create Room", Kit.ButtonStyle.Primary, HostOnline, 21f);
-            Kit.At((RectTransform)create.transform.parent, 32f, 378f, 504f, 60f);
-        }
-
-        private void BuildJoinCard(RectTransform frame)
-        {
-            RectTransform card = BuildCard(frame, "JoinCard", 656f, "Join a Room",
-                "Type the code the host shared, or pick an open room.");
-
-            TMP_Text codeLabel = Kit.Label(card, "CodeLabel", "Room code", 15f, Kit.InterSemiBold, Kit.Soft,
-                TextAlignmentOptions.Left);
-            Kit.At(codeLabel.rectTransform, 32f, 104f, 300f, 24f);
-            _codeField = CreateInputField(card, "Code", "ABC123", 30f, Kit.Cinzel, 20f);
-            Kit.At((RectTransform)_codeField.transform, 32f, 134f, 330f, 64f);
+            // Join with a code.
+            _codeField = CreateInputField(card, "Code", "ROOM CODE", 26f, Kit.Cinzel, 16f);
+            Kit.At((RectTransform)_codeField.transform, 32f, 104f, 300f, 56f);
             _codeField.onSubmit.AddListener(_ => JoinOnline());
-            TMP_Text join = Kit.Button(card, "Join", "Join", Kit.ButtonStyle.Outline, JoinOnline, 21f);
-            Kit.At((RectTransform)join.transform.parent, 374f, 134f, 162f, 64f);
+            TMP_Text join = Kit.Button(card, "Join", "Join", Kit.ButtonStyle.Outline, JoinOnline, 19f);
+            Kit.At((RectTransform)join.transform.parent, 344f, 104f, 140f, 56f);
 
             // The connection line: what is happening, or what went wrong.
             RectTransform statusRow = Kit.Box(card, "StatusRow", Kit.Inset, Kit.Line, 10f);
-            Kit.At(statusRow, 32f, 212f, 504f, 44f);
-            _onlineStatus = Kit.Label(statusRow, "Status", "Not connected yet", 14f, Kit.Inter, Kit.Soft,
+            Kit.At(statusRow, 496f, 104f, RoomsWidth - 528f, 56f);
+            _onlineStatus = Kit.Label(statusRow, "Status", "Not connected yet", 13f, Kit.Inter, Kit.Soft,
                 TextAlignmentOptions.Left);
             Kit.Stretch(_onlineStatus.rectTransform, 0f);
-            _onlineStatus.rectTransform.offsetMin = new Vector2(16f, 0f);
-            _onlineStatus.rectTransform.offsetMax = new Vector2(-16f, 0f);
+            _onlineStatus.rectTransform.offsetMin = new Vector2(14f, 0f);
+            _onlineStatus.rectTransform.offsetMax = new Vector2(-14f, 0f);
 
-            TMP_Text listLabel = Kit.Label(card, "RoomsLabel", "Open rooms", 15f, Kit.InterSemiBold, Kit.Soft,
+            Kit.Divider(card, 32f, 178f, RoomsWidth - 64f);
+            TMP_Text room = Kit.Label(card, "RoomHeader", "ROOM", 12f, Kit.InterBold, Kit.Muted,
                 TextAlignmentOptions.Left);
-            Kit.At(listLabel.rectTransform, 32f, 274f, 300f, 28f);
-            TMP_Text refresh = Kit.Button(card, "Refresh", "Refresh", Kit.ButtonStyle.Ghost,
-                () => _nextRoomRefresh = 0f, 13f, 8f);
-            Kit.At((RectTransform)refresh.transform.parent, 436f, 272f, 100f, 32f);
+            Kit.At(room.rectTransform, 48f, 192f, 200f, 20f);
+            room.characterSpacing = 12f;
+            TMP_Text players = Kit.Label(card, "PlayersHeader", "PLAYERS", 12f, Kit.InterBold, Kit.Muted);
+            Kit.At(players.rectTransform, 480f, 192f, 100f, 20f);
+            players.characterSpacing = 12f;
 
             for (int i = 0; i < MaxRoomRows; i++)
-                _roomRows[i] = CreateRoomRow(card, i, 312f + i * 46f);
+                _roomRows[i] = CreateRoomRow(card, i, RowsTop + i * RowStep);
             _roomListInfo = Kit.Label(card, "RoomsInfo", "", 13f, Kit.Inter, Kit.Muted);
             _roomListInfo.fontStyle = FontStyles.Italic;
-            Kit.At(_roomListInfo.rectTransform, 32f, 312f, 504f, 36f);
+            Kit.At(_roomListInfo.rectTransform, 32f, RowsTop, RoomsWidth - 64f, 36f);
+        }
+
+        // Beside the rooms: make your own. The number of Apostles is set in the Lobby.
+        private void BuildHostCard(RectTransform frame)
+        {
+            const float width = 368f;
+            RectTransform card = BuildCard(frame, "HostCard", 856f, width, "Host a Room",
+                "Get a code to share. Pick the number of Apostles in the lobby.");
+
+            TMP_Text type = Kit.Label(card, "TypeLabel", "Room", 15f, Kit.InterSemiBold, Kit.Soft,
+                TextAlignmentOptions.Left);
+            Kit.At(type.rectTransform, 32f, 128f, 200f, 24f);
+            _privacy = BuildSegmented(card, 32f, 160f, width - 64f, "Public", "Private", PickPrivacy);
+            _privacyHint = Kit.Label(card, "TypeHint", "", 13f, Kit.Inter, Kit.Muted, TextAlignmentOptions.TopLeft);
+            Kit.At(_privacyHint.rectTransform, 32f, 226f, width - 64f, 60f);
+
+            TMP_Text create = Kit.Button(card, "Create", "Create Room", Kit.ButtonStyle.Primary, HostOnline, 20f);
+            Kit.At((RectTransform)create.transform.parent, 32f, 378f, width - 64f, 60f);
         }
 
         // One open room: its name, how full it is, and Join. The whole row is the button.
         private RoomRow CreateRoomRow(RectTransform card, int index, float y)
         {
             TMP_Text join = Kit.Button(card, "Room" + index, "Join", Kit.ButtonStyle.Secondary,
-                () => JoinListedRoom(index), 14f, 8f);
+                () => JoinListedRoom(index), 15f, 8f);
             var rect = (RectTransform)join.transform.parent;
-            Kit.At(rect, 32f, y, 504f, 40f);
+            Kit.At(rect, 32f, y, RoomsWidth - 64f, 46f);
             join.alignment = TextAlignmentOptions.Right;
-            join.rectTransform.offsetMax = new Vector2(-16f, 0f);
+            join.rectTransform.offsetMax = new Vector2(-18f, 0f);
 
-            TMP_Text name = Kit.Label(rect, "Name", "", 15f, Kit.InterSemiBold, Kit.Text,
+            TMP_Text name = Kit.Label(rect, "Name", "", 16f, Kit.InterSemiBold, Kit.Text,
                 TextAlignmentOptions.Left);
-            Kit.At(name.rectTransform, 16f, 0f, 320f, 40f);
+            Kit.At(name.rectTransform, 16f, 0f, 400f, 46f);
             name.textWrappingMode = TextWrappingModes.NoWrap;
             name.overflowMode = TextOverflowModes.Ellipsis;
-            TMP_Text players = Kit.Label(rect, "Players", "", 14f, Kit.Inter, Kit.Muted);
-            Kit.At(players.rectTransform, 340f, 0f, 70f, 40f);
+            TMP_Text players = Kit.Label(rect, "Players", "", 15f, Kit.Inter, Kit.Muted);
+            Kit.At(players.rectTransform, 448f, 0f, 100f, 46f);
 
             rect.gameObject.SetActive(false);
             return new RoomRow { Root = rect.gameObject, Name = name, Players = players };
