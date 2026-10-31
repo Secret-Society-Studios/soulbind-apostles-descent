@@ -39,7 +39,7 @@ namespace SoulBind.UI
             _titleFont = null;
         }
 
-        /// <summary>The serif title font, if it was added at Assets/Resources/Fonts/Cinzel SDF; otherwise null.</summary>
+        /// <summary>The serif title font: Cinzel SDF if one was made, else Cinzel-Bold.ttf from Resources/Fonts; null if neither.</summary>
         public static TMP_FontAsset TitleFont
         {
             get
@@ -50,6 +50,9 @@ namespace SoulBind.UI
                     _titleFont = Resources.Load<TMP_FontAsset>("Fonts/Cinzel SDF");
                     if (_titleFont == null)
                         _titleFont = Resources.Load<TMP_FontAsset>("Cinzel SDF");
+                    // Otherwise the Cinzel .ttf in Resources/Fonts, made into a font at runtime.
+                    if (_titleFont == null)
+                        _titleFont = UiKit.Cinzel;
                 }
                 return _titleFont;
             }

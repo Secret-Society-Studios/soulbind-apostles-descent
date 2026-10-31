@@ -249,6 +249,42 @@ namespace SoulBind.Online
             }
         }
 
+        // The room setting that tells players who joined how many Apostles the host picked.
+        private const string SeatsKey = "seats";
+        private int _savedSeats;
+
+        /// <summary>The number of Apostles the host picked (0 until the host has set it).</summary>
+        public int SeatCount
+        {
+            get
+            {
+                if (_session == null || _session.Properties == null)
+                    return 0;
+                if (!_session.Properties.TryGetValue(SeatsKey, out SessionProperty property) || property == null)
+                    return 0;
+                return int.TryParse(property.Value, out int seats) ? seats : 0;
+            }
+        }
+
+        /// <summary>Host only: shares the number of Apostles with everyone in the room.</summary>
+        public async void SetSeatCount(int seats)
+        {
+            if (!IsHost || seats == _savedSeats)
+                return;
+            _savedSeats = seats;
+            try
+            {
+                IHostSession host = _session.AsHost();
+                host.SetProperty(SeatsKey, new SessionProperty(seats.ToString(), VisibilityPropertyOptions.Member));
+                await host.SavePropertiesAsync();
+            }
+            catch (Exception e)
+            {
+                _savedSeats = 0; // try again on the next change
+                Debug.LogWarning("OnlineSession: couldn't share the seat count: " + e.Message);
+            }
+        }
+
         // "Yves's room", or "SoulBind room" when no name is typed.
         private static string RoomName()
         {
@@ -358,6 +394,7 @@ namespace SoulBind.Online
         private void AfterEntering()
         {
             MatchStarted = false;
+            _savedSeats = 0;
             SceneManager.sceneLoaded -= OnSceneLoaded;
             SceneManager.sceneLoaded += OnSceneLoaded;
             if (NetworkManager.Singleton != null && !NetworkManager.Singleton.IsListening)

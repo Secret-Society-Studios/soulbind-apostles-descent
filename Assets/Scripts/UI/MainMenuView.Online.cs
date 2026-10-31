@@ -1,22 +1,20 @@
 using System.Collections.Generic;
-using System.Text;
 using SoulBind.Online;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using Kit = SoulBind.UI.UiKit;
 
 namespace SoulBind.UI
 {
-    // The Play Online window: the list of open public rooms, a box for a friend's code,
-    // and Create Lobby (public, or private for code only).
+    // The Play Online screen from the design: Host a Room on the left (Apostles, Public or Private,
+    // Create Room) and Join a Room on the right (a code box, Join, and the open public rooms).
     public sealed partial class MainMenuView
     {
-        // Rows shown at once. More open rooms than this show as "and N more".
-        private const int MaxRoomRows = 6;
-        // Seconds between room list refreshes while the window is open (Lobby has rate limits).
+        // Open rooms listed at once. More than this show as "and N more".
+        private const int MaxRoomRows = 3;
+        // Seconds between room list refreshes while the screen is open (Lobby has rate limits).
         private const float RoomRefreshSeconds = 6f;
-        // Seconds between re-reading the names in the room screen.
-        private const float NamesRefreshSeconds = 1f;
 
         private sealed class RoomRow
         {
@@ -25,69 +23,63 @@ namespace SoulBind.UI
             public TMP_Text Players;
         }
 
-        private GameObject _onlinePopup;
+        private GameObject _onlineScreen;
+        private TMP_Text _playingAs;
+        private TMP_Text _hostPlayers;
+        private TMP_Text[] _privacy;
+        private TMP_Text _privacyHint;
         private TMP_InputField _codeField;
-        private TMP_Text _privacyLabel;
-        private TMP_Text _popupStatus;
+        private TMP_Text _onlineStatus;
         private TMP_Text _roomListInfo;
         private readonly RoomRow[] _roomRows = new RoomRow[MaxRoomRows];
         private readonly List<OnlineSession.RoomInfo> _rooms = new List<OnlineSession.RoomInfo>(16);
-        private readonly List<OnlineSession.RoomPlayer> _roomPlayerList = new List<OnlineSession.RoomPlayer>(6);
-        private readonly StringBuilder _namesText = new StringBuilder(96);
         private bool _privateRoom;
         private bool _refreshing;
         private float _nextRoomRefresh;
-        private float _nextNames;
-        private string _names = string.Empty;
 
-        // ---------- Opening and closing ----------
+        // ---------- Actions ----------
 
-        private void OpenOnline()
+        private void OnOpenOnline()
         {
-            _popupStatus.text = string.Empty;
-            _onlinePopup.transform.SetAsLastSibling();
-            _onlinePopup.SetActive(true);
+            ShowProfileName();
+            ShowPrivacy();
             _nextRoomRefresh = 0f; // refresh now
         }
 
-        private void CloseOnline()
+        private void PickPrivacy(bool isPrivate)
         {
-            if (_onlinePopup != null)
-                _onlinePopup.SetActive(false);
-        }
-
-        private void TogglePrivacy()
-        {
-            _privateRoom = !_privateRoom;
+            _privateRoom = isPrivate;
             ShowPrivacy();
         }
 
         private void ShowPrivacy()
         {
-            _privacyLabel.text = _privateRoom ? "Private: code only" : "Public: listed";
+            ShowSegment(_privacy, _privateRoom);
+            _privacyHint.text = _privateRoom
+                ? "Only players with the code can join. Bots take any empty seats."
+                : "Listed under Open rooms for anyone to join. Bots take any empty seats.";
         }
 
-        // Shows a message in the window and behind it, so it is seen either way.
+        // Shows a message on the Join card, and on the main screen in case it is open.
         private void ShowOnlineStatus(string text)
         {
-            _popupStatus.text = text;
-            _onlineStatus.text = text;
+            _onlineStatus.text = string.IsNullOrEmpty(text) ? "Not connected yet" : text;
+            _mainStatus.text = text ?? string.Empty;
         }
-
-        // ---------- Host and join ----------
 
         private async void HostOnline()
         {
             if (_busy)
                 return;
             _busy = true;
-            ShowOnlineStatus("Creating a lobby...");
+            ShowOnlineStatus("Creating a room...");
             string error = await OnlineSession.GetOrCreate().HostAsync(_privateRoom);
             _busy = false;
             if (this == null)
                 return; // the menu closed meanwhile
-            ShowOnlineStatus(error ?? string.Empty);
-            ShowScreen();
+            ShowOnlineStatus(error);
+            if (error == null)
+                OnlineSession.Instance.SetSeatCount(_players);
         }
 
         private async void JoinOnline()
@@ -100,8 +92,7 @@ namespace SoulBind.UI
             _busy = false;
             if (this == null)
                 return;
-            ShowOnlineStatus(error ?? string.Empty);
-            ShowScreen();
+            ShowOnlineStatus(error);
         }
 
         private async void JoinListedRoom(int row)
@@ -114,19 +105,16 @@ namespace SoulBind.UI
             _busy = false;
             if (this == null)
                 return;
-            ShowOnlineStatus(error ?? string.Empty);
+            ShowOnlineStatus(error);
             if (error != null)
                 _nextRoomRefresh = 0f; // the room may be full or gone now
-            ShowScreen();
         }
 
         // ---------- Room list ----------
 
-        // Called every frame outside a room; asks the server only every few seconds.
+        // Called every frame on this screen; asks the server only every few seconds.
         private void UpdateRoomList()
         {
-            if (_onlinePopup == null || !_onlinePopup.activeSelf)
-                return;
             if (_refreshing || _busy || Time.unscaledTime < _nextRoomRefresh)
                 return;
             RefreshRooms();
@@ -150,7 +138,7 @@ namespace SoulBind.UI
             for (int i = 0; i < _roomRows.Length; i++)
             {
                 RoomRow row = _roomRows[i];
-                bool used = i < _rooms.Count;
+                bool used = error == null && i < _rooms.Count;
                 row.Root.SetActive(used);
                 if (!used)
                     continue;
@@ -162,121 +150,123 @@ namespace SoulBind.UI
             if (error != null)
                 _roomListInfo.text = error;
             else if (_rooms.Count == 0)
-                _roomListInfo.text = "No open rooms right now. Create a lobby, or join with a code.";
+                _roomListInfo.text = "No open rooms right now. Host one, or join with a code.";
             else if (_rooms.Count > MaxRoomRows)
                 _roomListInfo.text = $"and {_rooms.Count - MaxRoomRows} more...";
             else
                 _roomListInfo.text = string.Empty;
-        }
-
-        // ---------- Names in the room screen ----------
-
-        // "Yves (host), Ana, You". Read again at most once a second, so the menu doesn't
-        // build a new string every frame.
-        private string RoomNames(OnlineSession session)
-        {
-            if (Time.unscaledTime < _nextNames)
-                return _names;
-            _nextNames = Time.unscaledTime + NamesRefreshSeconds;
-
-            session.GetRoomPlayers(_roomPlayerList);
-            _namesText.Clear();
-            for (int i = 0; i < _roomPlayerList.Count; i++)
-            {
-                OnlineSession.RoomPlayer player = _roomPlayerList[i];
-                if (i > 0)
-                    _namesText.Append(", ");
-                string name = player.Name.Length > 0 ? player.Name : $"Player {i + 1}";
-                _namesText.Append(player.IsYou ? "You" : name);
-                if (player.IsHost)
-                    _namesText.Append(" (host)");
-            }
-            _names = _namesText.ToString();
-            return _names;
+            // The note sits under the rows when there are some, in their place when there are none.
+            float y = 312f + Mathf.Min(_rooms.Count, MaxRoomRows) * 46f;
+            Kit.At(_roomListInfo.rectTransform, 32f, error == null ? y : 312f, 504f, 36f);
         }
 
         // ---------- Layout ----------
 
-        private void BuildOnlinePopup(RectTransform root)
+        private void BuildOnline()
         {
-            // A dark cover; tapping outside the window closes it.
-            RectTransform cover = CreateRect("OnlinePopup", root);
-            Stretch(cover);
-            AddImage(cover, new Color(0f, 0f, 0f, 0.7f)).raycastTarget = true;
-            Button outside = cover.gameObject.AddComponent<Button>();
-            outside.transition = Selectable.Transition.None;
-            outside.onClick.AddListener(CloseOnline);
-            _onlinePopup = cover.gameObject;
+            RectTransform frame = Kit.CreateFrame(_root, "OnlineScreen");
+            _onlineScreen = frame.gameObject;
+            AddFrameLines(frame, false);
+            BuildBackButton(frame, () => ShowScreen(Screen.Main));
 
-            RectTransform panel = CreateRect("Panel", cover);
-            Place(panel, Vector2.zero, new Vector2(1100f, 800f));
-            AddImage(panel, PanelColor).raycastTarget = true; // taps here don't close it
-            Outline edge = panel.gameObject.AddComponent<Outline>();
-            edge.effectColor = GoldColor;
-            edge.effectDistance = new Vector2(3f, -3f);
+            TMP_Text title = Kit.Label(frame, "Title", "Play Online", 40f, Kit.Cinzel, Kit.Title,
+                TextAlignmentOptions.Left);
+            Kit.At(title.rectTransform, 128f, 44f, 500f, 52f);
+            title.characterSpacing = 6f;
+            _playingAs = Kit.Label(frame, "PlayingAs", "", 14f, Kit.Inter, Kit.Muted, TextAlignmentOptions.Right);
+            Kit.At(_playingAs.rectTransform, 724f, 44f, 500f, 52f);
 
-            TMP_Text title = CreateText("Title", panel, "Play Online", 48f, FontStyles.Bold);
-            Place(title.rectTransform, new Vector2(0f, 345f), new Vector2(800f, 70f));
-            title.color = GoldColor;
-            CreateButton("Close", panel, "X", new Vector2(500f, 345f), new Vector2(70f, 70f),
-                ButtonColor, CloseOnline);
-
-            // Open rooms, with Refresh.
-            TMP_Text listLabel = CreateText("RoomsLabel", panel, "Open rooms", 32f, FontStyles.Bold);
-            Place(listLabel.rectTransform, new Vector2(-300f, 270f), new Vector2(400f, 50f));
-            listLabel.alignment = TextAlignmentOptions.Left;
-            CreateButton("Refresh", panel, "Refresh", new Vector2(400f, 270f), new Vector2(200f, 56f),
-                ButtonColor, () => _nextRoomRefresh = 0f);
-
-            for (int i = 0; i < MaxRoomRows; i++)
-                _roomRows[i] = CreateRoomRow(panel, i, new Vector2(0f, 200f - i * 76f));
-            _roomListInfo = CreateText("RoomsInfo", panel, "", 24f, FontStyles.Italic);
-            Place(_roomListInfo.rectTransform, new Vector2(0f, 200f - MaxRoomRows * 76f + 20f),
-                new Vector2(1000f, 40f));
-            _roomListInfo.color = new Color(1f, 1f, 1f, 0.7f);
-
-            // Join with a code, or create a lobby.
-            _codeField = CreateInputField("Code", panel, "Room code", new Vector2(-300f, -262f),
-                new Vector2(400f, 68f));
-            _codeField.onSubmit.AddListener(_ => JoinOnline());
-            CreateButton("Join", panel, "Join", new Vector2(0f, -262f), new Vector2(180f, 68f),
-                ButtonColor, JoinOnline);
-            CreateButton("Create", panel, "Create Lobby", new Vector2(330f, -262f), new Vector2(320f, 68f),
-                PlayColor, HostOnline);
-            _privacyLabel = CreateButton("Privacy", panel, "", new Vector2(330f, -335f),
-                new Vector2(320f, 50f), ButtonColor, TogglePrivacy);
-            _privacyLabel.fontSize = 24f;
-            ShowPrivacy();
-
-            _popupStatus = CreateText("Status", panel, "", 24f, FontStyles.Normal);
-            Place(_popupStatus.rectTransform, new Vector2(-200f, -335f), new Vector2(640f, 50f));
-            _popupStatus.color = GoldColor;
-
-            _onlinePopup.SetActive(false);
+            BuildHostCard(frame);
+            BuildJoinCard(frame);
         }
 
-        // One room: its name, how full it is, and Join. The whole row is the button.
-        private RoomRow CreateRoomRow(RectTransform panel, int index, Vector2 position)
+        private RectTransform BuildCard(RectTransform frame, string name, float x, string heading, string sub)
         {
-            RectTransform rect = CreateRect("Room" + index, panel);
-            Place(rect, position, new Vector2(1000f, 66f));
-            Image image = AddImage(rect, ButtonColor);
-            image.raycastTarget = true;
-            Button button = rect.gameObject.AddComponent<Button>();
-            button.targetGraphic = image;
-            button.onClick.AddListener(() => JoinListedRoom(index));
+            RectTransform card = Kit.Box(frame, name, Kit.Panel, Kit.GoldLine, 14f);
+            Kit.At(card, x, 140f, 568f, 470f);
+            TMP_Text title = Kit.Label(card, "Heading", heading, 26f, Kit.Cinzel, Kit.Text,
+                TextAlignmentOptions.Left);
+            Kit.At(title.rectTransform, 32f, 28f, 504f, 36f);
+            TMP_Text hint = Kit.Label(card, "Sub", sub, 14f, Kit.Inter, Kit.Muted, TextAlignmentOptions.Left);
+            Kit.At(hint.rectTransform, 32f, 66f, 504f, 20f);
+            return card;
+        }
 
-            TMP_Text name = CreateText("Name", rect, "", 30f, FontStyles.Bold);
-            TopLeft(name.rectTransform, 24f, 8f, 620f, 50f);
-            name.alignment = TextAlignmentOptions.Left;
+        private void BuildHostCard(RectTransform frame)
+        {
+            RectTransform card = BuildCard(frame, "HostCard", 56f, "Host a Room",
+                "Get a code to share. Bots take any empty seats.");
+
+            TMP_Text apostles = Kit.Label(card, "ApostlesLabel", "Apostles", 15f, Kit.InterSemiBold, Kit.Soft,
+                TextAlignmentOptions.Left);
+            Kit.At(apostles.rectTransform, 32f, 118f, 200f, 44f);
+            _hostPlayers = BuildStepper(card, 392f, 118f, ChangePlayers);
+
+            TMP_Text type = Kit.Label(card, "TypeLabel", "Room", 15f, Kit.InterSemiBold, Kit.Soft,
+                TextAlignmentOptions.Left);
+            Kit.At(type.rectTransform, 32f, 186f, 200f, 24f);
+            _privacy = BuildSegmented(card, 32f, 218f, 504f, "Public", "Private", PickPrivacy);
+            _privacyHint = Kit.Label(card, "TypeHint", "", 13f, Kit.Inter, Kit.Muted, TextAlignmentOptions.Left);
+            Kit.At(_privacyHint.rectTransform, 32f, 280f, 504f, 40f);
+
+            TMP_Text create = Kit.Button(card, "Create", "Create Room", Kit.ButtonStyle.Primary, HostOnline, 21f);
+            Kit.At((RectTransform)create.transform.parent, 32f, 378f, 504f, 60f);
+        }
+
+        private void BuildJoinCard(RectTransform frame)
+        {
+            RectTransform card = BuildCard(frame, "JoinCard", 656f, "Join a Room",
+                "Type the code the host shared, or pick an open room.");
+
+            TMP_Text codeLabel = Kit.Label(card, "CodeLabel", "Room code", 15f, Kit.InterSemiBold, Kit.Soft,
+                TextAlignmentOptions.Left);
+            Kit.At(codeLabel.rectTransform, 32f, 104f, 300f, 24f);
+            _codeField = CreateInputField(card, "Code", "ABC123", 30f, Kit.Cinzel, 20f);
+            Kit.At((RectTransform)_codeField.transform, 32f, 134f, 330f, 64f);
+            _codeField.onSubmit.AddListener(_ => JoinOnline());
+            TMP_Text join = Kit.Button(card, "Join", "Join", Kit.ButtonStyle.Outline, JoinOnline, 21f);
+            Kit.At((RectTransform)join.transform.parent, 374f, 134f, 162f, 64f);
+
+            // The connection line: what is happening, or what went wrong.
+            RectTransform statusRow = Kit.Box(card, "StatusRow", Kit.Inset, Kit.Line, 10f);
+            Kit.At(statusRow, 32f, 212f, 504f, 44f);
+            _onlineStatus = Kit.Label(statusRow, "Status", "Not connected yet", 14f, Kit.Inter, Kit.Soft,
+                TextAlignmentOptions.Left);
+            Kit.Stretch(_onlineStatus.rectTransform, 0f);
+            _onlineStatus.rectTransform.offsetMin = new Vector2(16f, 0f);
+            _onlineStatus.rectTransform.offsetMax = new Vector2(-16f, 0f);
+
+            TMP_Text listLabel = Kit.Label(card, "RoomsLabel", "Open rooms", 15f, Kit.InterSemiBold, Kit.Soft,
+                TextAlignmentOptions.Left);
+            Kit.At(listLabel.rectTransform, 32f, 274f, 300f, 28f);
+            TMP_Text refresh = Kit.Button(card, "Refresh", "Refresh", Kit.ButtonStyle.Ghost,
+                () => _nextRoomRefresh = 0f, 13f, 8f);
+            Kit.At((RectTransform)refresh.transform.parent, 436f, 272f, 100f, 32f);
+
+            for (int i = 0; i < MaxRoomRows; i++)
+                _roomRows[i] = CreateRoomRow(card, i, 312f + i * 46f);
+            _roomListInfo = Kit.Label(card, "RoomsInfo", "", 13f, Kit.Inter, Kit.Muted);
+            _roomListInfo.fontStyle = FontStyles.Italic;
+            Kit.At(_roomListInfo.rectTransform, 32f, 312f, 504f, 36f);
+        }
+
+        // One open room: its name, how full it is, and Join. The whole row is the button.
+        private RoomRow CreateRoomRow(RectTransform card, int index, float y)
+        {
+            TMP_Text join = Kit.Button(card, "Room" + index, "Join", Kit.ButtonStyle.Secondary,
+                () => JoinListedRoom(index), 14f, 8f);
+            var rect = (RectTransform)join.transform.parent;
+            Kit.At(rect, 32f, y, 504f, 40f);
+            join.alignment = TextAlignmentOptions.Right;
+            join.rectTransform.offsetMax = new Vector2(-16f, 0f);
+
+            TMP_Text name = Kit.Label(rect, "Name", "", 15f, Kit.InterSemiBold, Kit.Text,
+                TextAlignmentOptions.Left);
+            Kit.At(name.rectTransform, 16f, 0f, 320f, 40f);
+            name.textWrappingMode = TextWrappingModes.NoWrap;
             name.overflowMode = TextOverflowModes.Ellipsis;
-
-            TMP_Text players = CreateText("Players", rect, "", 28f, FontStyles.Normal);
-            TopLeft(players.rectTransform, 660f, 8f, 140f, 50f);
-
-            TMP_Text join = CreateText("Join", rect, "Join", 28f, FontStyles.Bold);
-            TopLeft(join.rectTransform, 820f, 8f, 160f, 50f);
-            join.color = GoldColor;
+            TMP_Text players = Kit.Label(rect, "Players", "", 14f, Kit.Inter, Kit.Muted);
+            Kit.At(players.rectTransform, 340f, 0f, 70f, 40f);
 
             rect.gameObject.SetActive(false);
             return new RoomRow { Root = rect.gameObject, Name = name, Players = players };
