@@ -5,18 +5,15 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
-
+using Kit = SoulBind.UI.UiKit;
 
 namespace SoulBind.UI
 {
     /// <summary>
-    /// The start screen: the title, how many Apostles (2-6), who plays the other seats (bots, or
-    /// friends taking turns on this device), Play and Quit. It builds its own layout at runtime on the
-    /// Canvas it sits on, so the menu scene needs no hand setup (SoulBind > Create Main Menu Scene).
-    ///
-    /// Online: Play Online opens the room list (MainMenuView.Online.cs): join a public room, type a
-    /// code, or create a lobby. The room screen shows who has joined; the host presses Start, and bots
-    /// take the empty seats.
+    /// The start screens, built at runtime to match the SoulBind UI Screens design canvas:
+    /// Main (this file), Play Online (MainMenuView.Online.cs) and the Lobby (MainMenuView.Lobby.cs).
+    /// Each screen is laid out on a 1280 x 720 design frame that scales to the screen, using the
+    /// design's own numbers. The menu scene needs no hand setup (SoulBind > Create Main Menu Scene).
     /// </summary>
     public sealed partial class MainMenuView : MonoBehaviour
     {
@@ -24,167 +21,106 @@ namespace SoulBind.UI
         [SerializeField] private string gameSceneName = "SampleScene";
         [SerializeField, Range(2, 6)] private int defaultPlayers = 4;
 
-        private static readonly Color BackgroundColor = new Color(0.08f, 0.06f, 0.12f);
-        private static readonly Color PanelColor = new Color(0.13f, 0.10f, 0.19f, 0.95f);
-        private static readonly Color ButtonColor = new Color(0.24f, 0.19f, 0.34f);
-        private static readonly Color PlayColor = new Color(0.62f, 0.45f, 0.16f);
-        private static readonly Color GoldColor = new Color(1f, 0.85f, 0.4f);
+        private enum Screen { Main, Online, Lobby }
 
+        private Screen _screen;
         private int _players;
-        private bool _bots = true;
-        private TMP_Text _playersText;
-        private TMP_Text _opponentsText;
-        private TMP_Text _opponentsHint;
+        private bool _busy;
+        private RectTransform _root;
+        private GameObject _mainScreen;
+        private TMP_Text _mainPlayers;
+        private TMP_Text _botsLine;
+        private TMP_Text _mainStatus;
 
-        // Online
-        private GameObject _choicesScreen;
-        private GameObject _roomScreen;
+        // Profile (top-left on the main screen)
         private TMP_InputField _nameField;
         private GameObject _profilePopup;
         private TMP_Text _profileName;
         private TMP_Text _profileInitial;
-        private TMP_Text _onlineStatus;
-        private TMP_Text _roomCode;
-        private TMP_Text _roomPlayers;
-        private TMP_Text _roomSeats;
-        private TMP_Text _roomHint;
-        private TMP_Text _roomStatus;
-        private GameObject _roomStart;
-        private GameObject _roomSeatButtons;
-        private bool _busy;
-        private int _shownPlayers = -1;
-        private int _shownSeats = -1;
-        private string _shownNames;
 
         private void Start()
         {
             _players = Mathf.Clamp(defaultPlayers, 2, 6);
-            Build((RectTransform)transform);
-            ShowChoices();
+            _root = (RectTransform)transform;
+            Build();
 
             OnlineSession session = OnlineSession.Instance;
             if (session != null && session.InSession && session.MatchStarted)
                 session.Leave(); // back from an online match
             if (OnlineSession.LastMessage != null)
             {
-                _onlineStatus.text = OnlineSession.LastMessage;
+                _mainStatus.text = OnlineSession.LastMessage;
                 OnlineSession.LastMessage = null;
             }
-            ShowScreen();
+            ShowPlayers();
+            ShowScreen(Screen.Main);
         }
 
         private void Update()
         {
             OnlineSession session = OnlineSession.Instance;
             bool inRoom = session != null && session.InSession;
-            if (inRoom != _roomScreen.activeSelf)
+            if (inRoom && _screen != Screen.Lobby)
+                ShowScreen(Screen.Lobby);
+            else if (!inRoom && _screen == Screen.Lobby)
             {
-                if (!inRoom && OnlineSession.LastMessage != null)
+                // The room ended: the host left, or the connection dropped.
+                if (OnlineSession.LastMessage != null)
                 {
-                    _onlineStatus.text = OnlineSession.LastMessage;
+                    ShowOnlineStatus(OnlineSession.LastMessage);
                     OnlineSession.LastMessage = null;
                 }
-                ShowScreen();
+                ShowScreen(Screen.Online);
             }
-            if (inRoom)
-                ShowRoom(session, false);
-            else
+
+            if (_screen == Screen.Lobby)
+                ShowLobby(session, false);
+            else if (_screen == Screen.Online)
                 UpdateRoomList();
         }
+
+        private void ShowScreen(Screen screen)
+        {
+            _screen = screen;
+            _mainScreen.SetActive(screen == Screen.Main);
+            _onlineScreen.SetActive(screen == Screen.Online);
+            _lobbyScreen.SetActive(screen == Screen.Lobby);
+            if (screen == Screen.Online)
+                OnOpenOnline();
+            else if (screen == Screen.Lobby)
+            {
+                _lobbyStatus.text = string.Empty;
+                ShowLobby(OnlineSession.Instance, true);
+            }
+            if (screen == Screen.Main)
+                ShowProfileName();
+        }
+
+        // ---------- Main screen actions ----------
 
         private void ChangePlayers(int delta)
         {
             _players = Mathf.Clamp(_players + delta, 2, 6);
-            ShowChoices();
+            ShowPlayers();
         }
 
-        private void ToggleOpponents()
+        private void ShowPlayers()
         {
-            _bots = !_bots;
-            ShowChoices();
+            string count = _players.ToString();
+            _mainPlayers.text = count;
+            _hostPlayers.text = count;
+            _botsLine.text = $"You play Apostle 1 · bots play the other {_players - 1}";
         }
 
-        private void ShowChoices()
-        {
-            _playersText.text = _players.ToString();
-            _opponentsText.text = _bots ? "Bots" : "Friends on this device";
-            _opponentsHint.text = _bots
-                ? $"You play Apostle 1; bots play the other {_players - 1}."
-                : "Everyone takes turns on this screen; the view follows whoever's turn it is.";
-        }
+        private void PlayBots() => Play(true);
 
+        // Pass & Play: everyone takes turns on this device; the view follows whoever's turn it is.
+        private void PassAndPlay() => Play(false);
 
-        private void Play()
+        private void Play(bool bots)
         {
-            MatchSettings.Set(_players, _bots, true);
+            MatchSettings.Set(_players, bots, true);
             SceneManager.LoadScene(gameSceneName);
-        }
-
-        // ---- Online ----
-
-        // Host, Join and the room list are in MainMenuView.Online.cs.
-
-        private void StartOnline()
-        {
-            OnlineSession session = OnlineSession.Instance;
-            if (session == null || !session.IsHost)
-                return;
-            string error = session.StartMatch(gameSceneName, _players);
-            _roomStatus.text = error ?? "Starting...";
-        }
-
-        private void LeaveRoom()
-        {
-            OnlineSession.LeaveIfActive();
-            _onlineStatus.text = string.Empty;
-            ShowScreen();
-        }
-
-        private void ShowScreen()
-        {
-            OnlineSession session = OnlineSession.Instance;
-            bool inRoom = session != null && session.InSession;
-            _choicesScreen.SetActive(!inRoom);
-            _roomScreen.SetActive(inRoom);
-            if (inRoom)
-                CloseOnline();
-            if (inRoom)
-            {
-                _roomStatus.text = string.Empty;
-                ShowRoom(session, true);
-            }
-        }
-
-        // Called every frame in the room, but only rewrites the text when something changed.
-        private void ShowRoom(OnlineSession session, bool force)
-        {
-            int joined = session.PlayerCount;
-            if (session.IsHost && _players < joined)
-                _players = Mathf.Min(joined, 6);
-            string names = RoomNames(session);
-            if (!force && joined == _shownPlayers && _players == _shownSeats && names == _shownNames)
-                return;
-            _shownPlayers = joined;
-            _shownSeats = _players;
-            _shownNames = names;
-
-            _roomCode.text = session.Code;
-            _roomPlayers.text = (joined == 1 ? "1 player: " : $"{joined} players: ") + names;
-            _roomStart.SetActive(session.IsHost);
-            _roomSeatButtons.SetActive(session.IsHost);
-            _roomSeats.text = session.IsHost ? $"Apostles: {_players}" : string.Empty;
-            int bots = Mathf.Max(0, _players - joined);
-            _roomHint.text = session.IsHost
-                ? $"Share the code with your friends. {(bots == 0 ? "No bots." : bots == 1 ? "1 bot takes the empty seat." : $"{bots} bots take the empty seats.")}"
-                : "Waiting for the host to start the match...";
-        }
-
-        private void ChangeSeats(int delta)
-        {
-            OnlineSession session = OnlineSession.Instance;
-            int min = Mathf.Max(2, session != null ? session.PlayerCount : 1);
-            _players = Mathf.Clamp(_players + delta, min, 6);
-            _playersText.text = _players.ToString();
         }
 
         private void Quit()
@@ -196,161 +132,167 @@ namespace SoulBind.UI
 #endif
         }
 
-        // ---- Layout ----
+        // ---------- Building ----------
 
-        private void Build(RectTransform root)
+        private void Build()
         {
-            RectTransform background = CreateRect("Background", root);
-            Stretch(background);
-            AddImage(background, BackgroundColor);
+            RectTransform background = Kit.Stretch(Kit.CreateRect("Background", _root));
+            Image fill = background.gameObject.AddComponent<Image>();
+            fill.color = Kit.Background;
 
-            TMP_Text title = CreateText("Title", root, "SoulBind", 120f, FontStyles.Bold);
-            Place(title.rectTransform, new Vector2(0f, 330f), new Vector2(1400f, 150f));
-            title.color = GoldColor;
-            TMP_Text subtitle = CreateText("Subtitle", root, "Apostle's Descent", 46f, FontStyles.Italic);
-            Place(subtitle.rectTransform, new Vector2(0f, 235f), new Vector2(1400f, 70f));
-
-            // The game's version (Player Settings > Version, raised by SoulBind > Build Android APK),
-            // bottom-right, so testers can tell which APK they have.
-            TMP_Text version = CreateText("Version", root, "v" + Application.version, 26f, FontStyles.Normal);
-            RectTransform versionRect = version.rectTransform;
-            versionRect.anchorMin = versionRect.anchorMax = versionRect.pivot = new Vector2(1f, 0f);
-            versionRect.anchoredPosition = new Vector2(-24f, 16f);
-            versionRect.sizeDelta = new Vector2(320f, 40f);
-            version.alignment = TextAlignmentOptions.BottomRight;
-            version.color = new Color(1f, 1f, 1f, 0.5f);
-
-            _choicesScreen = CreateRect("Choices", root).gameObject;
-            Stretch((RectTransform)_choicesScreen.transform);
-            var choices = (RectTransform)_choicesScreen.transform;
-
-            
-
-            RectTransform panel = CreateRect("Panel", choices);
-            Place(panel, new Vector2(-400f, -40f), new Vector2(760f, 360f));
-            AddImage(panel, PanelColor);
-            Outline edge = panel.gameObject.AddComponent<Outline>();
-            edge.effectColor = GoldColor;
-            edge.effectDistance = new Vector2(3f, -3f);
-
-            // Players: < 4 >
-            TMP_Text playersLabel = CreateText("PlayersLabel", panel, "Apostles", 34f, FontStyles.Bold);
-            Place(playersLabel.rectTransform, new Vector2(-180f, 110f), new Vector2(300f, 60f));
-            CreateButton("Fewer", panel, "<", new Vector2(80f, 110f), new Vector2(70f, 64f), ButtonColor, () => ChangePlayers(-1));
-            _playersText = CreateText("Players", panel, "4", 44f, FontStyles.Bold);
-            Place(_playersText.rectTransform, new Vector2(170f, 110f), new Vector2(100f, 64f));
-            CreateButton("More", panel, ">", new Vector2(260f, 110f), new Vector2(70f, 64f), ButtonColor, () => ChangePlayers(1));
-
-            // Opponents: Bots / Friends on this device
-            TMP_Text opponentsLabel = CreateText("OpponentsLabel", panel, "Opponents", 34f, FontStyles.Bold);
-            Place(opponentsLabel.rectTransform, new Vector2(-180f, 20f), new Vector2(300f, 60f));
-            _opponentsText = CreateButton("Opponents", panel, "Bots", new Vector2(170f, 20f), new Vector2(330f, 64f),
-                ButtonColor, ToggleOpponents);
-            _opponentsHint = CreateText("OpponentsHint", panel, "", 22f, FontStyles.Normal);
-            Place(_opponentsHint.rectTransform, new Vector2(0f, -55f), new Vector2(700f, 50f));
-            _opponentsHint.color = new Color(1f, 1f, 1f, 0.7f);
-
-            CreateButton("Play", panel, "Play", new Vector2(0f, -130f), new Vector2(320f, 80f), PlayColor, Play);
-
-            BuildOnlinePanel(choices);
-            BuildRoomScreen(root);
-            CreateButton("Quit", root, "Quit", new Vector2(0f, -330f), new Vector2(220f, 60f), ButtonColor, Quit);
-            BuildProfile(root);
-
-            // A small ? in the top-right corner opens How to Play.
-            TMP_Text help = CreateButton("HelpButton", root, "?", Vector2.zero, new Vector2(80f, 80f), ButtonColor,
-                () => HelpPopup.Open(transform));
-            var helpRect = (RectTransform)help.transform.parent;
-            helpRect.anchorMin = helpRect.anchorMax = helpRect.pivot = new Vector2(1f, 1f);
-            helpRect.anchoredPosition = new Vector2(-30f, -30f);
+            BuildMain();
+            BuildOnline();
+            BuildLobby();
+            BuildProfilePopup();
         }
 
-        
-        // Top-left: your avatar and name. Tap it to change the name.
-        private void BuildProfile(RectTransform root)
+        // The two thin frame lines just inside the edge of every screen.
+        private static void AddFrameLines(RectTransform frame, bool inner)
         {
-            RectTransform card = CreateRect("Profile", root);
-            // Anchored to the safe area's left edge, so a camera
-            // notch or rounded corner never covers it.
-            float left = Screen.width > 0
-                ? Screen.safeArea.xMin / Screen.width : 0f;
-            card.anchorMin = card.anchorMax = new Vector2(left, 1f);
-            card.pivot = new Vector2(0f, 1f);
-            card.anchoredPosition = new Vector2(40f, -30f);
-            card.sizeDelta = new Vector2(320f, 76f);
-            AddImage(card, PanelColor).raycastTarget = true;
-            Outline edge = card.gameObject.AddComponent<Outline>();
-            edge.effectColor = GoldColor;
-            edge.effectDistance = new Vector2(2f, -2f);
-            card.gameObject.AddComponent<Button>()
-                .onClick.AddListener(OpenProfile);
+            RectTransform outer = Kit.Box(frame, "FrameLine", Color.clear, Kit.BronzeLine, 6f);
+            Kit.Stretch(outer, 18f);
+            if (!inner)
+                return;
+            RectTransform line = Kit.Box(frame, "FrameLineInner", Color.clear, Kit.Hex(0x2C2236), 4f);
+            Kit.Stretch(line, 24f);
+        }
 
-            // A round avatar with the name's first letter.
-            RectTransform avatar = CreateRect("Avatar", card);
-            avatar.anchorMin = avatar.anchorMax = new Vector2(0f, 0.5f);
-            avatar.pivot = new Vector2(0f, 0.5f);
-            avatar.anchoredPosition = new Vector2(10f, 0f);
-            avatar.sizeDelta = new Vector2(56f, 56f);
-            Image disc = AddImage(avatar, GoldColor);
-            disc.sprite = DiscSpriteFactory.Create(1f);
-            disc.preserveAspect = true;
-            _profileInitial = CreateText("Initial", avatar, "?",
-                30f, FontStyles.Bold);
-            Stretch(_profileInitial.rectTransform);
-            _profileInitial.color = BackgroundColor;
+        private void BuildMain()
+        {
+            RectTransform frame = Kit.CreateFrame(_root, "MainScreen");
+            _mainScreen = frame.gameObject;
+            AddFrameLines(frame, true);
+            BuildProfileCard(frame);
 
-            _profileName = CreateText("Name", card, "", 28f,
-                FontStyles.Bold);
-            TopLeft(_profileName.rectTransform, 76f, 8f, 236f, 36f);
-            _profileName.alignment = TextAlignmentOptions.Left;
+            // ? in the top-right corner: How to Play (the design keeps a round button there).
+            TMP_Text help = Kit.Button(frame, "HelpButton", "?", Kit.ButtonStyle.Secondary,
+                () => HelpPopup.Open(transform), 24f, 26f);
+            Kit.At((RectTransform)help.transform.parent, 1172f, 44f, 52f, 52f);
+            help.color = Kit.Gold;
+
+            // Emblem: two rings, then the title and subtitle.
+            RectTransform ring = Kit.Circle(frame, "Emblem", 64f, Color.clear, Kit.Gold, 2f);
+            Kit.At(ring, 608f, 96f, 64f, 64f);
+            RectTransform inner = Kit.Circle(ring, "Inner", 36f, Color.clear, Kit.GoldLine, 2f);
+            Kit.At(inner, 14f, 14f, 36f, 36f);
+
+            TMP_Text title = Kit.Label(frame, "Title", "SoulBind", 92f, Kit.CinzelBlack, Kit.Title);
+            Kit.At(title.rectTransform, 0f, 164f, 1280f, 100f);
+            title.characterSpacing = 4f;
+            TMP_Text subtitle = Kit.Label(frame, "Subtitle", "APOSTLE'S DESCENT", 24f, Kit.Cinzel, Kit.Soft);
+            Kit.At(subtitle.rectTransform, 0f, 268f, 1280f, 34f);
+            subtitle.characterSpacing = 33f;
+
+            // The column: Apostles, Play vs Bots, Online / Pass & Play, How to Play / Quit.
+            RectTransform column = Kit.At(Kit.CreateRect("Column", frame), 430f, 356f, 420f, 300f);
+            RectTransform stepper = Kit.Box(column, "Apostles", Kit.Panel, Kit.Line, 10f);
+            Kit.At(stepper, 0f, 0f, 420f, 60f);
+            TMP_Text label = Kit.Label(stepper, "Label", "APOSTLES", 16f, Kit.Cinzel, Kit.Soft,
+                TextAlignmentOptions.Left);
+            Kit.At(label.rectTransform, 20f, 0f, 200f, 60f);
+            label.characterSpacing = 12f;
+            _mainPlayers = BuildStepper(stepper, 270f, 8f, ChangePlayers);
+
+            TMP_Text play = Kit.Button(column, "PlayBots", "Play vs Bots", Kit.ButtonStyle.Primary, PlayBots, 24f);
+            Kit.At((RectTransform)play.transform.parent, 0f, 72f, 420f, 64f);
+            TMP_Text online = Kit.Button(column, "PlayOnline", "Play Online", Kit.ButtonStyle.Secondary,
+                () => ShowScreen(Screen.Online), 17f);
+            Kit.At((RectTransform)online.transform.parent, 0f, 148f, 204f, 56f);
+            TMP_Text local = Kit.Button(column, "PassAndPlay", "Pass & Play", Kit.ButtonStyle.Secondary,
+                PassAndPlay, 17f);
+            Kit.At((RectTransform)local.transform.parent, 216f, 148f, 204f, 56f);
+            TMP_Text rules = Kit.Button(column, "HowToPlay", "How to Play", Kit.ButtonStyle.Ghost,
+                () => HelpPopup.Open(transform), 15f);
+            Kit.At((RectTransform)rules.transform.parent, 0f, 216f, 204f, 48f);
+            TMP_Text quit = Kit.Button(column, "Quit", "Quit", Kit.ButtonStyle.Ghost, Quit, 15f);
+            Kit.At((RectTransform)quit.transform.parent, 216f, 216f, 204f, 48f);
+
+            _mainStatus = Kit.Label(frame, "Status", "", 14f, Kit.Inter, Kit.Gold);
+            Kit.At(_mainStatus.rectTransform, 330f, 628f, 620f, 24f);
+
+            _botsLine = Kit.Label(frame, "BotsLine", "", 13f, Kit.Inter, Kit.Muted, TextAlignmentOptions.Left);
+            Kit.At(_botsLine.rectTransform, 56f, 662f, 500f, 20f);
+            TMP_Text version = Kit.Label(frame, "Version", "v" + Application.version, 13f, Kit.Inter, Kit.Muted,
+                TextAlignmentOptions.Right);
+            Kit.At(version.rectTransform, 724f, 662f, 500f, 20f);
+        }
+
+        /// <summary>‹ count ›, the left button at x, y. Returns the count's text.</summary>
+        private static TMP_Text BuildStepper(RectTransform parent, float x, float y, System.Action<int> change)
+        {
+            TMP_Text fewer = Kit.Button(parent, "Fewer", "‹", Kit.ButtonStyle.Secondary, () => change(-1), 26f, 8f);
+            Kit.At((RectTransform)fewer.transform.parent, x, y, 44f, 44f);
+            TMP_Text count = Kit.Label(parent, "Count", "4", 28f, Kit.Cinzel, Kit.Text);
+            Kit.At(count.rectTransform, x + 50f, y, 44f, 44f);
+            TMP_Text more = Kit.Button(parent, "More", "›", Kit.ButtonStyle.Secondary, () => change(1), 26f, 8f);
+            Kit.At((RectTransform)more.transform.parent, x + 100f, y, 44f, 44f);
+            return count;
+        }
+
+        /// <summary>A round back button at the design's top-left spot.</summary>
+        private static void BuildBackButton(RectTransform frame, UnityEngine.Events.UnityAction onClick)
+        {
+            TMP_Text back = Kit.Button(frame, "Back", "‹", Kit.ButtonStyle.Secondary, onClick, 34f, 26f);
+            var rect = (RectTransform)back.transform.parent;
+            Kit.At(rect, 56f, 44f, 52f, 52f);
+            rect.GetComponent<Image>().color = Kit.Panel;
+            back.color = Kit.Gold;
+        }
+
+        // ---------- Profile ----------
+
+        // Top-left: your avatar and name. Tap it to change the name.
+        private void BuildProfileCard(RectTransform frame)
+        {
+            RectTransform card = Kit.Box(frame, "Profile", Kit.Panel, Kit.GoldLine, 36f);
+            Kit.At(card, 56f, 44f, 280f, 72f);
+            card.gameObject.AddComponent<Button>().onClick.AddListener(OpenProfile);
+
+            RectTransform avatar = Kit.Circle(card, "Avatar", 52f, Kit.Gold, Kit.GoldBright, 2f);
+            Kit.At(avatar, 10f, 10f, 52f, 52f);
+            avatar.GetComponent<Image>().raycastTarget = false;
+            _profileInitial = Kit.Label(avatar, "Initial", "?", 24f, Kit.Cinzel, Kit.Background);
+            Kit.Stretch(_profileInitial.rectTransform);
+
+            _profileName = Kit.Label(card, "Name", "", 18f, Kit.InterBold, Kit.Text, TextAlignmentOptions.Left);
+            Kit.At(_profileName.rectTransform, 76f, 12f, 190f, 26f);
+            _profileName.textWrappingMode = TextWrappingModes.NoWrap;
             _profileName.overflowMode = TextOverflowModes.Ellipsis;
+            TMP_Text hint = Kit.Label(card, "Hint", "Tap to change your name", 12f, Kit.Inter, Kit.Muted,
+                TextAlignmentOptions.Left);
+            Kit.At(hint.rectTransform, 76f, 40f, 190f, 18f);
+        }
 
-            TMP_Text hint = CreateText("Hint", card,
-                "Tap to change your name", 16f, FontStyles.Italic);
-            TopLeft(hint.rectTransform, 76f, 44f, 236f, 24f);
-            hint.alignment = TextAlignmentOptions.Left;
-            hint.color = new Color(1f, 1f, 1f, 0.6f);
-
-            // The pop-up for typing it. Tapping outside cancels.
-            RectTransform popup = CreateRect("ProfilePopup", root);
-            Stretch(popup);
-            AddImage(popup, new Color(0f, 0f, 0f, 0.7f))
-                .raycastTarget = true;
-            Button outside = popup.gameObject.AddComponent<Button>();
+        // The pop-up for typing it. Tapping outside cancels.
+        private void BuildProfilePopup()
+        {
+            RectTransform cover = Kit.Stretch(Kit.CreateRect("ProfilePopup", _root));
+            Image dim = cover.gameObject.AddComponent<Image>();
+            dim.color = new Color(0f, 0f, 0f, 0.7f);
+            Button outside = cover.gameObject.AddComponent<Button>();
             outside.transition = Selectable.Transition.None;
             outside.onClick.AddListener(CloseProfile);
-            _profilePopup = popup.gameObject;
+            _profilePopup = cover.gameObject;
 
-            RectTransform panel = CreateRect("Panel", popup);
-            Place(panel, Vector2.zero, new Vector2(620f, 300f));
-            AddImage(panel, PanelColor).raycastTarget = true;
-            Outline panelEdge = panel.gameObject.AddComponent<Outline>();
-            panelEdge.effectColor = GoldColor;
-            panelEdge.effectDistance = new Vector2(3f, -3f);
+            RectTransform frame = Kit.CreateFrame(cover, "Frame");
+            RectTransform panel = Kit.Box(frame, "Panel", Kit.Panel, Kit.GoldLine, 14f);
+            Kit.At(panel, 340f, 220f, 600f, 280f);
 
-            TMP_Text title = CreateText("Title", panel, "Your name",
-                36f, FontStyles.Bold);
-            Place(title.rectTransform, new Vector2(0f, 100f),
-                new Vector2(560f, 50f));
-            title.color = GoldColor;
+            TMP_Text title = Kit.Label(panel, "Title", "Your name", 30f, Kit.Cinzel, Kit.Title);
+            Kit.At(title.rectTransform, 0f, 28f, 600f, 40f);
 
-            _nameField = CreateInputField("NameField", panel,
-                "Type your name", new Vector2(0f, 15f),
-                new Vector2(500f, 68f));
+            _nameField = CreateInputField(panel, "NameField", "Type your name", 26f, Kit.InterSemiBold, 0f);
+            Kit.At((RectTransform)_nameField.transform, 60f, 96f, 480f, 64f);
             _nameField.characterLimit = PlayerNames.MaxLength;
-            _nameField.onValidateInput = (string _, int __, char c) =>
-                PlayerNames.IsAllowed(c) ? c : '\0';
+            _nameField.onValidateInput = (string _, int __, char c) => PlayerNames.IsAllowed(c) ? c : '\0';
             _nameField.onSubmit.AddListener(_ => SaveProfile());
 
-            CreateButton("Cancel", panel, "Cancel",
-                new Vector2(-130f, -95f), new Vector2(220f, 64f),
-                ButtonColor, CloseProfile);
-            CreateButton("Save", panel, "Save",
-                new Vector2(130f, -95f), new Vector2(220f, 64f),
-                PlayColor, SaveProfile);
+            TMP_Text cancel = Kit.Button(panel, "Cancel", "Cancel", Kit.ButtonStyle.Ghost, CloseProfile, 16f);
+            Kit.At((RectTransform)cancel.transform.parent, 60f, 192f, 230f, 56f);
+            TMP_Text save = Kit.Button(panel, "Save", "Save", Kit.ButtonStyle.Primary, SaveProfile, 20f);
+            Kit.At((RectTransform)save.transform.parent, 310f, 192f, 230f, 56f);
 
             _profilePopup.SetActive(false);
-            ShowProfileName();
         }
 
         private void OpenProfile()
@@ -377,111 +319,36 @@ namespace SoulBind.UI
             string typed = PlayerNames.LocalName;
             bool named = typed.Length > 0;
             _profileName.text = named ? typed : "Set your name";
-            _profileInitial.text = named
-                ? typed.Substring(0, 1).ToUpperInvariant()
-                : "?";
+            _profileInitial.text = named ? typed.Substring(0, 1).ToUpperInvariant() : "?";
+            if (_playingAs != null)
+                _playingAs.text = $"Playing as <color=#F5EBD8><b>{(named ? typed : "Apostle")}</b></color>";
         }
 
-        // A box placed from the parent's top-left corner.
-        private static void TopLeft(RectTransform rect, float x,
-            float y, float width, float height)
+        // ---------- Shared pieces ----------
+
+        // A text box. On phones, tapping it opens the keyboard.
+        private static TMP_InputField CreateInputField(RectTransform parent, string name, string placeholderText,
+            float fontSize, TMP_FontAsset font, float spacing)
         {
-            rect.anchorMin = rect.anchorMax = new Vector2(0f, 1f);
-            rect.pivot = new Vector2(0f, 1f);
-            rect.anchoredPosition = new Vector2(x, -y);
-            rect.sizeDelta = new Vector2(width, height);
-        }
-
-        // Play Online opens the room list, where you can join, type a code or create a lobby.
-        private void BuildOnlinePanel(RectTransform parent)
-        {
-            RectTransform panel = CreateRect("OnlinePanel", parent);
-            Place(panel, new Vector2(400f, -40f), new Vector2(760f, 360f));
-            AddImage(panel, PanelColor);
-            Outline edge = panel.gameObject.AddComponent<Outline>();
-            edge.effectColor = GoldColor;
-            edge.effectDistance = new Vector2(3f, -3f);
-
-            TMP_Text title = CreateText("OnlineTitle", panel, "Online", 34f, FontStyles.Bold);
-            Place(title.rectTransform, new Vector2(0f, 110f), new Vector2(700f, 60f));
-            CreateButton("PlayOnline", panel, "Play Online", new Vector2(0f, 20f), new Vector2(400f, 84f),
-                PlayColor, OpenOnline);
-            TMP_Text hint = CreateText("OnlineHint", panel,
-                "Join a room, type a friend's code, or create your own lobby.", 22f, FontStyles.Normal);
-            Place(hint.rectTransform, new Vector2(0f, -60f), new Vector2(700f, 40f));
-            hint.color = new Color(1f, 1f, 1f, 0.7f);
-
-            _onlineStatus = CreateText("OnlineStatus", panel, "", 22f, FontStyles.Normal);
-            Place(_onlineStatus.rectTransform, new Vector2(0f, -130f), new Vector2(720f, 50f));
-            _onlineStatus.color = GoldColor;
-
-            BuildOnlinePopup((RectTransform)transform);
-        }
-
-        // Shown while in a room: the code, who has joined, and (for the host) the seat count and Start.
-        private void BuildRoomScreen(RectTransform root)
-        {
-            RectTransform panel = CreateRect("Room", root);
-            Place(panel, new Vector2(0f, -40f), new Vector2(900f, 400f));
-            AddImage(panel, PanelColor);
-            Outline edge = panel.gameObject.AddComponent<Outline>();
-            edge.effectColor = GoldColor;
-            edge.effectDistance = new Vector2(3f, -3f);
-            _roomScreen = panel.gameObject;
-
-            TMP_Text label = CreateText("CodeLabel", panel, "Room code", 28f, FontStyles.Bold);
-            Place(label.rectTransform, new Vector2(0f, 150f), new Vector2(800f, 44f));
-            _roomCode = CreateText("RoomCode", panel, "", 72f, FontStyles.Bold);
-            Place(_roomCode.rectTransform, new Vector2(0f, 85f), new Vector2(800f, 90f));
-            _roomCode.color = GoldColor;
-            _roomPlayers = CreateText("RoomPlayers", panel, "", 30f, FontStyles.Normal);
-            Place(_roomPlayers.rectTransform, new Vector2(0f, 20f), new Vector2(800f, 44f));
-
-            _roomSeatButtons = CreateRect("Seats", panel).gameObject;
-            var seats = (RectTransform)_roomSeatButtons.transform;
-            Stretch(seats);
-            CreateButton("FewerSeats", seats, "<", new Vector2(-160f, -35f), new Vector2(64f, 56f), ButtonColor, () => ChangeSeats(-1));
-            _roomSeats = CreateText("RoomSeats", seats, "", 30f, FontStyles.Bold);
-            Place(_roomSeats.rectTransform, new Vector2(0f, -35f), new Vector2(240f, 56f));
-            CreateButton("MoreSeats", seats, ">", new Vector2(160f, -35f), new Vector2(64f, 56f), ButtonColor, () => ChangeSeats(1));
-
-            _roomHint = CreateText("RoomHint", panel, "", 22f, FontStyles.Normal);
-            Place(_roomHint.rectTransform, new Vector2(0f, -90f), new Vector2(840f, 40f));
-            _roomHint.color = new Color(1f, 1f, 1f, 0.7f);
-
-            _roomStart = CreateButton("Start", panel, "Start", new Vector2(-130f, -155f), new Vector2(240f, 70f), PlayColor,
-                StartOnline).transform.parent.gameObject;
-            CreateButton("Leave", panel, "Leave", new Vector2(130f, -155f), new Vector2(240f, 70f), ButtonColor, LeaveRoom);
-            _roomStatus = CreateText("RoomStatus", panel, "", 20f, FontStyles.Normal);
-            Place(_roomStatus.rectTransform, new Vector2(0f, -205f), new Vector2(840f, 30f));
-            _roomStatus.color = GoldColor;
-            _roomScreen.SetActive(false);
-        }
-
-        // A text box for the room code. On phones, tapping it opens the keyboard.
-        private static TMP_InputField CreateInputField(string name, RectTransform parent, string placeholderText,
-            Vector2 position, Vector2 size)
-        {
-            RectTransform box = CreateRect(name, parent);
-            Place(box, position, size);
+            RectTransform box = Kit.Box(parent, name, Kit.Field, Kit.GoldLine, 10f, 2f);
             box.gameObject.SetActive(false); // set up completely before the field wakes up
-            Image image = AddImage(box, new Color(0.06f, 0.05f, 0.09f));
+            Image image = box.GetComponent<Image>();
             image.raycastTarget = true;
-            Outline edge = box.gameObject.AddComponent<Outline>();
-            edge.effectColor = new Color(1f, 0.85f, 0.4f, 0.6f);
-            edge.effectDistance = new Vector2(2f, -2f);
 
-            RectTransform area = CreateRect("Text Area", box);
-            Stretch(area);
-            area.offsetMin = new Vector2(14f, 6f);
-            area.offsetMax = new Vector2(-14f, -6f);
+            RectTransform area = Kit.Stretch(Kit.CreateRect("Text Area", box), 0f);
+            area.offsetMin = new Vector2(18f, 4f);
+            area.offsetMax = new Vector2(-18f, -4f);
             area.gameObject.AddComponent<RectMask2D>();
 
-            TMP_Text placeholder = CreateText("Placeholder", area, placeholderText, 30f, FontStyles.Italic);
-            Stretch(placeholder.rectTransform);
-            placeholder.color = new Color(1f, 1f, 1f, 0.35f);
-            TMP_Text text = CreateText("Text", area, "", 34f, FontStyles.Bold);
-            Stretch(text.rectTransform);
+            TMP_Text placeholder = Kit.Label(area, "Placeholder", placeholderText, fontSize * 0.8f, Kit.Inter,
+                new Color(1f, 1f, 1f, 0.3f));
+            Kit.Stretch(placeholder.rectTransform);
+            placeholder.fontStyle = FontStyles.Italic;
+            TMP_Text text = Kit.Label(area, "Text", "", fontSize, font, Kit.Text);
+            Kit.Stretch(text.rectTransform);
+            text.characterSpacing = spacing;
+            text.textWrappingMode = TextWrappingModes.NoWrap;
+            text.overflowMode = TextOverflowModes.Overflow;
 
             TMP_InputField field = box.gameObject.AddComponent<TMP_InputField>();
             field.textViewport = area;
@@ -490,72 +357,45 @@ namespace SoulBind.UI
             field.targetGraphic = image;
             field.characterLimit = 10;
             // Letters and digits only, in capitals (this replaces the field's own validation).
-            field.onValidateInput = (string _, int __, char c) => char.IsLetterOrDigit(c) ? char.ToUpperInvariant(c) : '\0';
+            field.onValidateInput = (string _, int __, char c) =>
+                char.IsLetterOrDigit(c) ? char.ToUpperInvariant(c) : '\0';
             box.gameObject.SetActive(true);
             return field;
         }
 
-        // Returns the button's label so it can be changed later.
-        private static TMP_Text CreateButton(string name, RectTransform parent, string label, Vector2 position, Vector2 size,
-            Color color, UnityEngine.Events.UnityAction onClick)
+        /// <summary>
+        /// Two choices side by side in a dark track; the picked one is gold.
+        /// Returns both labels so the caller can repaint them with ShowSegment.
+        /// </summary>
+        private static TMP_Text[] BuildSegmented(RectTransform parent, float x, float y, float width,
+            string left, string right, System.Action<bool> pick)
         {
-            RectTransform rect = CreateRect(name, parent);
-            Place(rect, position, size);
-            Image image = AddImage(rect, color);
-            image.raycastTarget = true;
-            Button button = rect.gameObject.AddComponent<Button>();
-            button.targetGraphic = image;
-            button.onClick.AddListener(onClick);
-            TMP_Text text = CreateText("Label", rect, label, Mathf.Min(40f, size.y * 0.5f), FontStyles.Bold);
-            Stretch(text.rectTransform);
-            return text;
+            RectTransform track = Kit.Box(parent, "Segmented", Kit.Inset, Kit.Line, 10f);
+            Kit.At(track, x, y, width, 52f);
+            float half = (width - 8f) / 2f;
+            TMP_Text a = Kit.Button(track, "Left", left, Kit.ButtonStyle.Ghost, () => pick(false), 15f, 7f);
+            Kit.At((RectTransform)a.transform.parent, 4f, 4f, half, 44f);
+            TMP_Text b = Kit.Button(track, "Right", right, Kit.ButtonStyle.Ghost, () => pick(true), 15f, 7f);
+            Kit.At((RectTransform)b.transform.parent, 4f + half, 4f, half, 44f);
+            return new[] { a, b };
         }
 
-        private static RectTransform CreateRect(string name, Transform parent)
+        // Paints a segmented control: the picked half gold with dark text, the other one plain.
+        private static void ShowSegment(TMP_Text[] halves, bool rightPicked)
         {
-            var go = new GameObject(name, typeof(RectTransform));
-            go.layer = parent.gameObject.layer;
-            var rect = (RectTransform)go.transform;
-            rect.SetParent(parent, false);
-            return rect;
-        }
-
-        private static void Stretch(RectTransform rect)
-        {
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
-        }
-
-        // A fixed-size box, positioned from the middle of the parent.
-        private static void Place(RectTransform rect, Vector2 position, Vector2 size)
-        {
-            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
-            rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = position;
-            rect.sizeDelta = size;
-        }
-
-        private static Image AddImage(RectTransform rect, Color color)
-        {
-            Image image = rect.gameObject.AddComponent<Image>();
-            image.color = color;
-            image.raycastTarget = false;
-            return image;
-        }
-
-        private static TMP_Text CreateText(string name, RectTransform parent, string text, float size, FontStyles style)
-        {
-            RectTransform rect = CreateRect(name, parent);
-            TextMeshProUGUI tmp = rect.gameObject.AddComponent<TextMeshProUGUI>();
-            tmp.text = text;
-            tmp.fontSize = size;
-            tmp.fontStyle = style;
-            tmp.alignment = TextAlignmentOptions.Center;
-            tmp.color = Color.white;
-            tmp.raycastTarget = false;
-            return tmp;
+            for (int i = 0; i < halves.Length; i++)
+            {
+                bool picked = (i == 1) == rightPicked;
+                var rect = (RectTransform)halves[i].transform.parent;
+                rect.GetComponent<Image>().color = picked ? Kit.Gold : Color.clear;
+                Transform border = rect.Find("Border");
+                if (border != null)
+                    border.gameObject.SetActive(false);
+                halves[i].color = picked ? Kit.PlayText : Kit.Soft;
+                TMP_FontAsset font = picked ? Kit.InterBold : Kit.InterSemiBold;
+                if (font != null)
+                    halves[i].font = font;
+            }
         }
     }
 }
