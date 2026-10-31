@@ -72,6 +72,23 @@ namespace SoulBind.Online
             };
         }
 
+        /// <summary>A room anyone can see in the Play Online list.</summary>
+        public readonly struct RoomInfo
+        {
+            public readonly string Id;
+            public readonly string Name;
+            public readonly int Players;
+            public readonly int MaxPlayers;
+
+            public RoomInfo(string id, string name, int players, int maxPlayers)
+            {
+                Id = id;
+                Name = name;
+                Players = players;
+                MaxPlayers = maxPlayers;
+            }
+        }
+
         /// <summary>True once the match scene has loaded for this room.</summary>
         public bool MatchStarted { get; private set; }
 
@@ -109,8 +126,11 @@ namespace SoulBind.Online
 
         // ---- Host / Join ----
 
-        /// <summary>Creates a room. Returns null when it worked, or a message saying what went wrong.</summary>
-        public async Task<string> HostAsync()
+        /// <summary>
+        /// Creates a room. A public room shows in everyone's room list; a private one
+        /// can only be joined with its code. Returns null when it worked, or what went wrong.
+        /// </summary>
+        public async Task<string> HostAsync(bool isPrivate)
         {
             try
             {
@@ -118,8 +138,10 @@ namespace SoulBind.Online
                 EnsureNetworkManager();
                 SessionOptions options = new SessionOptions
                 {
+                    Name = RoomName(),
                     MaxPlayers = GameConstants.MaxPlayers,
-                    IsPrivate = true, // only people with the code can find it
+                    IsPrivate = isPrivate,
+                    PlayerProperties = NameProperty(),
                 }.WithRelayNetwork();
                 _session = await MultiplayerService.Instance.CreateSessionAsync(options);
                 AfterEntering();
@@ -143,7 +165,8 @@ namespace SoulBind.Online
             {
                 await SignInAsync();
                 EnsureNetworkManager();
-                _session = await MultiplayerService.Instance.JoinSessionByCodeAsync(code);
+                var options = new JoinSessionOptions { PlayerProperties = NameProperty() };
+                _session = await MultiplayerService.Instance.JoinSessionByCodeAsync(code, options);
                 MatchSettings.SetOnline(GameConstants.MaxPlayers); // the host sends the real seat count
                 AfterEntering();
                 Debug.Log($"OnlineSession: joined room {code}.");
@@ -156,6 +179,83 @@ namespace SoulBind.Online
             }
         }
 
+        /// <summary>Joins a room picked from the room list. Returns null when it worked, or what went wrong.</summary>
+        public async Task<string> JoinByIdAsync(string id)
+        {
+            if (string.IsNullOrEmpty(id))
+                return "Pick a room first.";
+            try
+            {
+                await SignInAsync();
+                EnsureNetworkManager();
+                var options = new JoinSessionOptions { PlayerProperties = NameProperty() };
+                _session = await MultiplayerService.Instance.JoinSessionByIdAsync(id, options);
+                MatchSettings.SetOnline(GameConstants.MaxPlayers); // the host sends the real seat count
+                AfterEntering();
+                Debug.Log($"OnlineSession: joined room {_session.Code}.");
+                return null;
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+                return "Couldn't join: " + e.Message;
+            }
+        }
+
+        /// <summary>
+        /// Fills rooms with the public rooms that have a free seat and haven't started.
+        /// Returns null when it worked, or what went wrong.
+        /// </summary>
+        public static async Task<string> FindRoomsAsync(List<RoomInfo> rooms)
+        {
+            rooms.Clear();
+            try
+            {
+                await SignInAsync();
+                QuerySessionsResults results =
+                    await MultiplayerService.Instance.QuerySessionsAsync(new QuerySessionsOptions());
+                foreach (ISessionInfo info in results.Sessions)
+                {
+                    if (info.IsLocked || info.HasPassword || info.AvailableSlots <= 0)
+                        continue;
+                    int players = info.MaxPlayers - info.AvailableSlots;
+                    rooms.Add(new RoomInfo(info.Id, info.Name, players, info.MaxPlayers));
+                }
+                return null;
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+                return "Couldn't load the rooms: " + e.Message;
+            }
+        }
+
+        /// <summary>Fills players with everyone in this room and the names they typed.</summary>
+        public void GetRoomPlayers(List<RoomPlayer> players)
+        {
+            players.Clear();
+            if (_session == null || _session.Players == null)
+                return;
+            string me = _session.CurrentPlayer != null ? _session.CurrentPlayer.Id : null;
+            foreach (IReadOnlyPlayer player in _session.Players)
+            {
+                string name = string.Empty;
+                if (player.Properties != null
+                    && player.Properties.TryGetValue(NameKey, out PlayerProperty property)
+                    && property != null)
+                    name = property.Value ?? string.Empty;
+                bool isHost = player.Id == _session.Host;
+                players.Add(new RoomPlayer(name, isHost, player.Id == me));
+            }
+        }
+
+        // "Yves's room", or "SoulBind room" when no name is typed.
+        private static string RoomName()
+        {
+            string name = PlayerNames.LocalName;
+            return name.Length > 0 ? $"{name}'s room" : "SoulBind room";
+        }
+
         /// <summary>Host only: takes everyone in the room to the match scene. seats includes the bots.</summary>
         public string StartMatch(string gameSceneName, int seats)
         {
@@ -164,10 +264,26 @@ namespace SoulBind.Online
                 return "The connection isn't ready yet. Try again in a moment.";
 
             MatchSettings.SetOnline(Mathf.Max(seats, PlayerCount));
+            LockRoom();
             SceneEventProgressStatus status = network.SceneManager.LoadScene(gameSceneName, LoadSceneMode.Single);
             if (status != SceneEventProgressStatus.Started)
                 return $"Couldn't load '{gameSceneName}' ({status}). Is it in File > Build Settings?";
             return null;
+        }
+
+        // A started match leaves the room list, so nobody tries to join it.
+        private async void LockRoom()
+        {
+            try
+            {
+                IHostSession host = _session.AsHost();
+                host.IsLocked = true;
+                await host.SavePropertiesAsync();
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("OnlineSession: couldn't lock the room: " + e.Message);
+            }
         }
 
         /// <summary>Leaves the room and stops the connection.</summary>

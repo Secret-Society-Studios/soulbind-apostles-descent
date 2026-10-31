@@ -14,10 +14,11 @@ namespace SoulBind.UI
     /// friends taking turns on this device), Play and Quit. It builds its own layout at runtime on the
     /// Canvas it sits on, so the menu scene needs no hand setup (SoulBind > Create Main Menu Scene).
     ///
-    /// Online: Host Online creates a room and shows its code; friends type the code and Join. The
-    /// room screen shows who has joined; the host presses Start, and bots take the empty seats.
+    /// Online: Play Online opens the room list (MainMenuView.Online.cs): join a public room, type a
+    /// code, or create a lobby. The room screen shows who has joined; the host presses Start, and bots
+    /// take the empty seats.
     /// </summary>
-    public sealed class MainMenuView : MonoBehaviour
+    public sealed partial class MainMenuView : MonoBehaviour
     {
         [Tooltip("The match scene Play loads. It must be in File > Build Settings.")]
         [SerializeField] private string gameSceneName = "SampleScene";
@@ -38,7 +39,6 @@ namespace SoulBind.UI
         // Online
         private GameObject _choicesScreen;
         private GameObject _roomScreen;
-        private TMP_InputField _codeField;
         private TMP_InputField _nameField;
         private GameObject _profilePopup;
         private TMP_Text _profileName;
@@ -54,6 +54,7 @@ namespace SoulBind.UI
         private bool _busy;
         private int _shownPlayers = -1;
         private int _shownSeats = -1;
+        private string _shownNames;
 
         private void Start()
         {
@@ -87,6 +88,8 @@ namespace SoulBind.UI
             }
             if (inRoom)
                 ShowRoom(session, false);
+            else
+                UpdateRoomList();
         }
 
         private void ChangePlayers(int delta)
@@ -119,33 +122,7 @@ namespace SoulBind.UI
 
         // ---- Online ----
 
-        private async void HostOnline()
-        {
-            if (_busy)
-                return;
-            _busy = true;
-            _onlineStatus.text = "Creating a room...";
-            string error = await OnlineSession.GetOrCreate().HostAsync();
-            _busy = false;
-            if (this == null)
-                return; // the menu closed meanwhile
-            _onlineStatus.text = error ?? string.Empty;
-            ShowScreen();
-        }
-
-        private async void JoinOnline()
-        {
-            if (_busy)
-                return;
-            _busy = true;
-            _onlineStatus.text = "Joining...";
-            string error = await OnlineSession.GetOrCreate().JoinAsync(_codeField.text);
-            _busy = false;
-            if (this == null)
-                return;
-            _onlineStatus.text = error ?? string.Empty;
-            ShowScreen();
-        }
+        // Host, Join and the room list are in MainMenuView.Online.cs.
 
         private void StartOnline()
         {
@@ -170,6 +147,8 @@ namespace SoulBind.UI
             _choicesScreen.SetActive(!inRoom);
             _roomScreen.SetActive(inRoom);
             if (inRoom)
+                CloseOnline();
+            if (inRoom)
             {
                 _roomStatus.text = string.Empty;
                 ShowRoom(session, true);
@@ -182,13 +161,15 @@ namespace SoulBind.UI
             int joined = session.PlayerCount;
             if (session.IsHost && _players < joined)
                 _players = Mathf.Min(joined, 6);
-            if (!force && joined == _shownPlayers && _players == _shownSeats)
+            string names = RoomNames(session);
+            if (!force && joined == _shownPlayers && _players == _shownSeats && names == _shownNames)
                 return;
             _shownPlayers = joined;
             _shownSeats = _players;
+            _shownNames = names;
 
             _roomCode.text = session.Code;
-            _roomPlayers.text = joined == 1 ? "1 player in the room" : $"{joined} players in the room";
+            _roomPlayers.text = (joined == 1 ? "1 player: " : $"{joined} players: ") + names;
             _roomStart.SetActive(session.IsHost);
             _roomSeatButtons.SetActive(session.IsHost);
             _roomSeats.text = session.IsHost ? $"Apostles: {_players}" : string.Empty;
@@ -411,7 +392,7 @@ namespace SoulBind.UI
             rect.sizeDelta = new Vector2(width, height);
         }
 
-        // Host a room, or type a code and join one.
+        // Play Online opens the room list, where you can join, type a code or create a lobby.
         private void BuildOnlinePanel(RectTransform parent)
         {
             RectTransform panel = CreateRect("OnlinePanel", parent);
@@ -422,19 +403,19 @@ namespace SoulBind.UI
             edge.effectDistance = new Vector2(3f, -3f);
 
             TMP_Text title = CreateText("OnlineTitle", panel, "Online", 34f, FontStyles.Bold);
-            Place(title.rectTransform, new Vector2(0f, 130f), new Vector2(700f, 60f));
-            CreateButton("Host", panel, "Host Online", new Vector2(0f, 55f), new Vector2(360f, 72f), PlayColor, HostOnline);
-            TMP_Text hostHint = CreateText("HostHint", panel, "Uses the Apostles count on the left. Bots take the empty seats.",
-                20f, FontStyles.Normal);
-            Place(hostHint.rectTransform, new Vector2(0f, 0f), new Vector2(700f, 36f));
-            hostHint.color = new Color(1f, 1f, 1f, 0.7f);
-
-            _codeField = CreateInputField("Code", panel, "Room code", new Vector2(-120f, -70f), new Vector2(330f, 68f));
-            CreateButton("Join", panel, "Join", new Vector2(175f, -70f), new Vector2(200f, 68f), ButtonColor, JoinOnline);
+            Place(title.rectTransform, new Vector2(0f, 110f), new Vector2(700f, 60f));
+            CreateButton("PlayOnline", panel, "Play Online", new Vector2(0f, 20f), new Vector2(400f, 84f),
+                PlayColor, OpenOnline);
+            TMP_Text hint = CreateText("OnlineHint", panel,
+                "Join a room, type a friend's code, or create your own lobby.", 22f, FontStyles.Normal);
+            Place(hint.rectTransform, new Vector2(0f, -60f), new Vector2(700f, 40f));
+            hint.color = new Color(1f, 1f, 1f, 0.7f);
 
             _onlineStatus = CreateText("OnlineStatus", panel, "", 22f, FontStyles.Normal);
-            Place(_onlineStatus.rectTransform, new Vector2(0f, -140f), new Vector2(720f, 50f));
+            Place(_onlineStatus.rectTransform, new Vector2(0f, -130f), new Vector2(720f, 50f));
             _onlineStatus.color = GoldColor;
+
+            BuildOnlinePopup((RectTransform)transform);
         }
 
         // Shown while in a room: the code, who has joined, and (for the host) the seat count and Start.
