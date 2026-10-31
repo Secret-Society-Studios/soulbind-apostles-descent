@@ -65,6 +65,12 @@ namespace SoulBind.UI
         [Tooltip("Opponents' hands bigger than this show this many face-down cards (the label still gives the real count). Your own hand always shows every card.")]
         [SerializeField, Range(1, 15)] private int maxCardsShown = 10;
 
+        [Header("Standing cards")]
+        [Tooltip("Opponents' cards stand up from the table by this many degrees, like a hand held up (0 = flat).")]
+        [SerializeField, Range(0f, 80f)] private float standAngle = 60f;
+        [Tooltip("Your own cards tilt up by this much. 0 keeps them flat: easiest to read, hover and drag.")]
+        [SerializeField, Range(0f, 60f)] private float yourStandAngle = 0f;
+
         [Header("Glows around the hands")]
         [Tooltip("The hand of the Apostle whose turn it is glows in this colour (pulsing slowly).")]
         [SerializeField] private Color turnGlowColor = new Color(1f, 0.80f, 0.42f, 1f);
@@ -689,8 +695,8 @@ namespace SoulBind.UI
             rect.anchorMin = new Vector2(0.5f, 0.5f);
             rect.anchorMax = new Vector2(0.5f, 0.5f);
             rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.localRotation = Quaternion.identity;
             rect.localScale = Vector3.one * seat.CardScale;
+            Stand(rect, yourStandAngle, CardHeight * seat.CardScale);
             if (face.GetComponent<CanvasGroup>() == null)
                 face.gameObject.AddComponent<CanvasGroup>();
             face.HoverStarted += OnHoverStarted;
@@ -702,6 +708,17 @@ namespace SoulBind.UI
             return face;
         }
 
+        // Stands a card up from its outer edge: tipped about the row's axis (its top, which faces the
+        // board, rises toward the camera) and lifted so the bottom edge stays on the table.
+        // anchoredPosition only moves x and y, so the lift survives the layout.
+        private static void Stand(RectTransform card, float angle, float height)
+        {
+            card.localRotation = Quaternion.Euler(-angle, 0f, 0f);
+            Vector3 position = card.anchoredPosition3D;
+            position.z = -0.5f * height * Mathf.Sin(angle * Mathf.Deg2Rad);
+            card.anchoredPosition3D = position;
+        }
+
         private RectTransform CreateBack(Seat seat)
         {
             RectTransform back = Instantiate(drawPile.CardBackTemplate, seat.Root);
@@ -711,7 +728,7 @@ namespace SoulBind.UI
             back.pivot = new Vector2(0.5f, 0.5f);
             back.sizeDelta = new Vector2(CardWidth, CardHeight);
             back.localScale = Vector3.one;
-            back.localRotation = Quaternion.identity;
+            Stand(back, standAngle, CardHeight);
 
             // edged in the owner's colour, so each card shows whose hand it belongs to.
             if (back.GetComponent<Image>() != null)
@@ -864,7 +881,7 @@ namespace SoulBind.UI
 
                 RectTransform rect = face.Rect;
                 rect.anchoredPosition = Vector2.Lerp(rect.anchoredPosition, target, t);
-                rect.localRotation = Quaternion.identity;
+                rect.localRotation = Quaternion.Euler(-yourStandAngle, 0f, 0f);
                 rect.localScale = Vector3.Lerp(rect.localScale, Vector3.one * scale, t);
             }
         }
