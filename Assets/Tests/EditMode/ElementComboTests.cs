@@ -141,6 +141,8 @@ namespace SoulBind.Tests.EditMode
 
             Play(match, ArcanaId.Death, target.Id);
             Play(match, ArcanaId.HighPriestess);
+            Assert.AreEqual(0, target.Corruption, "The combo waits for Strike");
+            match.Strike(out _);
 
             Assert.AreEqual(1, target.Corruption);
         }
@@ -197,6 +199,7 @@ namespace SoulBind.Tests.EditMode
 
             Play(match, ArcanaId.Death, near.Id);
             Play(match, ArcanaId.HighPriestess, 0, far.Id);
+            match.Strike(out _);
 
             Assert.AreEqual(1, far.Corruption);
             Assert.AreEqual(0, near.Corruption);
@@ -246,6 +249,7 @@ namespace SoulBind.Tests.EditMode
             Play(match, ArcanaId.Lovers);
 
             Assert.AreEqual(10, match.PendingAttack, "4 + 4 + Lovers pair 2");
+            match.Strike(out _);
             Assert.AreEqual(10, player.Shield, "4 + 4 + Radiance combo 2");
         }
     }

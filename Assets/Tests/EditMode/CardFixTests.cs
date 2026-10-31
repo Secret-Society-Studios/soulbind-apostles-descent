@@ -53,9 +53,9 @@ namespace SoulBind.Tests.EditMode
 
             Assert.AreEqual(EngagementState.Engaged, match.Engagement);
             Assert.AreEqual(2, match.PendingAttack, "The +2 ATK is in the attack right away");
-            Assert.AreEqual(2, match.CurrentApostle.Defense);
             match.Strike(out AttackOutcome outcome);
             Assert.AreEqual(2, outcome.Damage, "Counted once, not twice");
+            Assert.AreEqual(2, match.CurrentApostle.Defense, "The +2 DEF lands when the queue resolves");
         }
 
         [Test]
@@ -113,6 +113,7 @@ namespace SoulBind.Tests.EditMode
 
             Assert.AreEqual(CardPlayResult.Success, match.PlayCard(ArcanaId.Magician, target.Id));
             Assert.AreEqual(CardPlayResult.Success, match.PlayCard(ArcanaId.WheelOfFortune, 0));
+            match.Strike(out _);
 
             int moons = 0;
             foreach (ArcanaId card in match.GetHand(player.Id))

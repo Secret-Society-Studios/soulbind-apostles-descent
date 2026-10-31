@@ -9,6 +9,10 @@ namespace SoulBind.Core
     {
         public const int PairBonus = 2;
 
+        // Every second Lovers in the attack completes a pair.
+        public override int GetAttackPreview(int phase, int sameBefore) =>
+            sameBefore % 2 == 1 ? PairBonus : 0;
+
         public override void OnPlayed(CardPlayContext context)
         {
             if (!context.IsAttacking)
