@@ -71,7 +71,7 @@ namespace SoulBind.Core
             s.EmperorArmed = _emperorArmed;
             s.SkipRestOfRound = _skipRestOfRound;
             Array.Copy(_elementsPlayedThisTurn, s.ElementsPlayedThisTurn, _elementsPlayedThisTurn.Length);
-            s.AttackCards.AddRange(_attackCards);
+            s.AttackCards.AddRange(_queuedCards);
             s.LastStrikeHits.AddRange(_lastStrikeHits);
 
             s.IsOver = IsOver;
@@ -155,7 +155,11 @@ namespace SoulBind.Core
             _nocturneVictimId = 0;
             Array.Copy(snapshot.ElementsPlayedThisTurn, _elementsPlayedThisTurn, _elementsPlayedThisTurn.Length);
             _attackCards.Clear();
-            _attackCards.AddRange(snapshot.AttackCards);
+            _queuedCards.Clear();
+            _queuedCards.AddRange(snapshot.AttackCards);
+            _queuedPicks.Clear();
+            for (int i = 0; i < _queuedCards.Count; i++)
+                _queuedPicks.Add(0);
             _lastStrikeHits.Clear();
             _lastStrikeHits.AddRange(snapshot.LastStrikeHits);
 

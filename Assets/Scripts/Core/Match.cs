@@ -35,6 +35,12 @@ namespace SoulBind.Core
         // Every card that is part of the current attack, in play order (for The Lovers).
         private readonly List<ArcanaId> _attackCards = new List<ArcanaId>(8);
 
+        // Cards waiting in the attack queue, in play order. They resolve on Strike.
+        private readonly List<ArcanaId> _queuedCards = new List<ArcanaId>(8);
+
+        // The opponent picked with each queued card (Nocturne, Wheel), or 0.
+        private readonly List<int> _queuedPicks = new List<int>(8);
+
         // Set by The Emperor: the attack doubles at Strike if the target is more Corrupted than the player.
         private bool _emperorArmed;
 
@@ -282,6 +288,10 @@ namespace SoulBind.Core
                 }
             }
 
+            // An attack card waits in the queue: Capacity is held, the rest happens on Strike.
+            if (engagesNow || Engagement == EngagementState.Engaged)
+                return QueueCard(card, targetId, comboTargetId, engagesNow);
+
             // Nocturne combo: if this card is the turn's 2nd Nocturne, work out who it hits now,
             // so an invalid or missing pick changes nothing.
             int nocturneVictimId = 0;
@@ -351,6 +361,23 @@ namespace SoulBind.Core
             }
             // While Free with no target, the card's ATK is lost and only its DEF applies.
 
+            RunEffectAndCombo(card, definition);
+
+            // Temperance: the turn ends now, exactly as if End Turn had been pressed.
+            if (_endTurnRequested)
+            {
+                _endTurnRequested = false;
+                if (!IsOver)
+                    EndTurn();
+            }
+
+            return CardPlayResult.Success;
+        }
+
+        // The card's effect, the attack list and the element combo: the part of
+        // playing a card that both a direct play and the queue need.
+        private void RunEffectAndCombo(ArcanaId card, CardDefinition definition)
+        {
             // Then the card's own effect, if it has one.
             CardEffect effect = CardEffects.Get(card);
             if (effect != null)
@@ -390,21 +417,111 @@ namespace SoulBind.Core
                 ApplyCombo(definition.Element);
                 UpdateGameOver();
             }
+        }
 
-            // Temperance: the turn ends now, exactly as if End Turn had been pressed.
-            if (_endTurnRequested)
+        // Puts an attack card in the queue: its Capacity is held and it leaves the hand.
+        // DEF, ATK, effect and combo wait for Strike (see ResolveQueue).
+        private CardPlayResult QueueCard(ArcanaId card, int targetId, int pickId, bool engagesNow)
+        {
+            CardDefinition definition = CardCatalog.Get(card);
+            bool usesPick = card == ArcanaId.WheelOfFortune || definition.Element == Element.Nocturne;
+            if (!usesPick)
+                pickId = 0;
+            if (pickId != 0)
             {
-                _endTurnRequested = false;
-                if (!IsOver)
-                    EndTurn();
+                ApostleState picked = TryFindApostle(pickId);
+                if (picked == null || picked == CurrentApostle || picked.IsEliminated)
+                    return CardPlayResult.InvalidComboTarget;
             }
 
+            if (definition.Cap > 0)
+                CurrentCapacity.Spend(definition.Cap);
+            _hands[IndexOf(CurrentApostle.Id)].Remove(card);
+            _queuedCards.Add(card);
+            _queuedPicks.Add(pickId);
+
+            if (engagesNow)
+            {
+                Engagement = EngagementState.Engaged;
+                EngagedTargetId = targetId;
+                // A new attack: the last one's hits are old news.
+                _lastStrikeHits.Clear();
+            }
+            UpdateAttackPreview();
             return CardPlayResult.Success;
         }
 
-        /// <summary>True if this element's combo has already triggered this turn.</summary>
+        /// <summary>
+        /// Takes a queued card back into the hand and gives its Capacity back. If the queue
+        /// empties, the attack is called off (Free again). False, and no change, for a bad index.
+        /// </summary>
+        public bool ReturnQueuedCard(int index)
+        {
+            RequireActiveTurn();
+            if (Engagement != EngagementState.Engaged)
+                return false;
+            if (index < 0 || index >= _queuedCards.Count)
+                return false;
+
+            ArcanaId card = _queuedCards[index];
+            _queuedCards.RemoveAt(index);
+            _queuedPicks.RemoveAt(index);
+            _hands[IndexOf(CurrentApostle.Id)].Add(card);
+
+            int cap = CardCatalog.Get(card).Cap;
+            if (cap > 0)
+                CurrentCapacity.RestoreRemaining(CurrentCapacity.Remaining + cap);
+
+            if (_queuedCards.Count == 0)
+                ResetEngagement();
+            else
+                UpdateAttackPreview();
+            return true;
+        }
+
+        // ATK shown before Strike: printed ATK plus running ATK bonuses.
+        // Effect bonuses and the Crimson combo join when the queue resolves.
+        private void UpdateAttackPreview()
+        {
+            int total = CurrentApostle.GetTimedTotal(TimedEffectKind.Attack);
+            for (int i = 0; i < _queuedCards.Count; i++)
+                total += CardAttack.Of(_queuedCards[i]);
+            PendingAttack = total;
+        }
+
+        // Plays out the queued cards in order, as if each were played now.
+        // If the match ends partway, the rest just go to the discard pile.
+        private void ResolveQueue()
+        {
+            PendingAttack = CurrentApostle.GetTimedTotal(TimedEffectKind.Attack);
+            for (int i = 0; i < _queuedCards.Count; i++)
+            {
+                if (IsOver)
+                    Deck.Discard(_queuedCards[i]);
+                else
+                    ResolveCard(_queuedCards[i], _queuedPicks[i]);
+            }
+            _queuedCards.Clear();
+            _queuedPicks.Clear();
+        }
+
+        // One queued card: discard, DEF, ATK, then effect and combo.
+        // With no pick, Nocturne and Wheel use the attack target.
+        private void ResolveCard(ArcanaId card, int pickId)
+        {
+            CardDefinition definition = CardCatalog.Get(card);
+            _nocturneVictimId = pickId != 0 ? pickId : EngagedTargetId;
+            _pickedTargetId = card == ArcanaId.WheelOfFortune ? pickId : 0;
+            LastSwapTargetId = 0;
+            Deck.Discard(card);
+            CurrentApostle.AddShield(definition.Defense);
+            PendingAttack += CardAttack.Of(card);
+            RunEffectAndCombo(card, definition);
+        }
+
+        /// <summary>True if this element's combo has triggered this turn, queued cards included.</summary>
         public bool IsComboTriggered(Element element) =>
-            _elementsPlayedThisTurn[(int)element] >= ElementCombo.CardsNeeded;
+            GetElementsPlayedThisTurn(element) >= ElementCombo.CardsNeeded;
 
         private void ApplyCombo(Element element)
         {
@@ -522,10 +639,33 @@ namespace SoulBind.Core
         /// </summary>
         public bool Strike(out AttackOutcome outcome)
         {
+            bool struck = ResolveStrike(out outcome);
+
+            // Temperance in the queue: the turn ends once the attack is over.
+            if (_endTurnRequested)
+            {
+                _endTurnRequested = false;
+                if (struck && !IsOver)
+                    EndTurn();
+            }
+            return struck;
+        }
+
+        // Strike without Temperance's end of turn (EndTurn uses this).
+        private bool ResolveStrike(out AttackOutcome outcome)
+        {
             RequireActiveTurn();
             outcome = default;
             if (Engagement != EngagementState.Engaged)
                 return false;
+
+            // The queued cards happen first, in order.
+            ResolveQueue();
+            if (IsOver)
+            {
+                ResetEngagement();
+                return true;
+            }
 
             int primaryId = EngagedTargetId;
             int totalAttack = PendingAttack; // timed ATK bonuses were added as the attack started (see PlayCard)
@@ -668,7 +808,8 @@ namespace SoulBind.Core
 
             if (Engagement == EngagementState.Engaged)
             {
-                Strike(out _);
+                ResolveStrike(out _);
+                _endTurnRequested = false;
                 if (IsOver)
                     return TurnEvent.NextTurn;
             }
@@ -817,6 +958,8 @@ namespace SoulBind.Core
             PendingAttack = 0;
             _executeBelowVessel = 0;
             _attackCards.Clear();
+            _queuedCards.Clear();
+            _queuedPicks.Clear();
             _emperorArmed = false;
         }
 
