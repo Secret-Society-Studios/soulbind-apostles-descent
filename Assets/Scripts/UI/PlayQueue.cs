@@ -29,7 +29,8 @@ namespace SoulBind.UI
         private const float ChipHeight = 26f;
         private const float TotalHeight = 30f;
         private const float ButtonHeight = 62f;
-        private const float PhoneScale = 0.8f;
+        private const float Scale = 1.25f;        // the whole panel, so it reads at a glance
+        private const float PhoneScale = 0.8f;    // on top of Scale
         private const int MaxRows = 8;             // more cards than this are not listed
 
         private static readonly string[] ElementNames = { "RADIANCE", "CELESTE", "CRIMSON", "NOCTURNE" };
@@ -84,8 +85,8 @@ namespace SoulBind.UI
             rect.anchorMin = rect.anchorMax = new Vector2(0f, 1f);
             rect.pivot = new Vector2(0f, 1f);
             rect.anchoredPosition = new Vector2(Left, -Top);
-            if (Application.isMobilePlatform)
-                rect.localScale = Vector3.one * PhoneScale;
+            float scale = Application.isMobilePlatform ? Scale * PhoneScale : Scale;
+            rect.localScale = Vector3.one * scale;
 
             PlayQueue queue = go.AddComponent<PlayQueue>();
             queue._controller = controller;

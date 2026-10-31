@@ -174,7 +174,7 @@ namespace SoulBind.UI
             AddFrameLines(frame, false);
             BuildBackButton(frame, () => ShowScreen(Screen.Main));
 
-            TMP_Text title = Kit.Label(frame, "Title", "Play Online", 40f, Kit.Cinzel, Kit.Title,
+            TMP_Text title = Kit.Label(frame, "Title", "Play Online", 40f, Kit.Display, Kit.Title,
                 TextAlignmentOptions.Left);
             Kit.At(title.rectTransform, 128f, 44f, 500f, 52f);
             title.characterSpacing = 6f;
@@ -190,7 +190,7 @@ namespace SoulBind.UI
         {
             RectTransform card = Kit.Box(frame, name, Kit.Panel, Kit.GoldLine, 14f);
             Kit.At(card, x, 140f, width, 470f);
-            TMP_Text title = Kit.Label(card, "Heading", heading, 26f, Kit.Cinzel, Kit.Text,
+            TMP_Text title = Kit.Label(card, "Heading", heading, 26f, Kit.Display, Kit.Text,
                 TextAlignmentOptions.Left);
             Kit.At(title.rectTransform, 32f, 28f, width - 64f, 36f);
             TMP_Text hint = Kit.Label(card, "Sub", sub, 14f, Kit.Inter, Kit.Muted, TextAlignmentOptions.TopLeft);
@@ -208,7 +208,7 @@ namespace SoulBind.UI
             Kit.At((RectTransform)refresh.transform.parent, RoomsWidth - 132f, 32f, 100f, 32f);
 
             // Join with a code.
-            _codeField = CreateInputField(card, "Code", "ROOM CODE", 26f, Kit.Cinzel, 16f);
+            _codeField = CreateInputField(card, "Code", "ROOM CODE", 26f, Kit.Display, 16f);
             Kit.At((RectTransform)_codeField.transform, 32f, 104f, 300f, 56f);
             _codeField.onSubmit.AddListener(_ => JoinOnline());
             TMP_Text join = Kit.Button(card, "Join", "Join", Kit.ButtonStyle.Outline, JoinOnline, 19f);
