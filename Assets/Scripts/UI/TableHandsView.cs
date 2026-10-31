@@ -45,6 +45,9 @@ namespace SoulBind.UI
         [SerializeField, Range(0.3f, 1f)] private float mobilePreviewScale = 0.6f;
         [Tooltip("Tick to see the phone preview size while testing in the Editor.")]
         [SerializeField] private bool previewMobileInEditor;
+        [Tooltip("How far above the middle of the screen the card preview sits.")]
+        [SerializeField] private float previewRaise = 40f;
+
 
         [Header("Cards on the table")]
         [Tooltip("Height of an opponent's card on the table, in world units (a hex tile is about 1).")]
@@ -152,6 +155,9 @@ namespace SoulBind.UI
         private ArcanaId _pinned;
         private CanvasGroup _previewGroup;
         private Camera _previewCamera;
+        // Under a pinned preview: a tap anywhere else closes it, and never reacher the board.
+        private GameObject _previewBlocker;
+        private int _pinnedFrame = -1; // the frame a card was pinned, so that same tap doesn't close it
 
         private void Awake()
         {
@@ -164,11 +170,53 @@ namespace SoulBind.UI
                 group.blocksRaycasts = false;
                 group.interactable = false;
                 _previewGroup = group;
+                CenterPreview();
+                _previewBlocker = CreatePreviewBlocker();
                 preview.gameObject.SetActive(false);
             }
             if (previewReason != null)
                 previewReason.gameObject.SetActive(false);
             ShrinkPreviewOnPhones();
+        }
+
+        // The preview sits in the middle of the screen, a little high,
+        // so the hand along the bottom stays visible.
+        private void CenterPreview()
+        {
+            var middle = new Vector2(0.5f, 0.5f);
+            RectTransform rect = preview.Rect;
+            rect.anchorMin = rect.anchorMax = middle;
+            rect.pivot = middle;
+            rect.anchoredPosition = new Vector2(0f, previewRaise);
+            rect.SetAsLastSibling();
+            if (previewReason == null)
+                return;
+
+            // The "can't play" line sits just under the card.
+            RectTransform reason = previewReason.rectTransform;
+            reason.anchorMin = reason.anchorMax = middle;
+            reason.pivot = new Vector2(0.5f, 1f);
+            float half = rect.rect.height * 0.5f * rect.localScale.y;
+            reason.anchoredPosition = new Vector2(0f, previewRaise - half - 10f);
+            reason.SetAsLastSibling();
+        }
+
+        // A clear full-screen layer just under the preview.
+        // It is only switched on while a card is pinned.
+        private GameObject CreatePreviewBlocker()
+        {
+            var go = new GameObject("PreviewBlocker", typeof(RectTransform), typeof(Image));
+            var rect = (RectTransform)go.transform;
+            rect.SetParent(preview.Rect.parent, false);
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            rect.SetSiblingIndex(preview.Rect.GetSiblingIndex()); // just under the preview
+            var image = (Image)go.GetComponent(typeof(Image));
+            image.color = Color.clear; // invisible, but still catches taps
+            go.SetActive(false);
+            return go;
         }
 
         // On a phone the big PC preview covers too much of the board, so it is drawn smaller there.
@@ -713,6 +761,8 @@ namespace SoulBind.UI
                 previewReason.gameObject.SetActive(false);
             if (_previewGroup != null)
                 _previewGroup.blocksRaycasts = false;
+            if (_previewBlocker != null)
+                _previewBlocker.SetActive(false);
         }
 
         private void Unpin()
@@ -724,19 +774,24 @@ namespace SoulBind.UI
                 HidePreview();
         }
 
-        // Tapping (or clicking) the pinned preview puts it away.
+        // While a card is pinned, a tap outside the preview puts it away.
+        // It closes when the tap lets go: the blocker caught the press,
+        // so the board and the hand never saw it.
         private void CheckPreviewTap()
         {
             if (!_hasPinned || preview == null || !preview.gameObject.activeInHierarchy)
                 return;
+            if (Time.frameCount == _pinnedFrame)
+                return; // the tap that pinned it
             Pointer pointer = Pointer.current;
-            if (pointer == null || !pointer.press.wasPressedThisFrame)
+            if (pointer == null || !pointer.press.wasReleasedThisFrame)
                 return;
-            if (RectTransformUtility.RectangleContainsScreenPoint(preview.Rect, pointer.position.ReadValue(), _previewCamera))
-            {
-                _hovered = null;
-                Unpin();
-            }
+            Vector2 point = pointer.position.ReadValue();
+            if (RectTransformUtility.RectangleContainsScreenPoint(preview.Rect, point, _previewCamera))
+                return; // a tap on the preview itself keeps it open
+            _hovered = null;
+            Unpin();
+            HidePreview();
         }
 
         // Puts your cards back in hand order (after the tray) once a hovered card was brought to the front.
@@ -767,7 +822,7 @@ namespace SoulBind.UI
             }
         }
 
-        // A tap only shows the card: its preview stays up until the preview is tapped.
+        // A tap only shows the card: its preview stays up until you tap outside it.
         // Cards are played by dragging them out of the hand.
         private void OnClicked(CardView card)
         {
@@ -777,6 +832,9 @@ namespace SoulBind.UI
             // While pinned, the preview catches taps, so a tap on it never reaches the board underneath.
             if (_previewGroup != null)
                 _previewGroup.blocksRaycasts = true;
+            _pinnedFrame = Time.frameCount;
+            if (_previewBlocker != null)
+                _previewBlocker.SetActive(true);
         }
 
         private void OnDragStarted(CardView card, PointerEventData eventData)
