@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace SoulBind.Core
 {
     // Online play: questions a player's screen can answer from its own copy of the match,
@@ -6,6 +8,9 @@ namespace SoulBind.Core
     {
         /// <summary>How many cards of this element the current Apostle has played this turn.</summary>
         public int GetElementsPlayedThisTurn(Element element) => _elementsPlayedThisTurn[(int)element];
+                
+        /// <summary>The cards played into the attack in progress, in order (empty when not Engaged).</summary>
+        public IReadOnlyList<ArcanaId> AttackCards => _attackCards;
 
         /// <summary>
         /// True if playing this card now (with this attack target, 0 = not attacking) needs the player
@@ -19,8 +24,7 @@ namespace SoulBind.Core
                 return false;
             if (card == ArcanaId.WheelOfFortune)
                 return true;
-            return CardCatalog.Get(card).Element == Element.Nocturne
-                   && _elementsPlayedThisTurn[(int)Element.Nocturne] == ElementCombo.CardsNeeded - 1;
+            return CardCatalog.Get(card).Element == Element.Nocturne && _elementsPlayedThisTurn[(int)Element.Nocturne] == ElementCombo.CardsNeeded - 1;
         }
     }
 }

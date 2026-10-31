@@ -215,8 +215,35 @@ namespace SoulBind.UI
             rect.SetSiblingIndex(preview.Rect.GetSiblingIndex()); // just under the preview
             var image = (Image)go.GetComponent(typeof(Image));
             image.color = Color.clear; // invisible, but still catches taps
+            // Your own cards stay draggable through it.
+            go.AddComponent<BlockerFilter>().Owner = this;
             go.SetActive(false);
             return go;
+        }
+        // True if this screen point is over one of your hand cards.
+        private bool IsOverYourCard(Vector2 screenPoint)
+        {
+            if (_yours == null)
+                return false;
+            for (int i = 0; i < _yours.Faces.Count; i++)
+            {
+                CardView face = _yours.Faces[i];
+                if (!face.gameObject.activeInHierarchy)
+                    continue;
+                if (RectTransformUtility.RectangleContainsScreenPoint(face.Rect, screenPoint, _camera))
+                    return true;
+            }
+            return false;
+        }
+
+        // Makes the preview blocker see-through where your hand cards are,
+        // so a pinned preview never stops you dragging a card.
+        private sealed class BlockerFilter : MonoBehaviour, ICanvasRaycastFilter
+        {
+            public TableHandsView Owner;
+
+            public bool IsRaycastLocationValid(Vector2 screenPoint, Camera eventCamera) =>
+                Owner == null || !Owner.IsOverYourCard(screenPoint);
         }
 
         // On a phone the big PC preview covers too much of the board, so it is drawn smaller there.
