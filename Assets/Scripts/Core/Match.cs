@@ -258,6 +258,25 @@ namespace SoulBind.Core
         }
 
         /// <summary>
+        /// Fills path with the shortest walk to destination for the current Apostle this turn, one
+        /// tile per step (destination last). False, with path empty, if it is out of reach. Each step
+        /// is still its own Move. The caller supplies the list so it can be reused without allocating.
+        /// </summary>
+        public bool TryGetPath(HexCoord destination, List<HexCoord> path)
+        {
+            if (path == null)
+                throw new ArgumentNullException(nameof(path));
+            if (CurrentApostle == null || Engagement == EngagementState.Engaged)
+            {
+                path.Clear();
+                return false;
+            }
+
+            bool closed = IsAscensionTileClosedTo(CurrentApostle, Ascension.Tile);
+            return Battlefield.TryGetPath(CurrentApostle, CurrentCapacity, closed, Ascension.Tile, destination, path);
+        }
+
+        /// <summary>
         /// Plays a card from the current Apostle's hand into the queue: its CAP is held and it leaves
         /// the hand, and ReturnQueuedCard takes it back. Its DEF, ATK, effect and combo happen when the
         /// queue resolves: on Strike in an attack, otherwise on PlayQueued (or End Turn).

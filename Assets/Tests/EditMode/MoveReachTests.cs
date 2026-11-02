@@ -93,6 +93,61 @@ namespace SoulBind.Tests.EditMode
         }
 
         [Test]
+        public void Path_ToFarTile_IsOneTileAtATime()
+        {
+            var field = MakeField();
+            var a = At(1, 0, 0);
+            field.AddApostle(a);
+            var capacity = new TurnCapacity(3 * GameConstants.MoveCapacityCost);
+            var reach = new List<HexCoord>();
+            field.GetReachableTiles(a, capacity, false, default, reach);
+            HexCoord far = reach[reach.Count - 1]; // the last ring found is the furthest
+            var path = new List<HexCoord>();
+
+            Assert.IsTrue(field.TryGetPath(a, capacity, false, default, far, path));
+
+            Assert.AreEqual(HexCoord.Distance(a.Position, far), path.Count);
+            Assert.AreEqual(far, path[path.Count - 1]);
+            HexCoord from = a.Position;
+            foreach (HexCoord step in path)
+            {
+                Assert.IsTrue(HexCoord.AreAdjacent(from, step), $"{from} -> {step} is not one step.");
+                from = step;
+            }
+        }
+
+        [Test]
+        public void Path_OutOfReach_IsFalseAndEmpty()
+        {
+            var field = MakeField();
+            var a = At(1, 0, 0);
+            field.AddApostle(a);
+            var path = new List<HexCoord>();
+
+            bool found = field.TryGetPath(a, new TurnCapacity(GameConstants.MoveCapacityCost), false, default,
+                new HexCoord(4, 4), path);
+
+            Assert.IsFalse(found);
+            Assert.AreEqual(0, path.Count);
+        }
+
+        [Test]
+        public void Path_GoesAroundAnApostle()
+        {
+            var field = MakeField();
+            var a = At(1, 0, 0);
+            var b = At(2, 1, 0);
+            field.AddApostle(a);
+            field.AddApostle(b);
+            var path = new List<HexCoord>();
+
+            Assert.IsTrue(field.TryGetPath(a, new TurnCapacity(4 * GameConstants.MoveCapacityCost), false, default,
+                new HexCoord(2, 0), path));
+
+            CollectionAssert.DoesNotContain(path, b.Position);
+        }
+
+        [Test]
         public void Match_Reach_IncludesEveryNextStep()
         {
             HexBoard board = StandardBoard.Create();

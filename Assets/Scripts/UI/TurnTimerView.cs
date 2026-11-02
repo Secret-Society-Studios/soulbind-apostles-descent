@@ -8,7 +8,7 @@ using Kit = SoulBind.UI.UiKit;
 namespace SoulBind.UI
 {
     /// <summary>
-    /// The turn timer, top-center: whose turn it is, the seconds left and a bar that drains.
+    /// The turn timer, top-left (above the play queue): whose turn it is, the seconds left and a bar that drains.
     /// It turns red for the last seconds and pulses at the very end. Display only: the
     /// MatchController counts down and ends the turn. MatchHud creates it, so it needs no setup.
     /// </summary>
@@ -18,6 +18,7 @@ namespace SoulBind.UI
         private const float Width = 300f;
         private const float Height = 64f;
         private const float Top = 20f;
+        private const float Left = 30f;          // lines up with the play queue below it
         private const float BarHeight = 6f;
         private const float PhoneScale = 1.2f;
         private const float WarnSeconds = 10f;  // red from here down
@@ -38,8 +39,8 @@ namespace SoulBind.UI
         public static TurnTimerView Create(RectTransform hudRoot, MatchController controller)
         {
             RectTransform rect = Kit.Box(hudRoot, "TurnTimer", new Color(0.03f, 0.02f, 0.05f, 0.9f), Kit.GoldLine, 12f, 2f);
-            rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0.5f, 1f);
-            rect.anchoredPosition = new Vector2(0f, -Top);
+            rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0f, 1f);
+            rect.anchoredPosition = new Vector2(Left, -Top);
             rect.sizeDelta = new Vector2(Width, Height);
             rect.GetComponent<Image>().raycastTarget = false;
             if (Application.isMobilePlatform)
