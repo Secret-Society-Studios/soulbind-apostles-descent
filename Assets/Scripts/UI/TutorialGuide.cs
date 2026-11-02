@@ -237,7 +237,7 @@ namespace SoulBind.UI
                 case Check.Strike:
                     return match.Engagement == EngagementState.Disengaged;
                 case Check.RadianceCombo:
-                    return match.IsComboTriggered(Element.Radiance);
+                    return match.IsComboTriggered(SoulBind.Core.Element.Radiance);
                 case Check.EmptyQueue:
                     return match.AttackCards.Count == 0;
                 case Check.Awaken:
