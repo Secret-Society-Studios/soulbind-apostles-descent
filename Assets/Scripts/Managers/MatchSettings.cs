@@ -1,4 +1,3 @@
-using SoulBind.Core;
 using UnityEngine;
 
 namespace SoulBind.Managers
@@ -19,11 +18,8 @@ namespace SoulBind.Managers
         /// <summary>True when the match is played online (the host's NetworkMatch assigns the seats).</summary>
         public static bool IsOnline { get; private set; }
 
-        /// <summary>True for the tutorial: a ready-made situation against one bot, with guided steps.</summary>
+        /// <summary>True for the tutorial: one guided match against a bot that only passes.</summary>
         public static bool IsTutorial { get; private set; }
-
-        /// <summary>Which tutorial lesson to play (only meaningful while IsTutorial).</summary>
-        public static TutorialLesson Lesson { get; private set; }
 
         public const int TutorialPlayers = 2; // you and one bot, so the board stays easy to follow
 
@@ -38,12 +34,11 @@ namespace SoulBind.Managers
             IsSet = true;
         }
 
-        /// <summary>A tutorial lesson: you against one bot, offline, already set up for the lesson.</summary>
-        public static void SetTutorial(TutorialLesson lesson)
+        /// <summary>The tutorial: you against one bot, offline, starting from the tutorial's set-up.</summary>
+        public static void SetTutorial()
         {
             Set(TutorialPlayers, true, false);
             IsTutorial = true;
-            Lesson = lesson;
         }
 
         /// <summary>

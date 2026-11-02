@@ -6,17 +6,14 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using Kit = SoulBind.UI.UiKit;
-#if UNITY_EDITOR
-using UnityEditor.SceneManagement;
-#endif
 
 namespace SoulBind.UI
 {
     /// <summary>
-    /// The coach for a tutorial lesson, top-center. Each lesson is a ready-made situation (see
-    /// TutorialLessons) taught in one or two short steps. Only the step's own action works; anything
-    /// else is refused and the coach flashes. When the player does the step, the next one shows,
-    /// and at the end Next lesson loads the following one. MatchHud creates it only in the tutorial,
+    /// The coach for the tutorial match, top-center. The tutorial is one match (see TutorialMatch)
+    /// taught step by step: walk to a Soul tile, end the turn, play a combo, attack, Awaken and
+    /// ascend. Only the step's own action works; anything else is refused and the coach flashes.
+    /// When the player does the step, the next one shows. MatchHud creates it only in the tutorial,
     /// so it needs no setup. Display only: it reads the match and never changes it.
     /// </summary>
     public sealed class TutorialGuide : MonoBehaviour
@@ -34,7 +31,7 @@ namespace SoulBind.UI
         private static readonly Color FlashColor = new Color(0.95f, 0.30f, 0.25f, 1f);
 
         // What the player must do to finish a step.
-        private enum Check { ReachTarget, Engage, Strike, RadianceCombo, EmptyQueue, Awaken, Win }
+        private enum Check { PressNext, ReachTarget, NextTurn, RadianceCombo, EmptyQueue, Engage, Strike, Win }
 
         private sealed class Step
         {
@@ -44,98 +41,75 @@ namespace SoulBind.UI
             public Check Done;
         }
 
-        private sealed class Lesson
+        private static readonly Step[] Steps =
         {
-            public string Name;
-            public Step[] Steps;
-            public string Summary; // shown when the lesson is complete
-        }
-
-        private static readonly Lesson[] Lessons =
-        {
-            new Lesson
+            new Step
             {
-                Name = "Move",
-                Steps = new[]
-                {
-                    new Step
-                    {
-                        Title = "Move: walk to the Soul tile",
-                        Text = "Green tiles show how far you can walk this turn. Tap the purple Soul tile: your Apostle " +
-                               $"walks there one tile at a time, {GameConstants.MoveCapacityCost} Capacity per step.",
-                        Allowed = TutorialActions.Move, Done = Check.ReachTarget
-                    }
-                },
-                Summary = $"Soul tiles give +{GameConstants.SoulTileAmount} Souls. Heal and Purify tiles work the same way, " +
-                          "and used tiles come back every Phase."
+                Title = "Welcome to SoulBind",
+                Text = "This is a guided match against a bot that only watches. Follow each step here; anything " +
+                       "else is locked until you get to it. Real matches give each turn 30 to 45 seconds.",
+                Allowed = TutorialActions.None, Done = Check.PressNext
             },
-            new Lesson
+            new Step
             {
-                Name = "Attack",
-                Steps = new[]
-                {
-                    new Step
-                    {
-                        Title = "Attack: start with a card",
-                        Text = "The enemy is right next to you, ringed in red. Drag The Chariot onto them to start an attack.",
-                        Allowed = TutorialActions.Attack, Done = Check.Engage
-                    },
-                    new Step
-                    {
-                        Title = "Attack: add a card and Strike",
-                        Text = "Drag The Magician onto them too, for more ATK. Then press ATTACK in the play queue (top-left).",
-                        Allowed = TutorialActions.Attack, Done = Check.Strike
-                    }
-                },
-                Summary = $"Breaking their DEF steals {GameConstants.SoulsStolenPerAttack} Soul and gives you " +
-                          $"+{GameConstants.AttackCorruption} Corruption. You can attack once per turn."
+                Title = "1  Move",
+                Text = "Green tiles show how far you can walk this turn. Tap the purple Soul tile: your Apostle " +
+                       $"walks there one tile at a time, {GameConstants.MoveCapacityCost} Capacity per step.",
+                Allowed = TutorialActions.Move, Done = Check.ReachTarget
             },
-            new Lesson
+            new Step
             {
-                Name = "Combos",
-                Steps = new[]
-                {
-                    new Step
-                    {
-                        Title = "Combo: two of one element",
-                        Text = "Drag The Magician onto the discard pile, then The Lovers. Both are Radiance: two cards " +
-                               "of one element in a turn trigger its combo.",
-                        Allowed = TutorialActions.Cards, Done = Check.RadianceCombo
-                    },
-                    new Step
-                    {
-                        Title = "Combo: use the cards",
-                        Text = $"The queue glows: Radiance gives +{ElementCombo.RadianceShield} DEF. " +
-                               "Press PLAY in the play queue to use the cards.",
-                        Allowed = TutorialActions.Cards, Done = Check.EmptyQueue
-                    }
-                },
-                Summary = $"Celeste cleans {ElementCombo.CelesteCorruptionReduction} Corruption, Crimson adds " +
-                          $"+{ElementCombo.CrimsonAttack} ATK to an attack, and Nocturne gives a foe Corruption."
+                Title = "2  End your turn",
+                Text = $"The Soul tile gave you +{GameConstants.SoulTileAmount} Souls. Heal and Purify tiles work the same " +
+                       "way. Press End Turn: you draw a card and the bot plays.",
+                Allowed = TutorialActions.EndTurn, Done = Check.NextTurn
             },
-            new Lesson
+            new Step
             {
-                Name = "How to win",
-                Steps = new[]
-                {
-                    new Step
-                    {
-                        Title = "Win: steal your last Soul",
-                        Text = $"You have {GameConstants.SoulsToAwaken - 1} Souls. Drag The Chariot onto the enemy and press " +
-                               $"ATTACK to steal one more. At {GameConstants.SoulsToAwaken} you Awaken.",
-                        Allowed = TutorialActions.Attack, Done = Check.Awaken
-                    },
-                    new Step
-                    {
-                        Title = "Win: reach the Ascension tile",
-                        Text = "You are Awakened, and the gold Ascension tile has appeared. Walk onto it to win. " +
-                               "Too far? Press End Turn and keep walking next turn.",
-                        Allowed = TutorialActions.Move | TutorialActions.EndTurn, Done = Check.Win
-                    }
-                },
-                Summary = "You can also win by being the last Apostle standing: at 0 Vessel an Apostle is out."
+                Title = "3  Combo",
+                Text = "Drag The Magician onto the discard pile, then The Lovers. Both are Radiance, and two cards of " +
+                       "one element in a turn trigger its combo.",
+                Allowed = TutorialActions.Cards, Done = Check.RadianceCombo
+            },
+            new Step
+            {
+                Title = "3  Combo: use the cards",
+                Text = $"The play queue glows: Radiance gives +{ElementCombo.RadianceShield} DEF. Press PLAY in the " +
+                       "queue (top-left) to use the cards.",
+                Allowed = TutorialActions.Cards, Done = Check.EmptyQueue
+            },
+            new Step
+            {
+                Title = "4  End your turn",
+                Text = "Capacity left over is lost when the turn ends, so spend it well. Press End Turn.",
+                Allowed = TutorialActions.EndTurn, Done = Check.NextTurn
+            },
+            new Step
+            {
+                Title = "5  Attack",
+                Text = "Step next to the enemy, then drag The Chariot onto them (they glow red when you can) " +
+                       "to start an attack.",
+                Allowed = TutorialActions.Move | TutorialActions.Attack, Done = Check.Engage
+            },
+            new Step
+            {
+                Title = "5  Attack: Strike",
+                Text = "Drag The Magician onto them too, for more ATK. Then press ATTACK in the play queue. " +
+                       "Breaking their DEF steals a Soul.",
+                Allowed = TutorialActions.Attack, Done = Check.Strike
+            },
+            new Step
+            {
+                Title = "6  Ascend to win",
+                Text = $"That was your {GameConstants.SoulsToAwaken}th Soul: you are Awakened and the gold Ascension tile " +
+                       "has appeared. Walk onto it to win. Too far? End Turn and keep walking.",
+                Allowed = TutorialActions.Move | TutorialActions.EndTurn, Done = Check.Win
             }
         };
+
+        private const string DoneTitle = "Tutorial complete!";
+        private const string DoneText = "You can also win by being the last Apostle standing. Watch your Corruption: " +
+                                        $"at {GameConstants.CorruptionThreshold} you lose Vessel every turn and cannot gain Souls.";
 
         private MatchController _controller;
         private CanvasGroup _group;
@@ -144,12 +118,12 @@ namespace SoulBind.UI
         private TMP_Text _text;
         private GameObject _nextButton;
         private TMP_Text _nextLabel;
-        private Lesson _lesson;
-        private int _step;          // index into _lesson.Steps; Steps.Length = the lesson is complete
+        private int _step;           // index into Steps; Steps.Length = the tutorial is complete
         private int _shownStep = -1; // -1 = nothing shown yet
-        private float _flash;       // seconds left of the "follow the step" flash
+        private int _stepRound;      // the round the step began in (for NextTurn)
+        private float _flash;        // seconds left of the "follow the step" flash
 
-        private bool IsComplete => _step >= _lesson.Steps.Length;
+        private bool IsComplete => _step >= Steps.Length;
 
         public static TutorialGuide Create(RectTransform hudRoot, MatchController controller)
         {
@@ -163,12 +137,11 @@ namespace SoulBind.UI
 
             TutorialGuide guide = rect.gameObject.AddComponent<TutorialGuide>();
             guide._controller = controller;
-            guide._lesson = Lessons[Mathf.Clamp((int)controller.Lesson, 0, Lessons.Length - 1)];
             guide.Build(rect);
             Transform border = rect.Find("Border");
             guide._border = border != null ? border.GetComponent<Image>() : null;
             controller.TutorialActionBlocked += guide.OnBlocked;
-            controller.SetTutorialActions(guide._lesson.Steps[0].Allowed);
+            controller.SetTutorialActions(Steps[0].Allowed);
             return guide;
         }
 
@@ -194,10 +167,10 @@ namespace SoulBind.UI
             Kit.At(_text.rectTransform, Pad, 46f, textWidth, Height - 56f);
 
             float x = Width - Pad - ButtonWidth;
-            _nextLabel = Kit.Button(root, "Next", "Next lesson", Kit.ButtonStyle.Primary, NextLesson, 15f, 8f);
+            _nextLabel = Kit.Button(root, "Next", "Next", Kit.ButtonStyle.Primary, OnNext, 15f, 8f);
             _nextButton = _nextLabel.transform.parent.gameObject;
             Kit.At((RectTransform)_nextButton.transform, x, 16f, ButtonWidth, ButtonHeight);
-            TMP_Text leave = Kit.Button(root, "Leave", "Leave lesson", Kit.ButtonStyle.Ghost, Leave, 13f, 8f);
+            TMP_Text leave = Kit.Button(root, "Leave", "Leave tutorial", Kit.ButtonStyle.Ghost, Leave, 13f, 8f);
             Kit.At((RectTransform)leave.transform.parent, x, 16f + ButtonHeight + 10f, ButtonWidth, 36f);
         }
 
@@ -206,21 +179,21 @@ namespace SoulBind.UI
         private void Update()
         {
             Match match = _controller != null ? _controller.CurrentMatch : null;
-            // A won lesson stays on screen, over the end-of-match screen.
+            // The last step stays on screen when the match is won, over the end-of-match screen.
             bool visible = match != null && (!match.IsOver || IsComplete || IsWinStep());
             _group.alpha = visible ? 1f : 0f;
             _group.blocksRaycasts = visible;
             if (!visible)
                 return;
 
-            if (!IsComplete && IsStepDone(match, _lesson.Steps[_step].Done))
+            if (!IsComplete && IsStepDone(match, Steps[_step].Done))
                 GoTo(_step + 1);
             if (_shownStep != _step)
                 Show();
             ShowFlash();
         }
 
-        private bool IsWinStep() => !IsComplete && _lesson.Steps[_step].Done == Check.Win;
+        private bool IsWinStep() => !IsComplete && Steps[_step].Done == Check.Win;
 
         // True once the player has done what the step asks.
         private bool IsStepDone(Match match, Check check)
@@ -228,20 +201,21 @@ namespace SoulBind.UI
             int you = _controller.ViewerId;
             switch (check)
             {
+                case Check.PressNext:
+                    return false;
                 case Check.ReachTarget:
                     ApostleState apostle = Find(match, you);
-                    return _controller.HasTutorialTarget && apostle != null && !_controller.IsWalking
-                           && apostle.Position == _controller.TutorialTarget;
-                case Check.Engage:
-                    return match.Engagement != EngagementState.Free;
-                case Check.Strike:
-                    return match.Engagement == EngagementState.Disengaged;
+                    return apostle != null && !_controller.IsWalking && apostle.Position == _controller.TutorialTarget;
+                case Check.NextTurn:
+                    return _controller.IsLocalTurn && match.Turns.RoundNumber > _stepRound;
                 case Check.RadianceCombo:
                     return match.IsComboTriggered(SoulBind.Core.Element.Radiance);
                 case Check.EmptyQueue:
                     return match.AttackCards.Count == 0;
-                case Check.Awaken:
-                    return match.Ascension.HasAwakened && match.Ascension.AwakenedId == you;
+                case Check.Engage:
+                    return match.Engagement != EngagementState.Free;
+                case Check.Strike:
+                    return match.Engagement == EngagementState.Disengaged;
                 default:
                     return match.IsOver && match.WinnerId == you;
             }
@@ -258,30 +232,32 @@ namespace SoulBind.UI
             return null;
         }
 
-        // Once the lesson is complete, everything works again: the player can keep playing.
+        // Once the tutorial is complete, everything works again.
         private void GoTo(int step)
         {
             _step = step;
-            _controller.SetTutorialActions(IsComplete ? TutorialActions.All : _lesson.Steps[_step].Allowed);
+            Match match = _controller.CurrentMatch;
+            _stepRound = match != null ? match.Turns.RoundNumber : 0;
+            _controller.SetTutorialActions(IsComplete ? TutorialActions.All : Steps[_step].Allowed);
         }
 
         private void Show()
         {
             _shownStep = _step;
-            bool last = (int)_controller.Lesson >= Lessons.Length - 1;
+            bool waitsForNext = IsComplete || Steps[_step].Done == Check.PressNext;
             if (IsComplete)
             {
-                _title.text = _lesson.Name + ": lesson complete!";
-                _text.text = _lesson.Summary;
-                _nextLabel.text = last ? "Main menu" : "Next lesson";
+                _title.text = DoneTitle;
+                _text.text = DoneText;
+                _nextLabel.text = "Main menu";
             }
             else
             {
-                Step step = _lesson.Steps[_step];
-                _title.text = step.Title;
-                _text.text = step.Text;
+                _title.text = Steps[_step].Title;
+                _text.text = Steps[_step].Text;
+                _nextLabel.text = "Next";
             }
-            _nextButton.SetActive(IsComplete);
+            _nextButton.SetActive(waitsForNext);
         }
 
         // The player tried something this step does not allow: the coach flashes red.
@@ -300,26 +276,13 @@ namespace SoulBind.UI
 
         // ---------- Buttons ----------
 
-        // Loads the next lesson in this scene, or goes back to the menu after the last one.
-        private void NextLesson()
+        // Next moves past a step that only explains; at the end it goes back to the menu.
+        private void OnNext()
         {
-            int next = (int)_controller.Lesson + 1;
-            if (next >= Lessons.Length)
-            {
+            if (IsComplete)
                 Leave();
-                return;
-            }
-            MatchSettings.SetTutorial((TutorialLesson)next);
-            Scene scene = SceneManager.GetActiveScene();
-            if (scene.buildIndex >= 0)
-            {
-                SceneManager.LoadScene(scene.buildIndex);
-                return;
-            }
-#if UNITY_EDITOR
-            // A scene that is not in the Build Settings can still be reloaded in the Editor.
-            EditorSceneManager.LoadSceneInPlayMode(scene.path, new LoadSceneParameters(LoadSceneMode.Single));
-#endif
+            else
+                GoTo(_step + 1);
         }
 
         // The main menu is the first scene in the Build Settings.
