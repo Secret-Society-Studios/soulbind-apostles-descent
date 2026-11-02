@@ -1,4 +1,3 @@
-using SoulBind.Core;
 using SoulBind.Managers;
 using SoulBind.Online;
 using SoulBind.Utility;
@@ -38,9 +37,6 @@ namespace SoulBind.UI
         private GameObject _profilePopup;
         private TMP_Text _profileName;
         private TMP_Text _profileInitial;
-
-        // Tutorial: the lesson picker pop-up
-        private GameObject _lessonPopup;
 
         private void Start()
         {
@@ -126,10 +122,10 @@ namespace SoulBind.UI
             SceneManager.LoadScene(gameSceneName);
         }
 
-        // A tutorial lesson: a ready-made situation against one bot, whatever the Apostles count says.
-        private void PlayLesson(TutorialLesson lesson)
+        // The tutorial: one guided match against a bot, whatever the Apostles count says.
+        private void PlayTutorial()
         {
-            MatchSettings.SetTutorial(lesson);
+            MatchSettings.SetTutorial();
             SceneManager.LoadScene(gameSceneName);
         }
 
@@ -154,7 +150,6 @@ namespace SoulBind.UI
             BuildOnline();
             BuildLobby();
             BuildProfilePopup();
-            BuildLessonPopup();
         }
 
         // The two thin frame lines just inside the edge of every screen.
@@ -213,7 +208,7 @@ namespace SoulBind.UI
                 PassAndPlay, 17f);
             Kit.At((RectTransform)local.transform.parent, 216f, 148f, 204f, 56f);
             // A practice match against one bot, with a coach, before playing for real.
-            TMP_Text tutorial = Kit.Button(column, "Tutorial", "Tutorial", Kit.ButtonStyle.Secondary, OpenLessons, 15f);
+            TMP_Text tutorial = Kit.Button(column, "Tutorial", "Tutorial", Kit.ButtonStyle.Secondary, PlayTutorial, 15f);
             Kit.At((RectTransform)tutorial.transform.parent, 0f, 216f, 132f, 48f);
             TMP_Text rules = Kit.Button(column, "HowToPlay", "How to Play", Kit.ButtonStyle.Ghost,
                 () => HelpPopup.Open(transform), 15f);
@@ -308,68 +303,6 @@ namespace SoulBind.UI
 
             _profilePopup.SetActive(false);
         }
-
-        // ---------- Tutorial lessons ----------
-
-        private static readonly string[] LessonNames = { "Move", "Attack", "Combos", "How to win" };
-        private static readonly string[] LessonLines =
-        {
-            "Walk across the board",
-            "Hit the enemy next to you",
-            "Two cards of one element",
-            "Awaken and ascend"
-        };
-
-        // The pop-up that lists the lessons. Tapping outside closes it.
-        private void BuildLessonPopup()
-        {
-            RectTransform cover = Kit.Stretch(Kit.CreateRect("LessonPopup", _root));
-            Image dim = cover.gameObject.AddComponent<Image>();
-            dim.color = new Color(0f, 0f, 0f, 0.7f);
-            Button outside = cover.gameObject.AddComponent<Button>();
-            outside.transition = Selectable.Transition.None;
-            outside.onClick.AddListener(CloseLessons);
-            _lessonPopup = cover.gameObject;
-
-            RectTransform frame = Kit.CreateFrame(cover, "Frame");
-            RectTransform panel = Kit.Box(frame, "Panel", Kit.Panel, Kit.GoldLine, 14f);
-            Kit.At(panel, 340f, 170f, 600f, 380f);
-
-            TMP_Text title = Kit.Label(panel, "Title", "Tutorial", 30f, Kit.Display, Kit.Title);
-            Kit.At(title.rectTransform, 0f, 24f, 600f, 40f);
-            TMP_Text hint = Kit.Label(panel, "Hint", "Pick a lesson. Each one sets up a situation to try.", 14f,
-                Kit.Inter, Kit.Muted);
-            Kit.At(hint.rectTransform, 0f, 66f, 600f, 22f);
-
-            // Two by two: each button has the lesson's name and a short line under it.
-            for (int i = 0; i < LessonNames.Length; i++)
-            {
-                var lesson = (TutorialLesson)i;
-                float x = 50f + (i % 2) * 256f;
-                float y = 104f + (i / 2) * 96f;
-                TMP_Text name = Kit.Button(panel, "Lesson" + i, LessonNames[i], Kit.ButtonStyle.Secondary,
-                    () => PlayLesson(lesson), 18f);
-                var button = (RectTransform)name.transform.parent;
-                Kit.At(button, x, y, 244f, 84f);
-                name.rectTransform.offsetMin = new Vector2(4f, 30f);
-                TMP_Text line = Kit.Label(button, "Line", LessonLines[i], 13f, Kit.Inter, Kit.Muted);
-                Kit.Stretch(line.rectTransform, 4f);
-                line.rectTransform.offsetMax = new Vector2(-4f, -46f);
-            }
-
-            TMP_Text close = Kit.Button(panel, "Close", "Close", Kit.ButtonStyle.Ghost, CloseLessons, 16f);
-            Kit.At((RectTransform)close.transform.parent, 200f, 312f, 200f, 48f);
-
-            _lessonPopup.SetActive(false);
-        }
-
-        private void OpenLessons()
-        {
-            _lessonPopup.transform.SetAsLastSibling();
-            _lessonPopup.SetActive(true);
-        }
-
-        private void CloseLessons() => _lessonPopup.SetActive(false);
 
         private void OpenProfile()
         {
