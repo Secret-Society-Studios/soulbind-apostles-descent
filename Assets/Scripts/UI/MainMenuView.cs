@@ -21,7 +21,7 @@ namespace SoulBind.UI
         [SerializeField] private string gameSceneName = "SampleScene";
         [SerializeField, Range(2, 6)] private int defaultPlayers = 4;
 
-        private enum Screen { Main, Online, Lobby }
+        private enum Screen { Main, Singleplayer, Online, Lobby, Collections, Settings }
 
         private Screen _screen;
         private int _players;
@@ -83,6 +83,9 @@ namespace SoulBind.UI
         {
             _screen = screen;
             _mainScreen.SetActive(screen == Screen.Main);
+            _singleScreen.SetActive(screen == Screen.Singleplayer);
+            _collectionsScreen.SetActive(screen == Screen.Collections);
+            _settingsScreen.SetActive(screen == Screen.Settings);
             _onlineScreen.SetActive(screen == Screen.Online);
             _lobbyScreen.SetActive(screen == Screen.Lobby);
             if (screen == Screen.Online)
@@ -147,6 +150,9 @@ namespace SoulBind.UI
             fill.color = Kit.Background;
 
             BuildMain();
+            BuildSingleplayer();
+            BuildCollections();
+            BuildSettings();
             BuildOnline();
             BuildLobby();
             BuildProfilePopup();
@@ -170,57 +176,32 @@ namespace SoulBind.UI
             AddFrameLines(frame, true);
             BuildProfileCard(frame);
 
-            // ? in the top-right corner: How to Play (the design keeps a round button there).
-            TMP_Text help = Kit.Button(frame, "HelpButton", "?", Kit.ButtonStyle.Secondary,
-                () => HelpPopup.Open(transform), 24f, 26f);
-            Kit.At((RectTransform)help.transform.parent, 1172f, 44f, 52f, 52f);
-            help.color = Kit.Gold;
-
             // Emblem: two rings, then the title and subtitle.
-            RectTransform ring = Kit.Circle(frame, "Emblem", 64f, Color.clear, Kit.Gold, 2f);
-            Kit.At(ring, 608f, 96f, 64f, 64f);
-            RectTransform inner = Kit.Circle(ring, "Inner", 36f, Color.clear, Kit.GoldLine, 2f);
-            Kit.At(inner, 14f, 14f, 36f, 36f);
+            RectTransform ring = Kit.Circle(frame, "Emblem", 56f, Color.clear, Kit.Gold, 2f);
+            Kit.At(ring, 612f, 52f, 56f, 56f);
+            RectTransform inner = Kit.Circle(ring, "Inner", 32f, Color.clear, Kit.GoldLine, 2f);
+            Kit.At(inner, 12f, 12f, 32f, 32f);
 
-            TMP_Text title = Kit.Label(frame, "Title", "SoulBind", 92f, Kit.DisplayHeavy, Kit.Title);
-            Kit.At(title.rectTransform, 0f, 164f, 1280f, 100f);
+            TMP_Text title = Kit.Label(frame, "Title", "SoulBind", 84f, Kit.DisplayHeavy, Kit.Title);
+            Kit.At(title.rectTransform, 0f, 112f, 1280f, 92f);
             title.characterSpacing = 4f;
-            TMP_Text subtitle = Kit.Label(frame, "Subtitle", "APOSTLE'S DESCENT", 24f, Kit.Display, Kit.Soft);
-            Kit.At(subtitle.rectTransform, 0f, 268f, 1280f, 34f);
+            TMP_Text subtitle = Kit.Label(frame, "Subtitle", "APOSTLE'S DESCENT", 22f, Kit.Display, Kit.Soft);
+            Kit.At(subtitle.rectTransform, 0f, 206f, 1280f, 32f);
             subtitle.characterSpacing = 33f;
 
-            // The column: Apostles, Play vs Bots, Online / Pass & Play, Tutorial / How to Play / Quit.
-            RectTransform column = Kit.At(Kit.CreateRect("Column", frame), 430f, 356f, 420f, 300f);
-            RectTransform stepper = Kit.Box(column, "Apostles", Kit.Panel, Kit.Line, 10f);
-            Kit.At(stepper, 0f, 0f, 420f, 60f);
-            TMP_Text label = Kit.Label(stepper, "Label", "APOSTLES", 16f, Kit.Display, Kit.Soft,
-                TextAlignmentOptions.Left);
-            Kit.At(label.rectTransform, 20f, 0f, 200f, 60f);
-            label.characterSpacing = 12f;
-            _mainPlayers = BuildStepper(stepper, 270f, 8f, ChangePlayers);
-
-            TMP_Text play = Kit.Button(column, "PlayBots", "Play vs Bots", Kit.ButtonStyle.Primary, PlayBots, 24f);
-            Kit.At((RectTransform)play.transform.parent, 0f, 72f, 420f, 64f);
-            TMP_Text online = Kit.Button(column, "PlayOnline", "Play Online", Kit.ButtonStyle.Secondary,
-                () => ShowScreen(Screen.Online), 17f);
-            Kit.At((RectTransform)online.transform.parent, 0f, 148f, 204f, 56f);
-            TMP_Text local = Kit.Button(column, "PassAndPlay", "Pass & Play", Kit.ButtonStyle.Secondary,
-                PassAndPlay, 17f);
-            Kit.At((RectTransform)local.transform.parent, 216f, 148f, 204f, 56f);
+            // The column, top to bottom. Each opens its own screen, except Tutorial and Quit.
+            RectTransform column = Kit.At(Kit.CreateRect("Column", frame), 430f, 268f, 420f, 350f);
+            AddMenuButton(column, 0, "Singleplayer", Kit.ButtonStyle.Primary, () => ShowScreen(Screen.Singleplayer));
+            AddMenuButton(column, 1, "Multiplayer", Kit.ButtonStyle.Outline, () => ShowScreen(Screen.Online));
             // A practice match against one bot, with a coach, before playing for real.
-            TMP_Text tutorial = Kit.Button(column, "Tutorial", "Tutorial", Kit.ButtonStyle.Secondary, PlayTutorial, 15f);
-            Kit.At((RectTransform)tutorial.transform.parent, 0f, 216f, 132f, 48f);
-            TMP_Text rules = Kit.Button(column, "HowToPlay", "How to Play", Kit.ButtonStyle.Ghost,
-                () => HelpPopup.Open(transform), 15f);
-            Kit.At((RectTransform)rules.transform.parent, 144f, 216f, 132f, 48f);
-            TMP_Text quit = Kit.Button(column, "Quit", "Quit", Kit.ButtonStyle.Ghost, Quit, 15f);
-            Kit.At((RectTransform)quit.transform.parent, 288f, 216f, 132f, 48f);
+            AddMenuButton(column, 2, "Tutorial", Kit.ButtonStyle.Secondary, PlayTutorial);
+            AddMenuButton(column, 3, "Collections", Kit.ButtonStyle.Secondary, () => ShowScreen(Screen.Collections));
+            AddMenuButton(column, 4, "Settings", Kit.ButtonStyle.Secondary, () => ShowScreen(Screen.Settings));
+            AddMenuButton(column, 5, "Quit", Kit.ButtonStyle.Ghost, Quit);
 
             _mainStatus = Kit.Label(frame, "Status", "", 14f, Kit.Inter, Kit.Gold);
-            Kit.At(_mainStatus.rectTransform, 330f, 628f, 620f, 24f);
+            Kit.At(_mainStatus.rectTransform, 330f, 630f, 620f, 24f);
 
-            _botsLine = Kit.Label(frame, "BotsLine", "", 13f, Kit.Inter, Kit.Muted, TextAlignmentOptions.Left);
-            Kit.At(_botsLine.rectTransform, 56f, 662f, 500f, 20f);
             TMP_Text version = Kit.Label(frame, "Version", "v" + Application.version, 13f, Kit.Inter, Kit.Muted,
                 TextAlignmentOptions.Right);
             Kit.At(version.rectTransform, 724f, 662f, 500f, 20f);
