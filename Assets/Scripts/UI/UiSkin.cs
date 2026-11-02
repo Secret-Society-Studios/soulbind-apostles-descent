@@ -4,7 +4,7 @@ using UnityEngine.UI;
 namespace SoulBind.UI
 {
     /// <summary>
-    /// The art slots for the HUD's bars: Capacity, Vessel (HP), Corruption and Souls.
+    /// The art slots for the HUD's bars (Capacity, Vessel (HP), Corruption and Souls) and the quick chat emotes.
     /// It lives at Assets/Resources/UiSkin.asset. Drag a sprite into a slot and that part of the bar
     /// uses it; an empty slot keeps the code-drawn placeholder, so the art can arrive one piece at a time.
     /// Frames and backs should be 9-sliced in the Sprite Editor; fills are drawn as Filled, Horizontal.
@@ -35,6 +35,10 @@ namespace SoulBind.UI
         [SerializeField] private Sprite soulsFill;
         [SerializeField] private Sprite soulsFrame;
 
+        [Header("Quick chat emotes")]
+        [Tooltip("One sprite per emote slot (QuickChat.EmoteCount = 8). An empty slot shows a numbered placeholder.")]
+        [SerializeField] private Sprite[] emotes = new Sprite[8];
+
         [Header("Colours")]
         [Tooltip("Off: fill sprites show their own colours. On: the game still tints them " +
                  "(Corruption turns red when Corrupted, for example). Draw fills white to tint them.")]
@@ -44,6 +48,10 @@ namespace SoulBind.UI
         public Sprite CapacityPipSpent => capacityPipSpent;
         public Sprite CapacityFrame => capacityFrame;
         public bool TintFills => tintFills;
+
+        /// <summary>The art for emote slot index, or null to keep its placeholder.</summary>
+        public Sprite GetEmote(int index) =>
+            emotes != null && index >= 0 && index < emotes.Length ? emotes[index] : null;
 
         private static UiSkin _current;
         private static bool _looked;

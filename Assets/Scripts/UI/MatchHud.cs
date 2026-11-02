@@ -93,6 +93,8 @@ namespace SoulBind.UI
                 NamePlates.Create((RectTransform)transform, matchController);
                 // The turn timer, top-left above the play queue (hidden while it is off or nobody is acting).
                 TurnTimerView.Create((RectTransform)transform, matchController);
+                // Quick chat: the Chat button left of Menu, and bubbles above each speaker's cards.
+                ChatView.Create((RectTransform)transform, matchController);
                 // The practice match's step-by-step coach.
                 if (matchController.IsTutorial)
                     TutorialGuide.Create((RectTransform)transform, matchController);

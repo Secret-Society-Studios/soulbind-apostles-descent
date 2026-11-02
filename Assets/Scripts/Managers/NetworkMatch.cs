@@ -46,12 +46,14 @@ namespace SoulBind.Online
             {
                 controller.MatchChanged += SendSnapshots;
                 controller.DraftChanged += SendDraft;
+                controller.ChatShown += SendChatToPlayers;
                 NetworkManager.OnClientDisconnectCallback += OnClientDisconnected;
             }
             else
             {
                 controller.CommandSubmitted += SendCommand;
                 controller.SpawnSubmitted += SendSpawn;
+                controller.ChatSubmitted += SendChat;
                 ClientReadyRpc(PlayerNames.LocalName);
             }
         }
@@ -64,6 +66,8 @@ namespace SoulBind.Online
                 controller.CommandSubmitted -= SendCommand;
                 controller.DraftChanged -= SendDraft;
                 controller.SpawnSubmitted -= SendSpawn;
+                controller.ChatShown -= SendChatToPlayers;
+                controller.ChatSubmitted -= SendChat;
             }
             if (NetworkManager != null)
                 NetworkManager.OnClientDisconnectCallback -= OnClientDisconnected;
@@ -231,6 +235,35 @@ namespace SoulBind.Online
                 return;
             if (!controller.ApplyRemoteSpawn(seat, new HexCoord(q, r)))
                 Debug.Log($"NetworkMatch: APostle {seat}'s starting tile was refused.");
+        }
+
+        // ---- Quick chat ----
+
+        // Player: only the chat id goes to the host.
+        private void SendChat(int chatId)
+        {
+            SubmitChatRpc((byte)chatId);
+        }
+
+        // Host: the seat comes from the connection; the controller checks the id and the spam limit.
+        [Rpc(SendTo.Server)]
+        private void SubmitChatRpc(byte chatId, RpcParams rpcParams = default)
+        {
+            ulong sender = rpcParams.Receive.SenderClientId;
+            if (_seatByClient.TryGetValue(sender, out int seat))
+                controller.ReceiveRemoteChat(seat, chatId);
+        }
+
+        // Host: every message shown here (its own, a bot's or a player's) goes to all players.
+        private void SendChatToPlayers(int seat, int chatId)
+        {
+            ChatRpc((byte)seat, (byte)chatId);
+        }
+
+        [Rpc(SendTo.NotServer)]
+        private void ChatRpc(byte seat, byte chatId)
+        {
+            controller.ShowRemoteChat(seat, chatId);
         }
 
         private void OnClientDisconnected(ulong clientId)
