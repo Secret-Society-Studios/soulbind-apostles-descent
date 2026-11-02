@@ -108,7 +108,7 @@ namespace SoulBind.UI
         };
 
         private const string DoneTitle = "Tutorial complete!";
-        private const string DoneText = "You can also win by being the last Apostle standing. Watch your Corruption: " +
+        private static readonly string DoneText = "You can also win by being the last Apostle standing. Watch your Corruption: " +
                                         $"at {GameConstants.CorruptionThreshold} you lose Vessel every turn and cannot gain Souls.";
 
         private MatchController _controller;
