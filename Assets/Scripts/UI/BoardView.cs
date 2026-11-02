@@ -23,6 +23,10 @@ namespace SoulBind.UI
         [SerializeField] private Color ascensionTileColor = new Color(1.00f, 0.80f, 0.20f);
         [SerializeField] private Color ascensionHighlightColor = new Color(1.00f, 0.95f, 0.60f);
         [SerializeField] private Color attackTargetColor = new Color(0.45f, 0.08f, 0.10f);
+        [Tooltip("The faint tint on every tile the Apostle can still walk to this turn (its furthest reach).")]
+        [SerializeField] private Color reachColor = new Color(0.55f, 0.80f, 0.60f);
+        [Tooltip("How strongly the reach tint covers a tile's own colour: 0 = not at all, 1 = fully.")]
+        [SerializeField, Range(0f, 1f)] private float reachStrength = 0.45f;
 
         [Header("Tile art (optional: an empty slot keeps the placeholder hex and color)")]
         [Tooltip("A normal tile. Also used for edge tiles if Edge Tile Sprite is empty.")]
@@ -69,6 +73,7 @@ namespace SoulBind.UI
         private readonly Dictionary<HexCoord, SpriteRenderer> _tiles = new Dictionary<HexCoord, SpriteRenderer>();
         private readonly Dictionary<HexCoord, SpecialTileType> _specialTypes = new Dictionary<HexCoord, SpecialTileType>();
         private readonly List<HexCoord> _highlighted = new List<HexCoord>(6);
+        private readonly List<HexCoord> _reach = new List<HexCoord>(64);
         private readonly List<HexCoord> _attackMarks = new List<HexCoord>(6);
         private readonly List<HexCoord> _changedTiles = new List<HexCoord>(16);
         private Sprite _placeholderSprite;
@@ -229,6 +234,31 @@ namespace SoulBind.UI
             for (int i = 0; i < _highlighted.Count; i++)
                 ApplyBase(_highlighted[i]);
             _highlighted.Clear();
+        }
+
+        /// <summary>
+        /// Tints every tile in walking range this turn, clearing the earlier tint. The tile keeps a hint
+        /// of its own colour, so special tiles still read. Call ClearHighlights before it and
+        /// SetHighlights after it, so the next step stays the brightest.
+        /// </summary>
+        public void SetReach(IReadOnlyList<HexCoord> tiles)
+        {
+            ClearReach();
+            for (int i = 0; i < tiles.Count; i++)
+            {
+                if (!_tiles.TryGetValue(tiles[i], out SpriteRenderer spriteRenderer))
+                    continue;
+                ApplyBase(tiles[i]);
+                spriteRenderer.color = Color.Lerp(spriteRenderer.color, reachColor, reachStrength);
+                _reach.Add(tiles[i]);
+            }
+        }
+
+        public void ClearReach()
+        {
+            for (int i = 0; i < _reach.Count; i++)
+                ApplyBase(_reach[i]);
+            _reach.Clear();
         }
 
         /// <summary>
