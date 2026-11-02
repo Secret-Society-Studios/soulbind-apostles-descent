@@ -141,8 +141,17 @@ namespace SoulBind.Managers
         /// <summary>The seconds each turn gets.</summary>
         public float TurnSecondsLimit => _turnTimer != null ? _turnTimer.Limit : 0f;
 
-        /// <summary>True in the tutorial (practice) match: one bot, guided steps, no turn timer.</summary>
+        /// <summary>True in a tutorial lesson: a ready-made situation, one bot, guided steps, no turn timer.</summary>
         public bool IsTutorial => MatchSettings.IsSet && MatchSettings.IsTutorial;
+
+        /// <summary>The lesson being played (only meaningful while IsTutorial).</summary>
+        public TutorialLesson Lesson => MatchSettings.Lesson;
+
+        /// <summary>True when the lesson asks the player to reach TutorialTarget.</summary>
+        public bool HasTutorialTarget { get; private set; }
+
+        /// <summary>The tile the lesson asks the player to reach.</summary>
+        public HexCoord TutorialTarget { get; private set; }
 
         // ---- Tutorial (set by TutorialGuide) ----
 
@@ -351,6 +360,11 @@ namespace SoulBind.Managers
             }
 
             CreateViews();
+            if (IsTutorial)
+            {
+                StartLesson();
+                return;
+            }
             if (chooseSpawns)
             {
                 // The turn order is drawn first (as before), and the Apostles pick their tiles in that order.
@@ -394,6 +408,17 @@ namespace SoulBind.Managers
 
             Debug.Log($"MatchController: {playerCount} players. Apostle {CurrentMatch.CurrentApostle.Id} " +
                       $"plays first with {CurrentMatch.CurrentCapacity.Remaining} Capacity.");
+            AfterMatchChange();
+        }
+
+        // A tutorial lesson: the match starts from the lesson's ready-made situation, and you go first.
+        private void StartLesson()
+        {
+            TutorialLessons.Setup setup = TutorialLessons.Create(Lesson, boardView.Board, _random);
+            CurrentMatch = setup.Match;
+            HasTutorialTarget = setup.HasTarget;
+            TutorialTarget = setup.Target;
+            Debug.Log($"MatchController: tutorial lesson {Lesson}.");
             AfterMatchChange();
         }
 
@@ -1351,7 +1376,11 @@ namespace SoulBind.Managers
                 return;
             _botWait = botActionDelay;
 
-            BotAction action = ++_botActionsThisTurn > MaxBotActionsPerTurn ? BotAction.EndTurn : _bot.Decide(CurrentMatch);
+            // In a lesson the bot only passes (it still picks a direction between Phases),
+            // so nothing gets in the way of what is being learned.
+            bool lessonPass = IsTutorial && !CurrentMatch.IsAwaitingPhaseStart;
+            bool passOnly = lessonPass || ++_botActionsThisTurn > MaxBotActionsPerTurn;
+            BotAction action = passOnly ? BotAction.EndTurn : _bot.Decide(CurrentMatch);
             if (action.Kind == BotActionKind.None)
                 return;
 
