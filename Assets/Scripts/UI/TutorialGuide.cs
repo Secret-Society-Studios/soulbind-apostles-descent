@@ -10,8 +10,9 @@ namespace SoulBind.UI
 {
     /// <summary>
     /// The coach for the tutorial (practice) match, top-center: one short step at a time, from
-    /// moving to ending the turn. A step moves on by itself when the player does it, or with Next.
-    /// Skip hides the coach and leaves a normal match against the bot. MatchHud creates it only in
+    /// moving to ending the turn. Only the step's own action works (moving while it says Move, and
+    /// so on); anything else is refused and the coach flashes. A step moves on by itself when the
+    /// player does it, or with Next. Skip hides the coach and leaves a normal match against the bot. MatchHud creates it only in
     /// the tutorial, so it needs no setup. Display only: it reads the match, it never changes it.
     /// </summary>
     public sealed class TutorialGuide : MonoBehaviour
@@ -31,6 +32,7 @@ namespace SoulBind.UI
         {
             public string Title;
             public string Text;
+            public TutorialActions Allowed;
         }
 
         private static readonly Page[] Pages =
@@ -39,37 +41,43 @@ namespace SoulBind.UI
             {
                 Title = "Practice match",
                 Text = "You play one bot here. Nothing counts and there is no turn timer, so take your time. " +
-                       "Real matches give each turn 30 to 45 seconds."
+                       "Real matches give each turn 30 to 45 seconds. Press Next to begin.",
+                Allowed = TutorialActions.None
             },
             new Page
             {
                 Title = "1  Move",
-                Text = "The faint green tiles show how far you can walk this turn. The bright ones are your next step: " +
-                       $"tap one to move. Each step costs {GameConstants.MoveCapacityCost} Capacity."
+                Text = "The green tiles show how far you can walk this turn. Tap any of them: your Apostle walks there " +
+                       $"one tile at a time, and each step costs {GameConstants.MoveCapacityCost} Capacity.",
+                Allowed = TutorialActions.Move
             },
             new Page
             {
                 Title = "2  Play a card",
                 Text = "Drag a card onto the discard pile. It waits in the play queue (top-left) with its Capacity held: " +
-                       "tap it there to take it back, or press PLAY to use it."
+                       "tap it there to take it back, or press PLAY to use it.",
+                Allowed = TutorialActions.Cards
             },
             new Page
             {
                 Title = "3  Attack",
                 Text = "Walk next to the enemy. When they glow red, drag a card with ATK onto them, then press ATTACK. " +
-                       "Breaking their DEF steals a Soul. You attack once per turn."
+                       "Breaking their DEF steals a Soul. You attack once per turn. Too far away? Press Next.",
+                Allowed = TutorialActions.Move | TutorialActions.Cards | TutorialActions.Attack
             },
             new Page
             {
                 Title = "4  End your turn",
                 Text = "Press End Turn when you are done. Anything still queued resolves, you draw a card, " +
-                       "and the bot plays."
+                       "and the bot plays.",
+                Allowed = TutorialActions.EndTurn
             },
             new Page
             {
                 Title = "How to win",
                 Text = $"Be the last Apostle standing, or reach {GameConstants.SoulsToAwaken} Souls to Awaken and step " +
-                       "onto the Ascension tile. Keep practising, or use Menu > Leave when you are ready."
+                       "onto the Ascension tile. Keep practising, or use Menu > Leave when you are ready.",
+                Allowed = TutorialActions.All
             }
         };
 
@@ -86,6 +94,11 @@ namespace SoulBind.UI
         private HexCoord _startTile;
         private int _startHand;
         private bool _hadTurn;
+        private float _flash;          // seconds left of the "follow the step" flash
+        private Image _border;
+
+        private const float FlashTime = 0.6f;
+        private static readonly Color FlashColor = new Color(0.95f, 0.30f, 0.25f, 1f);
 
         public static TutorialGuide Create(RectTransform hudRoot, MatchController controller)
         {
@@ -100,6 +113,10 @@ namespace SoulBind.UI
             TutorialGuide guide = rect.gameObject.AddComponent<TutorialGuide>();
             guide._controller = controller;
             guide.Build(rect);
+            Transform border = rect.Find("Border");
+            guide._border = border != null ? border.GetComponent<Image>() : null;
+            controller.TutorialActionBlocked += guide.OnBlocked;
+            controller.SetTutorialActions(Pages[0].Allowed);
             return guide;
         }
 
@@ -123,6 +140,18 @@ namespace SoulBind.UI
             Kit.At((RectTransform)skip.transform.parent, x, 16f + ButtonHeight + 10f, ButtonWidth, 36f);
         }
 
+        private void OnDestroy()
+        {
+            if (_controller != null)
+            {
+                _controller.TutorialActionBlocked -= OnBlocked;
+                _controller.SetTutorialActions(TutorialActions.All);
+            }
+        }
+
+        // The player tried something this step does not allow: the coach flashes red.
+        private void OnBlocked() => _flash = FlashTime;
+
         // ---------- Steps ----------
 
         private void Update()
@@ -140,8 +169,20 @@ namespace SoulBind.UI
 
             if (IsStepDone(match))
                 GoTo(_step + 1);
-            if (_shownStep != _step)
+            if (_step != Step.Done && _shownStep != _step)
                 Show();
+            ShowFlash();
+        }
+
+        private void ShowFlash()
+        {
+            if (_border == null)
+                return;
+            if (_flash > 0f)
+                _flash -= Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(_flash / FlashTime);
+            _border.color = Color.Lerp(Kit.Gold, FlashColor, t);
+            _title.color = Color.Lerp(Kit.Title, FlashColor, t);
         }
 
         // True once the player has done what this step asks.
@@ -165,7 +206,7 @@ namespace SoulBind.UI
             switch (_step)
             {
                 case Step.Move:
-                    return _hasStart && you.Position != _startTile;
+                    return _hasStart && you.Position != _startTile && !_controller.IsWalking;
                 case Step.PlayCard:
                     return yourTurn && _hasStart && match.GetHand(you.Id).Count < _startHand;
                 case Step.Attack:
@@ -197,7 +238,12 @@ namespace SoulBind.UI
             _hasStart = false;
             _hadTurn = false;
             if (_step == Step.Done)
+            {
+                _controller.SetTutorialActions(TutorialActions.All);
                 gameObject.SetActive(false);
+                return;
+            }
+            _controller.SetTutorialActions(Pages[(int)_step].Allowed);
         }
 
         private void Show()

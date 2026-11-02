@@ -75,7 +75,7 @@ namespace SoulBind.Managers
         private readonly List<HexCoord> _legalDestinations = new List<HexCoord>(6);
         private readonly List<HexCoord> _reachTiles = new List<HexCoord>(64); // every tile in walking range
         private readonly List<ApostleState> _attackTargets = new List<ApostleState>(6);
-        private readonly List<HexCoord> _pickTiles = new List<HexCoord>(6);
+        private readonly List<HexCoord> _pickTiles = new List<HexCoord>(64);
         private readonly List<HexCoord> _attackTiles = new List<HexCoord>(6);
 
         /// <summary>Raised after anything that changes what the player should see.</summary>
@@ -143,6 +143,27 @@ namespace SoulBind.Managers
 
         /// <summary>True in the tutorial (practice) match: one bot, guided steps, no turn timer.</summary>
         public bool IsTutorial => MatchSettings.IsSet && MatchSettings.IsTutorial;
+
+        // ---- Tutorial (set by TutorialGuide) ----
+
+        private TutorialActions _tutorialAllowed = TutorialActions.All;
+
+        /// <summary>Raised when the tutorial refused an action, so the coach can point at its step.</summary>
+        public event System.Action TutorialActionBlocked;
+
+        /// <summary>In the tutorial: only these actions work until the coach moves on. All by default.</summary>
+        public void SetTutorialActions(TutorialActions allowed) => _tutorialAllowed = allowed;
+
+        // ---- Walking to a tile further away ----
+
+        private const float WalkStepTimeout = 3f; // online: give up if the host has not shown a step by then
+        private readonly List<HexCoord> _walkPath = new List<HexCoord>(16);
+        private int _walkIndex;      // the next step to send
+        private int _walkTurnKey;    // the turn the walk belongs to
+        private float _walkWait;
+
+        /// <summary>True while the piece walks, one tile at a time, toward a tile further away.</summary>
+        public bool IsWalking => _walkPath.Count > 0;
 
         // ---- Hand play state (read by the HUD) ----
 
@@ -593,6 +614,13 @@ namespace SoulBind.Managers
         /// </summary>
         private CommandResult Submit(MatchCommand command)
         {
+            if (IsTutorial && !IsAllowedInTutorial(command))
+            {
+                StopWalk();
+                TutorialActionBlocked?.Invoke();
+                return CommandResult.Refused;
+            }
+
             if (_online == OnlineRole.Client)
             {
                 CommandSubmitted?.Invoke(command);
@@ -624,6 +652,7 @@ namespace SoulBind.Managers
                 return;
             }
             UpdateTurnTimer();
+            UpdateWalk();
             RunBots();
             if (!IsLocalTurn)
                 return;
@@ -840,7 +869,8 @@ namespace SoulBind.Managers
             }
             else
             {
-                _pickTiles.AddRange(_legalDestinations);
+                // Every tile in reach can be tapped: the far ones start a walk.
+                _pickTiles.AddRange(_reachTiles);
             }
         }
 
@@ -888,13 +918,120 @@ namespace SoulBind.Managers
             if (!IsLocalTurn)
                 return;
 
-            // A copy checks the highlighted tiles first, so a click elsewhere sends nothing.
-            if (IsOnlineClient && !_legalDestinations.Contains(destination))
+            // A new tap replaces a walk in progress.
+            StopWalk();
+
+            // A tile further away: walk there along the shortest path, one tile at a time.
+            if (!_legalDestinations.Contains(destination))
+            {
+                StartWalk(destination);
                 return;
+            }
 
             CommandResult result = Submit(MatchCommand.Move(destination));
             if (result != CommandResult.Applied)
                 Debug.Log($"MatchController: move to {destination} rejected ({result}).");
+        }
+
+        // ---------- Walking ----------
+
+        // Plans the walk and takes its first step. Tiles out of reach do nothing (so a copy sends nothing).
+        private void StartWalk(HexCoord destination)
+        {
+            if (!_reachTiles.Contains(destination))
+                return;
+            if (!CurrentMatch.TryGetPath(destination, _walkPath))
+                return;
+
+            _walkIndex = 0;
+            _walkTurnKey = TurnTimer.GetTurnKey(CurrentMatch);
+            SendWalkStep();
+        }
+
+        // Sends the next step as an ordinary Move, so every step costs Capacity and follows the rules.
+        private void SendWalkStep()
+        {
+            HexCoord next = _walkPath[_walkIndex];
+            if (Submit(MatchCommand.Move(next)) != CommandResult.Applied)
+            {
+                Debug.Log($"MatchController: walk step to {next} rejected.");
+                StopWalk();
+                return;
+            }
+            _walkIndex++;
+            _walkWait = WalkStepTimeout;
+        }
+
+        // Takes the next step once the piece has arrived on the last one. The walk stops if the
+        // turn changes, an attack starts, or (online) the host never shows the step.
+        private void UpdateWalk()
+        {
+            if (!IsWalking)
+                return;
+            if (!IsLocalTurn || TurnTimer.GetTurnKey(CurrentMatch) != _walkTurnKey
+                || CurrentMatch.Engagement == EngagementState.Engaged)
+            {
+                StopWalk();
+                return;
+            }
+
+            HexCoord arrived = _walkPath[_walkIndex - 1];
+            if (CurrentMatch.CurrentApostle.Position != arrived)
+            {
+                _walkWait -= Time.deltaTime;
+                if (_walkWait <= 0f)
+                    StopWalk();
+                return;
+            }
+            if (IsPieceGliding(CurrentMatch.CurrentApostle))
+                return;
+
+            if (_walkIndex >= _walkPath.Count)
+                StopWalk(); // arrived
+            else
+                SendWalkStep();
+        }
+
+        private void StopWalk()
+        {
+            _walkPath.Clear();
+            _walkIndex = 0;
+        }
+
+        // True while this Apostle's piece is still sliding to its tile.
+        private bool IsPieceGliding(ApostleState apostle)
+        {
+            IReadOnlyList<ApostleState> apostles = CurrentMatch.Battlefield.Apostles;
+            for (int i = 0; i < apostles.Count && i < _views.Count; i++)
+            {
+                if (apostles[i] == apostle)
+                    return _discTargets[i] != _moveTo[i] || _moveElapsed[i] < _moveDuration[i];
+            }
+            return false;
+        }
+
+        // ---------- Tutorial ----------
+
+        // Choosing a direction is always allowed, so the tutorial can never get stuck between Phases.
+        private bool IsAllowedInTutorial(MatchCommand command)
+        {
+            switch (command.Kind)
+            {
+                case CommandKind.Move:
+                    return (_tutorialAllowed & TutorialActions.Move) != 0;
+                case CommandKind.PlayCard:
+                    bool attacking = command.TargetId != 0 || CurrentMatch.Engagement == EngagementState.Engaged;
+                    return (_tutorialAllowed & (attacking ? TutorialActions.Attack : TutorialActions.Cards)) != 0;
+                case CommandKind.ReturnCard:
+                case CommandKind.PlayQueued:
+                    return (_tutorialAllowed & (TutorialActions.Cards | TutorialActions.Attack)) != 0;
+                case CommandKind.Strike:
+                    return (_tutorialAllowed & TutorialActions.Attack) != 0;
+                case CommandKind.EndTurn:
+                    return (_tutorialAllowed & TutorialActions.EndTurn) != 0;
+                default:
+                    return true;
+            }
         }
 
         /// <summary>

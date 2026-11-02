@@ -91,7 +91,7 @@ namespace SoulBind.UI
                 // A plate above every piece: name, Souls, Vessel, Corruption and DEF.
                 // They take over from the opponents' portrait row, which is hidden.
                 NamePlates.Create((RectTransform)transform, matchController);
-                // The turn timer, top-center (hidden while it is off or nobody is acting).
+                // The turn timer, top-left above the play queue (hidden while it is off or nobody is acting).
                 TurnTimerView.Create((RectTransform)transform, matchController);
                 // The practice match's step-by-step coach.
                 if (matchController.IsTutorial)

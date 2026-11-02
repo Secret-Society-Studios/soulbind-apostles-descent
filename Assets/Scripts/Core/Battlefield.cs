@@ -15,6 +15,8 @@ namespace SoulBind.Core
         private readonly HashSet<HexCoord> _seen = new HashSet<HexCoord>();
         private readonly List<HexCoord> _ring = new List<HexCoord>(32);
         private readonly List<HexCoord> _nextRing = new List<HexCoord>(32);
+        private readonly List<HexCoord> _pathScratch = new List<HexCoord>(64);
+        private readonly Dictionary<HexCoord, HexCoord> _cameFrom = new Dictionary<HexCoord, HexCoord>(); // tile -> the tile before it
 
         public HexBoard Board { get; }
 
@@ -151,6 +153,7 @@ namespace SoulBind.Core
 
             int steps = capacity.Remaining / GameConstants.MoveCapacityCost;
             _seen.Clear();
+            _cameFrom.Clear();
             _ring.Clear();
             _seen.Add(apostle.Position);
             _ring.Add(apostle.Position);
@@ -166,6 +169,33 @@ namespace SoulBind.Core
             }
         }
 
+        /// <summary>
+        /// Fills path with the shortest walk to destination, one tile per step (the first step first,
+        /// destination last), within the same reach as GetReachableTiles. False, with path empty,
+        /// if destination cannot be reached this turn. Does not allocate.
+        /// </summary>
+        public bool TryGetPath(ApostleState apostle, TurnCapacity capacity, bool hasClosedTile,
+            HexCoord closedTile, HexCoord destination, List<HexCoord> path)
+        {
+            if (path == null)
+                throw new ArgumentNullException(nameof(path));
+
+            path.Clear();
+            GetReachableTiles(apostle, capacity, hasClosedTile, closedTile, _pathScratch);
+            if (!_cameFrom.ContainsKey(destination))
+                return false;
+
+            // Walk back from the destination to the start, then flip it so the first step comes first.
+            HexCoord tile = destination;
+            while (tile != apostle.Position)
+            {
+                path.Add(tile);
+                tile = _cameFrom[tile];
+            }
+            path.Reverse();
+            return true;
+        }
+
         // Adds the unseen, walkable neighbours of a tile to the next ring and to the results.
         private void AddFreeNeighbors(HexCoord tile, bool hasClosedTile, HexCoord closedTile, List<HexCoord> results)
         {
@@ -178,6 +208,7 @@ namespace SoulBind.Core
                 if (IsOccupied(next) || (hasClosedTile && next == closedTile))
                     continue;
                 _nextRing.Add(next);
+                _cameFrom[next] = tile;
                 results.Add(next);
             }
         }
