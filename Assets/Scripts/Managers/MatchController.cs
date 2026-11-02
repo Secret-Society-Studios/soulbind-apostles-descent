@@ -47,6 +47,13 @@ namespace SoulBind.Managers
         [Tooltip("Extra pause before a bot's first action of a turn.")]
         [SerializeField] private float botTurnStartDelay = 0.6f;
 
+        [Header("Turn timer")]
+        [Tooltip("On: each turn has a time limit, and the turn ends by itself when it runs out (online too).")]
+        [SerializeField] private bool useTurnTimer = true;
+        [Tooltip("Seconds per turn (and for choosing the next Phase's direction).")]
+        [SerializeField, Range(TurnTimer.MinSeconds, TurnTimer.MaxSeconds)]
+        private float turnSeconds = TurnTimer.DefaultSeconds;
+
         [Header("Animation")]
         [Tooltip("Speed of every animation: 1 = normal, 2 = twice as fast, 0.5 = half speed.")]
         [SerializeField, Range(0.5f, 2f)] private float animationSpeed = 1f;
@@ -66,6 +73,7 @@ namespace SoulBind.Managers
 
         private readonly List<ApostleView> _views = new List<ApostleView>(GameConstants.MaxPlayers);
         private readonly List<HexCoord> _legalDestinations = new List<HexCoord>(6);
+        private readonly List<HexCoord> _reachTiles = new List<HexCoord>(64); // every tile in walking range
         private readonly List<ApostleState> _attackTargets = new List<ApostleState>(6);
         private readonly List<HexCoord> _pickTiles = new List<HexCoord>(6);
         private readonly List<HexCoord> _attackTiles = new List<HexCoord>(6);
@@ -119,6 +127,22 @@ namespace SoulBind.Managers
             }
             return null;
         }
+
+        // ---- Turn timer (read by the HUD) ----
+
+        private TurnTimer _turnTimer;
+
+        /// <summary>True while the turn timer counts down for whoever acts now.</summary>
+        public bool IsTurnTimerRunning => _turnTimer != null && _turnTimer.IsRunning;
+
+        /// <summary>Seconds left for whoever acts now (online players see their own copy of the count).</summary>
+        public float TurnSecondsLeft => _turnTimer != null ? _turnTimer.Remaining : 0f;
+
+        /// <summary>The seconds each turn gets.</summary>
+        public float TurnSecondsLimit => _turnTimer != null ? _turnTimer.Limit : 0f;
+
+        /// <summary>True in the tutorial (practice) match: one bot, guided steps, no turn timer.</summary>
+        public bool IsTutorial => MatchSettings.IsSet && MatchSettings.IsTutorial;
 
         // ---- Hand play state (read by the HUD) ----
 
@@ -257,6 +281,10 @@ namespace SoulBind.Managers
                 chooseSpawns = MatchSettings.ChooseSpawns;
             }
             bool online = MatchSettings.IsSet && MatchSettings.IsOnline;
+
+            // The tutorial is for learning, so nobody is rushed there.
+            if (useTurnTimer && !IsTutorial)
+                _turnTimer = new TurnTimer(turnSeconds);
 
             localApostleId = Mathf.Clamp(localApostleId, 1, playerCount);
             _lastViewerId = localApostleId;
@@ -595,6 +623,7 @@ namespace SoulBind.Managers
                 UpdateSpawnDraft();
                 return;
             }
+            UpdateTurnTimer();
             RunBots();
             if (!IsLocalTurn)
                 return;
@@ -1115,6 +1144,40 @@ namespace SoulBind.Managers
             StateChanged?.Invoke();
         }
 
+        // ---------- Turn timer ----------
+
+        // Counts down whoever acts now. Offline and on the host, running out ends the turn (or keeps
+        // the current direction between Phases). A player who joined only shows the count: the host
+        // decides, and its next snapshot shows the new turn.
+        private void UpdateTurnTimer()
+        {
+            if (_turnTimer == null || CurrentMatch == null)
+                return;
+
+            int key = TurnTimer.GetTurnKey(CurrentMatch);
+            if (!_turnTimer.Tick(key, Time.deltaTime))
+                return;
+            if (_online == OnlineRole.Client)
+                return;
+
+            int actorId = MatchCommands.GetActorId(CurrentMatch);
+            MatchCommand command = CurrentMatch.IsAwaitingPhaseStart
+                ? MatchCommand.ChooseDirection(CurrentMatch.Turns.Direction)
+                : MatchCommand.EndTurn();
+            if (actorId == localApostleId || !botsPlayOthers)
+            {
+                HasSelectedCard = false;
+                IsChoosingComboTarget = false;
+            }
+
+            if (MatchCommands.Apply(CurrentMatch, actorId, command) != CommandResult.Applied)
+                return;
+            Debug.Log($"MatchController: Apostle {actorId} ran out of time. {command}.");
+            _botTurnOwner = -1;
+            LogIfOver();
+            AfterMatchChange();
+        }
+
         // ---- Bots ----
 
         // Lets the bot whose turn it is (or who chooses the next Phase's direction) take one action
@@ -1496,15 +1559,24 @@ namespace SoulBind.Managers
         }
 
         // Moves and attack marks are only shown to the player whose turn it is on this screen.
+        // The faint tint is everywhere the Apostle can still walk this turn; the bright one is the next step.
         private void RefreshHighlights()
         {
             if (IsLocalTurn)
+            {
                 CurrentMatch.GetLegalDestinations(_legalDestinations);
+                CurrentMatch.GetReachableTiles(_reachTiles);
+            }
             else
+            {
                 _legalDestinations.Clear();
-            if (_legalDestinations.Count == 0)
-                boardView.ClearHighlights();
-            else
+                _reachTiles.Clear();
+            }
+
+            // Highlights go first, so the reach tint starts from each tile's own look.
+            boardView.ClearHighlights();
+            boardView.SetReach(_reachTiles);
+            if (_legalDestinations.Count > 0)
                 boardView.SetHighlights(_legalDestinations);
         }
 

@@ -239,6 +239,25 @@ namespace SoulBind.Core
         }
 
         /// <summary>
+        /// Fills results with every tile the current Apostle could still walk to this turn with the
+        /// Capacity left: the furthest reach, not just the next step. Empty when nobody's turn is
+        /// active or while Engaged. The caller supplies the list so it can be reused without allocating.
+        /// </summary>
+        public void GetReachableTiles(List<HexCoord> results)
+        {
+            if (results == null)
+                throw new ArgumentNullException(nameof(results));
+            if (CurrentApostle == null || Engagement == EngagementState.Engaged)
+            {
+                results.Clear();
+                return;
+            }
+
+            bool closed = IsAscensionTileClosedTo(CurrentApostle, Ascension.Tile);
+            Battlefield.GetReachableTiles(CurrentApostle, CurrentCapacity, closed, Ascension.Tile, results);
+        }
+
+        /// <summary>
         /// Plays a card from the current Apostle's hand into the queue: its CAP is held and it leaves
         /// the hand, and ReturnQueuedCard takes it back. Its DEF, ATK, effect and combo happen when the
         /// queue resolves: on Strike in an attack, otherwise on PlayQueued (or End Turn).

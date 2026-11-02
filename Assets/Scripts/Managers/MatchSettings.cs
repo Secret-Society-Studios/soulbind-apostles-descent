@@ -18,6 +18,11 @@ namespace SoulBind.Managers
         /// <summary>True when the match is played online (the host's NetworkMatch assigns the seats).</summary>
         public static bool IsOnline { get; private set; }
 
+        /// <summary>True for the tutorial: a practice match against one bot, with guided steps.</summary>
+        public static bool IsTutorial { get; private set; }
+
+        public const int TutorialPlayers = 2; // you and one bot, so the board stays easy to follow
+
         public static void Set(int playerCount, bool botsPlayOthers, bool chooseSpawns)
         {
             PlayerCount = Mathf.Clamp(playerCount, 2, 6);
@@ -25,7 +30,15 @@ namespace SoulBind.Managers
             LocalApostleId = 1;
             ChooseSpawns = chooseSpawns;
             IsOnline = false;
+            IsTutorial = false;
             IsSet = true;
+        }
+
+        /// <summary>The tutorial: you against one bot, offline, picking your own starting tile.</summary>
+        public static void SetTutorial()
+        {
+            Set(TutorialPlayers, true, true);
+            IsTutorial = true;
         }
 
         /// <summary>
@@ -39,6 +52,7 @@ namespace SoulBind.Managers
             LocalApostleId = 1;
             ChooseSpawns = true; // picking starting tiles online comes later
             IsOnline = true;
+            IsTutorial = false;
             IsSet = true;
         }
 
@@ -49,6 +63,7 @@ namespace SoulBind.Managers
         {
             IsSet = false;
             IsOnline = false;
+            IsTutorial = false;
         }
     }
 }

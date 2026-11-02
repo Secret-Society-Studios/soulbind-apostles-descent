@@ -11,6 +11,11 @@ namespace SoulBind.Core
     {
         private readonly List<ApostleState> _apostles = new List<ApostleState>(GameConstants.MaxPlayers);
 
+        // Reused by GetReachableTiles, so the walk allocates nothing once they have grown.
+        private readonly HashSet<HexCoord> _seen = new HashSet<HexCoord>();
+        private readonly List<HexCoord> _ring = new List<HexCoord>(32);
+        private readonly List<HexCoord> _nextRing = new List<HexCoord>(32);
+
         public HexBoard Board { get; }
 
         /// <summary>The special tiles still waiting to be used.</summary>
@@ -122,6 +127,58 @@ namespace SoulBind.Core
             {
                 if (!IsOccupied(neighbors[i]))
                     results.Add(neighbors[i]);
+            }
+        }
+
+        /// <summary>
+        /// Fills results with every tile this Apostle could walk to this turn, one step at a time,
+        /// with the Capacity it has left (each step costs MoveCapacityCost). Other Apostles block
+        /// the way, and so does closedTile when hasClosedTile is true (the Ascension tile, for
+        /// anyone but the Awakened). The start tile is not included. Does not allocate.
+        /// </summary>
+        public void GetReachableTiles(ApostleState apostle, TurnCapacity capacity, bool hasClosedTile,
+            HexCoord closedTile, List<HexCoord> results)
+        {
+            RequireRegistered(apostle);
+            if (capacity == null)
+                throw new ArgumentNullException(nameof(capacity));
+            if (results == null)
+                throw new ArgumentNullException(nameof(results));
+
+            results.Clear();
+            if (apostle.IsEliminated)
+                return;
+
+            int steps = capacity.Remaining / GameConstants.MoveCapacityCost;
+            _seen.Clear();
+            _ring.Clear();
+            _seen.Add(apostle.Position);
+            _ring.Add(apostle.Position);
+
+            // Walk out one ring at a time, so a tile is only kept if a free path reaches it in time.
+            for (int step = 0; step < steps && _ring.Count > 0; step++)
+            {
+                _nextRing.Clear();
+                for (int i = 0; i < _ring.Count; i++)
+                    AddFreeNeighbors(_ring[i], hasClosedTile, closedTile, results);
+                _ring.Clear();
+                _ring.AddRange(_nextRing);
+            }
+        }
+
+        // Adds the unseen, walkable neighbours of a tile to the next ring and to the results.
+        private void AddFreeNeighbors(HexCoord tile, bool hasClosedTile, HexCoord closedTile, List<HexCoord> results)
+        {
+            IReadOnlyList<HexCoord> neighbors = Board.GetNeighborsOnBoard(tile);
+            for (int n = 0; n < neighbors.Count; n++)
+            {
+                HexCoord next = neighbors[n];
+                if (!_seen.Add(next))
+                    continue;
+                if (IsOccupied(next) || (hasClosedTile && next == closedTile))
+                    continue;
+                _nextRing.Add(next);
+                results.Add(next);
             }
         }
 

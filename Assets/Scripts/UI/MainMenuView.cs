@@ -122,6 +122,13 @@ namespace SoulBind.UI
             SceneManager.LoadScene(gameSceneName);
         }
 
+        // The tutorial: a practice match against one bot, whatever the Apostles count says.
+        private void PlayTutorial()
+        {
+            MatchSettings.SetTutorial();
+            SceneManager.LoadScene(gameSceneName);
+        }
+
         private void Quit()
         {
 #if UNITY_EDITOR
@@ -182,7 +189,7 @@ namespace SoulBind.UI
             Kit.At(subtitle.rectTransform, 0f, 268f, 1280f, 34f);
             subtitle.characterSpacing = 33f;
 
-            // The column: Apostles, Play vs Bots, Online / Pass & Play, How to Play / Quit.
+            // The column: Apostles, Play vs Bots, Online / Pass & Play, Tutorial / How to Play / Quit.
             RectTransform column = Kit.At(Kit.CreateRect("Column", frame), 430f, 356f, 420f, 300f);
             RectTransform stepper = Kit.Box(column, "Apostles", Kit.Panel, Kit.Line, 10f);
             Kit.At(stepper, 0f, 0f, 420f, 60f);
@@ -200,11 +207,14 @@ namespace SoulBind.UI
             TMP_Text local = Kit.Button(column, "PassAndPlay", "Pass & Play", Kit.ButtonStyle.Secondary,
                 PassAndPlay, 17f);
             Kit.At((RectTransform)local.transform.parent, 216f, 148f, 204f, 56f);
+            // A practice match against one bot, with a coach, before playing for real.
+            TMP_Text tutorial = Kit.Button(column, "Tutorial", "Tutorial", Kit.ButtonStyle.Secondary, PlayTutorial, 15f);
+            Kit.At((RectTransform)tutorial.transform.parent, 0f, 216f, 132f, 48f);
             TMP_Text rules = Kit.Button(column, "HowToPlay", "How to Play", Kit.ButtonStyle.Ghost,
                 () => HelpPopup.Open(transform), 15f);
-            Kit.At((RectTransform)rules.transform.parent, 0f, 216f, 204f, 48f);
+            Kit.At((RectTransform)rules.transform.parent, 144f, 216f, 132f, 48f);
             TMP_Text quit = Kit.Button(column, "Quit", "Quit", Kit.ButtonStyle.Ghost, Quit, 15f);
-            Kit.At((RectTransform)quit.transform.parent, 216f, 216f, 204f, 48f);
+            Kit.At((RectTransform)quit.transform.parent, 288f, 216f, 132f, 48f);
 
             _mainStatus = Kit.Label(frame, "Status", "", 14f, Kit.Inter, Kit.Gold);
             Kit.At(_mainStatus.rectTransform, 330f, 628f, 620f, 24f);
