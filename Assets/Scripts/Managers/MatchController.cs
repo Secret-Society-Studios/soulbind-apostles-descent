@@ -157,6 +157,19 @@ namespace SoulBind.Managers
         /// <summary>In the tutorial: only these actions work until the coach moves on. All by default.</summary>
         public void SetTutorialActions(TutorialActions allowed) => _tutorialAllowed = allowed;
 
+        private bool _hasMoveGoal;
+        private HexCoord _moveGoal;
+
+        /// <summary>
+        /// In the tutorial: while set, a step only works if it brings the Apostle closer to goal, so the
+        /// player cannot spend the turn's Capacity walking somewhere else and get stuck.
+        /// </summary>
+        public void SetTutorialMoveGoal(bool hasGoal, HexCoord goal)
+        {
+            _hasMoveGoal = hasGoal;
+            _moveGoal = goal;
+        }
+
         // ---- Walking to a tile further away ----
 
         private const float WalkStepTimeout = 3f; // online: give up if the host has not shown a step by then
@@ -1030,13 +1043,22 @@ namespace SoulBind.Managers
 
         // ---------- Tutorial ----------
 
+        // True when this step is one tile closer to the tutorial's move goal.
+        private bool IsStepTowardGoal(HexCoord destination)
+        {
+            HexCoord from = CurrentMatch.CurrentApostle.Position;
+            return HexCoord.Distance(destination, _moveGoal) == HexCoord.Distance(from, _moveGoal) - 1;
+        }
+
         // Choosing a direction is always allowed, so the tutorial can never get stuck between Phases.
         private bool IsAllowedInTutorial(MatchCommand command)
         {
             switch (command.Kind)
             {
                 case CommandKind.Move:
-                    return (_tutorialAllowed & TutorialActions.Move) != 0;
+                    if ((_tutorialAllowed & TutorialActions.Move) == 0)
+                        return false;
+                    return !_hasMoveGoal || IsStepTowardGoal(command.Destination);
                 case CommandKind.PlayCard:
                     bool attacking = command.TargetId != 0 || CurrentMatch.Engagement == EngagementState.Engaged;
                     return (_tutorialAllowed & (attacking ? TutorialActions.Attack : TutorialActions.Cards)) != 0;
