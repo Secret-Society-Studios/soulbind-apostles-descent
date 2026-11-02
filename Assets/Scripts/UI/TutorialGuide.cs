@@ -142,6 +142,7 @@ namespace SoulBind.UI
             guide._border = border != null ? border.GetComponent<Image>() : null;
             controller.TutorialActionBlocked += guide.OnBlocked;
             controller.SetTutorialActions(Steps[0].Allowed);
+            controller.SetTutorialMoveGoal(false, default);
             return guide;
         }
 
@@ -151,6 +152,7 @@ namespace SoulBind.UI
                 return;
             _controller.TutorialActionBlocked -= OnBlocked;
             _controller.SetTutorialActions(TutorialActions.All);
+            _controller.SetTutorialMoveGoal(false, default);
         }
 
         // ---------- Building ----------
@@ -239,6 +241,24 @@ namespace SoulBind.UI
             Match match = _controller.CurrentMatch;
             _stepRound = match != null ? match.Turns.RoundNumber : 0;
             _controller.SetTutorialActions(IsComplete ? TutorialActions.All : Steps[_step].Allowed);
+            SetMoveGoal(match);
+        }
+
+        // Walking steps only go toward their goal (the Soul tile, then the enemy), so the turn's
+        // Capacity is never spent somewhere that leaves the player stuck.
+        private void SetMoveGoal(Match match)
+        {
+            Check check = IsComplete ? Check.Win : Steps[_step].Done;
+            if (check == Check.ReachTarget)
+            {
+                _controller.SetTutorialMoveGoal(true, _controller.TutorialTarget);
+                return;
+            }
+            ApostleState enemy = match != null ? Find(match, TutorialMatch.EnemyId) : null;
+            if (check == Check.Engage && enemy != null)
+                _controller.SetTutorialMoveGoal(true, enemy.Position);
+            else
+                _controller.SetTutorialMoveGoal(false, default);
         }
 
         private void Show()
