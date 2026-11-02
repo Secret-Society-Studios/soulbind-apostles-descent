@@ -267,12 +267,12 @@ namespace SoulBind.UI
             Kit.At(_profileName.rectTransform, 76f, 12f, 190f, 26f);
             _profileName.textWrappingMode = TextWrappingModes.NoWrap;
             _profileName.overflowMode = TextOverflowModes.Ellipsis;
-            TMP_Text hint = Kit.Label(card, "Hint", "Tap to change your name", 12f, Kit.Inter, Kit.Muted,
+            TMP_Text hint = Kit.Label(card, "Hint", "Tap for your profile and stats", 12f, Kit.Inter, Kit.Muted,
                 TextAlignmentOptions.Left);
             Kit.At(hint.rectTransform, 76f, 40f, 190f, 18f);
         }
 
-        // The pop-up for typing it. Tapping outside cancels.
+        // The profile page: your name (type to change it) and your stats. Tapping outside cancels.
         private void BuildProfilePopup()
         {
             RectTransform cover = Kit.Stretch(Kit.CreateRect("ProfilePopup", _root));
@@ -285,21 +285,29 @@ namespace SoulBind.UI
 
             RectTransform frame = Kit.CreateFrame(cover, "Frame");
             RectTransform panel = Kit.Box(frame, "Panel", Kit.Panel, Kit.GoldLine, 14f);
-            Kit.At(panel, 340f, 220f, 600f, 280f);
+            Kit.At(panel, 280f, 70f, ProfileWidth, 580f);
+            // A click on the panel would bubble up to the cover's Button and close the page,
+            // so the panel takes its own clicks with a Button that does nothing.
+            panel.gameObject.AddComponent<Button>().transition = Selectable.Transition.None;
 
-            TMP_Text title = Kit.Label(panel, "Title", "Your name", 30f, Kit.Display, Kit.Title);
-            Kit.At(title.rectTransform, 0f, 28f, 600f, 40f);
+            TMP_Text title = Kit.Label(panel, "Title", "Profile", 30f, Kit.Display, Kit.Title);
+            Kit.At(title.rectTransform, 0f, 22f, ProfileWidth, 40f);
 
+            TMP_Text nameLabel = Kit.Label(panel, "NameLabel", "YOUR NAME", 12f, Kit.InterBold, Kit.Muted,
+                TextAlignmentOptions.Left);
+            Kit.At(nameLabel.rectTransform, 60f, 72f, 300f, 18f);
             _nameField = CreateInputField(panel, "NameField", "Type your name", 26f, Kit.InterSemiBold, 0f);
-            Kit.At((RectTransform)_nameField.transform, 60f, 96f, 480f, 64f);
+            Kit.At((RectTransform)_nameField.transform, 60f, 94f, 600f, 60f);
             _nameField.characterLimit = PlayerNames.MaxLength;
             _nameField.onValidateInput = (string _, int __, char c) => PlayerNames.IsAllowed(c) ? c : '\0';
             _nameField.onSubmit.AddListener(_ => SaveProfile());
 
+            BuildProfileStats(panel);
+
             TMP_Text cancel = Kit.Button(panel, "Cancel", "Cancel", Kit.ButtonStyle.Ghost, CloseProfile, 16f);
-            Kit.At((RectTransform)cancel.transform.parent, 60f, 192f, 230f, 56f);
+            Kit.At((RectTransform)cancel.transform.parent, 60f, 500f, 290f, 56f);
             TMP_Text save = Kit.Button(panel, "Save", "Save", Kit.ButtonStyle.Primary, SaveProfile, 20f);
-            Kit.At((RectTransform)save.transform.parent, 310f, 192f, 230f, 56f);
+            Kit.At((RectTransform)save.transform.parent, 370f, 500f, 290f, 56f);
 
             _profilePopup.SetActive(false);
         }
@@ -307,6 +315,7 @@ namespace SoulBind.UI
         private void OpenProfile()
         {
             _nameField.text = PlayerNames.LocalName;
+            ShowProfileStats();
             _profilePopup.transform.SetAsLastSibling();
             _profilePopup.SetActive(true);
         }

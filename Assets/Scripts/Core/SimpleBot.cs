@@ -19,7 +19,7 @@ namespace SoulBind.Core
     /// Decide returns one action at a time, always one the rules allow, so the caller can show each step.
     /// Pure rules code: no Unity types.
     /// </summary>
-    public sealed class SimpleBot
+    public sealed class SimpleBot : IBot
     {
         // How the bot weighs things. Higher Priority = attack or chase first.
         private const int AwakenedPriority = 1000; // stop an ascension above everything
@@ -35,6 +35,8 @@ namespace SoulBind.Core
         private readonly List<HexCoord> _destinations = new List<HexCoord>(6);
         private readonly List<ApostleState> _targets = new List<ApostleState>(6);
         private readonly List<int> _caps = new List<int>(8);
+
+        public string Name => "SimpleBot";
 
         /// <summary>The next action for whoever must act now (the current Apostle, or the Phase chooser).</summary>
         public BotAction Decide(Match match)
