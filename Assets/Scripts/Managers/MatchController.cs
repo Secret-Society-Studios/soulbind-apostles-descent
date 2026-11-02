@@ -23,7 +23,7 @@ namespace SoulBind.Managers
     /// sends every action to the host as a MatchCommand instead of applying it. All local actions go
     /// through Submit, so the same buttons work in every mode.
     /// </summary>
-    public sealed class MatchController : MonoBehaviour
+    public sealed partial class MatchController : MonoBehaviour
     {
         [SerializeField] private BoardView boardView;
         [SerializeField] private GameObject apostlePrefab;
@@ -42,6 +42,8 @@ namespace SoulBind.Managers
         [SerializeField, Range(1, 6)] private int localApostleId = 1;
         [Tooltip("On: bots play every other Apostle. Off: you play every Apostle and the screen follows the turn.")]
         [SerializeField] private bool botsPlayOthers = true;
+        [Tooltip("Bots try each play one step ahead before choosing (SmartBot). Off = the simpler SimpleBot.")]
+        [SerializeField] private bool smartBots = true;
         [Tooltip("Seconds between a bot's actions, so you can follow what it does.")]
         [SerializeField] private float botActionDelay = 0.6f;
         [Tooltip("Extra pause before a bot's first action of a turn.")]
@@ -204,7 +206,7 @@ namespace SoulBind.Managers
         private ArcanaId _comboCard;
         private int _comboAttackTarget; // the attack target that card was dropped on, kept while the player picks
 
-        private readonly SimpleBot _bot = new SimpleBot();
+        private IBot _bot; // made on first use, from smartBots
         private float _botWait;
         private int _botTurnOwner = -1;
         private int _botActionsThisTurn;
@@ -652,15 +654,18 @@ namespace SoulBind.Managers
                 return CommandResult.Refused;
             }
 
+            PrepareProfileNote(command);
             if (_online == OnlineRole.Client)
             {
                 CommandSubmitted?.Invoke(command);
+                CommitProfileNote();
                 return CommandResult.Applied;
             }
 
             CommandResult result = MatchCommands.Apply(CurrentMatch, MatchCommands.GetActorId(CurrentMatch), command);
             if (result == CommandResult.Applied)
             {
+                CommitProfileNote();
                 LogIfOver();
                 AfterMatchChange();
             }
@@ -1395,6 +1400,7 @@ namespace SoulBind.Managers
             // so nothing gets in the way of what is being learned.
             bool lessonPass = IsTutorial && !CurrentMatch.IsAwaitingPhaseStart;
             bool passOnly = lessonPass || ++_botActionsThisTurn > MaxBotActionsPerTurn;
+            _bot ??= smartBots ? new SmartBot() : (IBot)new SimpleBot();
             BotAction action = passOnly ? BotAction.EndTurn : _bot.Decide(CurrentMatch);
             if (action.Kind == BotActionKind.None)
                 return;
@@ -1676,6 +1682,7 @@ namespace SoulBind.Managers
             RefreshAttackMarks();
             DetectStrike();
             ShowStatChanges();
+            SaveProfileIfOver();
             Hint = BuildHint();
             StateChanged?.Invoke();
         }
