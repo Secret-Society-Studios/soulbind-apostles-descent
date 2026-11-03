@@ -8,8 +8,11 @@ namespace SoulBind.Utility
         private const float Sqrt3 = 1.7320508f;
         private const int TextureHeight = 256;
 
-        /// <summary>A white hexagon sprite that is 2 * hexSize tall in world units.</summary>
-        public static Sprite Create(float hexSize)
+        /// <summary>
+        /// A white hexagon sprite that is 2 * hexSize tall in world units. With an outline (a share of the
+        /// hex's radius) only the sides are solid and the inside is see-through by fill (0 to 1).
+        /// </summary>
+        public static Sprite Create(float hexSize, float outline = 0f, float fill = 1f)
         {
             int height = TextureHeight;
             int width = Mathf.RoundToInt(height * Sqrt3 / 2f);
@@ -19,6 +22,10 @@ namespace SoulBind.Utility
             var pixels = new Color32[width * height];
             var inside = new Color32(255, 255, 255, 255);
             var outside = new Color32(255, 255, 255, 0);
+            // The inside of an outlined hex, almost see-through.
+            byte fillAlpha = (byte)Mathf.RoundToInt(255f * Mathf.Clamp01(fill));
+            var faint = new Color32(255, 255, 255, fillAlpha);
+            float line = outline * radius; // outline width in pixels, 0 = solid
 
             for (int py = 0; py < height; py++)
             {
@@ -27,7 +34,10 @@ namespace SoulBind.Utility
                 {
                     float dx = Mathf.Abs(px + 0.5f - width / 2f);
                     bool isInside = dx <= halfWidth && dy <= radius - dx / Sqrt3;
-                    pixels[py * width + px] = isInside ? inside : outside;
+                    // How far this pixel is from the nearest side, in pixels.
+                    float edge = Mathf.Min(halfWidth - dx, (radius - dy - dx / Sqrt3) * Sqrt3 / 2f);
+                    Color32 color = line <= 0f || edge <= line ? inside : faint;
+                    pixels[py * width + px] = isInside ? color : outside;
                 }
             }
 

@@ -39,8 +39,8 @@ namespace SoulBind.UI
         [SerializeField] private Sprite island;
         [Tooltip("Island size as a multiple of the board's radius (x = width, y = height). " + "Make it big enough that every tile sits on the island's flat top.")]
         [SerializeField] private Vector2 islandSize = new Vector2(1.35f, 2.15f);
-        [Tooltip("How far above the picture's middle the island's flat top is, as a share of the picture's " + "height. The island moves down by this much, so the board sits on the top and the cliffs hang below.")]
-        [SerializeField, Range(0f, 0.5f)] private float islandTopShift = 0.14f;
+        [Tooltip("Moves the island down by this share of its height. Leave at 0 when the island sprite's " + "pivot is already on the centre of its flat top (MapBoard.png's is).")]
+        [SerializeField, Range(0f, 0.5f)] private float islandTopShift = 0f;
 
         [Header("Lava glow (over the island's edge, pulses)")]
         [SerializeField] private Sprite lavaGlow;
