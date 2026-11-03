@@ -241,6 +241,7 @@ namespace SoulBind.Managers
         private bool _impactDone;
         private bool _strikeStartedNow;
         private readonly List<Vector3> _impactTargets = new List<Vector3>(GameConstants.MaxPlayers);
+        private readonly List<int> _impactViews = new List<int>(GameConstants.MaxPlayers); // pieces that flinch
 
         // Gliding pieces: each move eases in and out, leaving a little smoke behind.
         private readonly Vector3[] _moveFrom = new Vector3[GameConstants.MaxPlayers];
@@ -1571,6 +1572,10 @@ namespace SoulBind.Managers
         // The Strike lands: a slash on every Apostle hit, a shudder and a dark pulse at the screen's edges.
         private void Impact()
         {
+            // Every Apostle whose DEF broke flinches, facing the attacker.
+            for (int i = 0; i < _impactViews.Count; i++)
+                _views[_impactViews[i]].PlayDamaged(_lungeDirection.x < 0f);
+
             if (_effects == null)
                 return;
             for (int i = 0; i < _impactTargets.Count; i++)
@@ -1598,12 +1603,18 @@ namespace SoulBind.Managers
                     _impactDone = false;
                     _strikeStartedNow = true; // the damage numbers wait for the impact
                     _impactTargets.Clear();
+                    _impactViews.Clear();
                     for (int h = 0; h < hits.Count; h++)
                     {
                         int hit = IndexOfApostle(hits[h].TargetId);
-                        if (hit >= 0)
-                            _impactTargets.Add(_discTargets[hit]);
+                        if (hit < 0)
+                            continue;
+                        _impactTargets.Add(_discTargets[hit]);
+                        if (hits[h].BrokeDefense && hit < _views.Count)
+                            _impactViews.Add(hit);
                     }
+                    if (attacker < _views.Count)
+                        _views[attacker].PlayAttack(_lungeDirection.x);
                 }
             }
 
