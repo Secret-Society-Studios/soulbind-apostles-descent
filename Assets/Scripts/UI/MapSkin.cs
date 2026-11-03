@@ -42,6 +42,31 @@ namespace SoulBind.UI
         [Tooltip("Moves the island down by this share of its height. Leave at 0 when the island sprite's " + "pivot is already on the centre of its flat top (MapBoard.png's is).")]
         [SerializeField, Range(0f, 0.5f)] private float islandTopShift = 0f;
 
+        [Header("3D island (built in code from the island art)")]
+        [Tooltip("On: the island is a 3D rock, its top cut from the island art and its cliffs hanging below, " + "so it looks right when the camera turns. Off: the flat picture above.")]
+        [SerializeField] private bool island3D = true;
+        [Tooltip("The flat top's size as a multiple of the board's radius (x = width, y = depth).")]
+        [SerializeField] private Vector2 islandTopSize = new Vector2(1.3f, 1.25f);
+        [Tooltip("How far the rock hangs below the top, as a multiple of the top's half-width.")]
+        [SerializeField, Min(0.1f)] private float islandDepth = 1.1f;
+        [Tooltip("How bumpy the rim and the cliffs are: 0 = a smooth oval.")]
+        [SerializeField, Range(0f, 0.3f)] private float islandRoughness = 0.06f;
+        [Tooltip("The part of the island art used for the flat top (0 to 1 across the picture, from its " + "bottom-left corner).")]
+        [SerializeField] private Rect islandTopArea = new Rect(0.08f, 0.42f, 0.79f, 0.5f);
+        [Tooltip("The part of the island art used for the cliffs and the edge rocks.")]
+        [SerializeField] private Rect islandCliffArea = new Rect(0.15f, 0.05f, 0.7f, 0.31f);
+        [Tooltip("How dark the bottom of the cliffs gets: 1 = no darkening.")]
+        [SerializeField, Range(0f, 1f)] private float cliffShade = 0.45f;
+
+        [Header("Edge rocks (big rocks standing on the 3D island's rim)")]
+        [Tooltip("Your rock art, picked in turn. Each stands on the rim and faces the camera, like the " + "avatars. Empty = 3D placeholder rocks cut from the cliff art.")]
+        [SerializeField] private Sprite[] edgeRocks = new Sprite[0];
+        [SerializeField, Range(0, 40)] private int edgeRockCount = 14;
+        [Tooltip("The smallest and largest rock height, in world units.")]
+        [SerializeField] private Vector2 edgeRockHeight = new Vector2(0.7f, 1.6f);
+        [Tooltip("How far in from the rim the rocks stand, as a share of the island's radius.")]
+        [SerializeField, Range(0f, 0.3f)] private float edgeRockInset = 0.05f;
+
         [Header("Lava glow (over the island's edge, pulses)")]
         [SerializeField] private Sprite lavaGlow;
         [SerializeField] private Color glowColor = new Color(1f, 0.45f, 0.1f);
@@ -77,6 +102,17 @@ namespace SoulBind.UI
         public Sprite Island => island;
         public Vector2 IslandSize => islandSize;
         public float IslandTopShift => islandTopShift;
+        public bool Island3D => island3D;
+        public Vector2 IslandTopSize => islandTopSize;
+        public float IslandDepth => islandDepth;
+        public float IslandRoughness => islandRoughness;
+        public Rect IslandTopArea => islandTopArea;
+        public Rect IslandCliffArea => islandCliffArea;
+        public float CliffShade => cliffShade;
+        public bool HasEdgeRockArt => edgeRocks != null && edgeRocks.Length > 0;
+        public int EdgeRockCount => edgeRockCount;
+        public Vector2 EdgeRockHeight => edgeRockHeight;
+        public float EdgeRockInset => edgeRockInset;
         public Sprite LavaGlow => lavaGlow;
         public Color GlowColor => glowColor;
         public float GlowPulseSpeed => glowPulseSpeed;
@@ -90,6 +126,9 @@ namespace SoulBind.UI
         public float EmberSize => emberSize;
         public float EmberSpeed => emberSpeed;
         public Color EmberColor => emberColor;
+
+        /// <summary>The art for edge rock number i, or null for a 3D placeholder rock.</summary>
+        public Sprite GetEdgeRock(int i) => HasEdgeRockArt ? edgeRocks[i % edgeRocks.Length] : null;
 
         /// <summary>The art for rock number i, or null for the placeholder.</summary>
         public Sprite GetRock(int i) =>
