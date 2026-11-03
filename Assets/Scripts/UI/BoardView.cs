@@ -36,6 +36,26 @@ namespace SoulBind.UI
         [SerializeField] private Sprite purifyTileSprite;
         [SerializeField] private Sprite soulTileSprite;
         [SerializeField] private bool fitCameraToBoard = true;
+
+        [Header("Map view (the board sits on the island art)")]
+        [Tooltip("On: MatchCamera follows your avatar. Off: the camera is fitted to the whole table as before.")]
+        [SerializeField] private bool followCamera = true;
+        [Tooltip("Show the dark hexagonal mat under the board. Off lets the island art show through.")]
+        [SerializeField] private bool showMat = false;
+        [Tooltip("Hide the hex grid except while you are moving or attacking.")]
+        [SerializeField] private bool gridOnlyWhenActing = true;
+
+        [Header("Floating special tiles")]
+        [Tooltip("Special tiles float above their tile and face the camera, like the Apostles.")]
+        [SerializeField] private bool floatSpecialTiles = true;
+        [Tooltip("How high the icon floats above the board, in world units.")]
+        [SerializeField, Min(0f)] private float specialFloatHeight = 0.45f;
+        [Tooltip("How far the icon bobs up and down, in world units.")]
+        [SerializeField, Min(0f)] private float specialBobHeight = 0.08f;
+        [Tooltip("Bobs per second.")]
+        [SerializeField, Min(0f)] private float specialBobSpeed = 0.8f;
+        [Tooltip("The icon's size, in tile heights.")]
+        [SerializeField, Range(0.3f, 1.5f)] private float specialIconSize = 0.8f;
         [SerializeField] private float cameraMargin = 0.2f;
 
         [Header("Table view")]
@@ -76,6 +96,10 @@ namespace SoulBind.UI
         private readonly List<HexCoord> _reach = new List<HexCoord>(64);
         private readonly List<HexCoord> _attackMarks = new List<HexCoord>(6);
         private readonly List<HexCoord> _changedTiles = new List<HexCoord>(16);
+        private readonly List<SpriteRenderer> _icons = new List<SpriteRenderer>(8); // pooled floating icons
+        private readonly List<Vector3> _iconRest = new List<Vector3>(8);           // each icon's spot at rest
+        private int _iconCount;                                                   // icons in use this Phase
+        private const int IconSortingOrder = 10; // under the avatars (11)
         private Sprite _placeholderSprite;
         private bool _hasAscensionTile;
         private HexCoord _ascensionTile;
@@ -193,6 +217,8 @@ namespace SoulBind.UI
                     ApplyBase(pair.Key);
                 }
             }
+            PlaceSpecialIcons();
+            RefreshGrid();
         }
 
         /// <summary>
@@ -213,6 +239,7 @@ namespace SoulBind.UI
                 _ascensionTile = tile;
                 spriteRenderer.color = ascensionTileColor;
             }
+            RefreshGrid();
         }
 
         /// <summary>Highlights exactly these tiles, clearing any earlier highlights.</summary>
@@ -227,6 +254,7 @@ namespace SoulBind.UI
                     _highlighted.Add(tiles[i]);
                 }
             }
+            RefreshGrid();
         }
 
         public void ClearHighlights()
@@ -234,6 +262,7 @@ namespace SoulBind.UI
             for (int i = 0; i < _highlighted.Count; i++)
                 ApplyBase(_highlighted[i]);
             _highlighted.Clear();
+            RefreshGrid();
         }
 
         /// <summary>
@@ -252,6 +281,7 @@ namespace SoulBind.UI
                 spriteRenderer.color = Color.Lerp(spriteRenderer.color, reachColor, reachStrength);
                 _reach.Add(tiles[i]);
             }
+            RefreshGrid();
         }
 
         public void ClearReach()
@@ -259,6 +289,7 @@ namespace SoulBind.UI
             for (int i = 0; i < _reach.Count; i++)
                 ApplyBase(_reach[i]);
             _reach.Clear();
+            RefreshGrid();
         }
 
         /// <summary>
@@ -276,6 +307,7 @@ namespace SoulBind.UI
                     _attackMarks.Add(tiles[i]);
                 }
             }
+            RefreshGrid();
         }
 
         /// <summary>Removes the attack marks. Call it first, before the other board updates.</summary>
@@ -284,6 +316,7 @@ namespace SoulBind.UI
             for (int i = 0; i < _attackMarks.Count; i++)
                 ApplyBase(_attackMarks[i]);
             _attackMarks.Clear();
+            RefreshGrid();
         }
 
         /// <summary>The share of the screen height kept clear at the top (for the HUD strip).</summary>
@@ -312,6 +345,12 @@ namespace SoulBind.UI
         public float MatHalfHeight => _matHalfHeight;
 
         /// <summary>The radius of a circle that encloses the mat and the hands lying around it.</summary>
+        /// <summary>Center to the board's furthest tile edge, in world units (sizes the island art).</summary>
+        public float BoardRadius => Mathf.Max(_boardWidth, _boardHeight) * 0.5f;
+
+        /// <summary>True while the match camera follows the avatar instead of the fitted table view.</summary>
+        public bool FollowCamera => followCamera;
+
         public float SeatRingRadius => Mathf.Max(_matRadius, _matHalfHeight) + seatGap + seatDepth;
 
         /// <summary>
@@ -389,7 +428,7 @@ namespace SoulBind.UI
         // of the screen the panels leave free, centered in it.
         private void FitCamera()
         {
-            if (!fitCameraToBoard || Board == null)
+            if (!fitCameraToBoard || followCamera || Board == null)
                 return;
 
             Camera cam = Camera.main;
@@ -563,7 +602,9 @@ namespace SoulBind.UI
 
             Sprite hexagon = CreateHexagonSprite(_matRadius, _matHalfHeight, matSideAngle, matColor,
                 Color.Lerp(matColor, Color.white, 0.25f), matRimWidth);
-            CreateFlat("Mat", hexagon, Color.white, -10, Vector3.one);
+            GameObject mat = CreateFlat("Mat", hexagon, Color.white, -10, Vector3.one);
+            // The mat's size still places the piles and seats; it is just not drawn over the island.
+            mat.SetActive(showMat);
         }
 
         // Draws the stretched hexagon (with a soft edge and a lighter rim) into a texture, sized in world
@@ -617,7 +658,7 @@ namespace SoulBind.UI
             return Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(0.5f, 0.5f), pixelsPerUnit);
         }
 
-        private void CreateFlat(string objectName, Sprite sprite, Color color, int sortingOrder, Vector3 scale)
+        private GameObject CreateFlat(string objectName, Sprite sprite, Color color, int sortingOrder, Vector3 scale)
         {
             var flat = new GameObject(objectName);
             flat.transform.SetParent(transform, false);
@@ -626,6 +667,7 @@ namespace SoulBind.UI
             spriteRenderer.sprite = sprite;
             spriteRenderer.color = color;
             spriteRenderer.sortingOrder = sortingOrder;
+            return flat;
         }
 
         private bool IsAscensionTile(HexCoord tile) => _hasAscensionTile && _ascensionTile == tile;
@@ -659,12 +701,10 @@ namespace SoulBind.UI
         {
             if (_specialTypes.TryGetValue(tile, out SpecialTileType type))
             {
-                switch (type)
-                {
-                    case SpecialTileType.Heal: return healTileSprite;
-                    case SpecialTileType.Purify: return purifyTileSprite;
-                    default: return soulTileSprite;
-                }
+                // A floating icon shows the art; the tile under it keeps the plain hex in the special colour.
+                if (floatSpecialTiles)
+                    return Board.IsEdge(tile) && edgeTileSprite != null ? edgeTileSprite : plainTileSprite;
+                return SpecialArt(type);
             }
             if (Board.IsEdge(tile) && edgeTileSprite != null)
                 return edgeTileSprite;
@@ -678,6 +718,16 @@ namespace SoulBind.UI
             if (height <= 0f)
                 return tileScale;
             return tileScale * (2f * hexSize) / height;
+        }
+
+        private Sprite SpecialArt(SpecialTileType type)
+        {
+            switch (type)
+            {
+                case SpecialTileType.Heal: return healTileSprite;
+                case SpecialTileType.Purify: return purifyTileSprite;
+                default: return soulTileSprite;
+            }
         }
 
         private Color SpecialColor(SpecialTileType type)
@@ -746,11 +796,87 @@ namespace SoulBind.UI
             // Give every tile its art (or placeholder) and color.
             foreach (HexCoord tile in board.Tiles)
                 ApplyBase(tile);
+            RefreshGrid();
             Debug.Log($"BoardView: built {_tiles.Count} tiles ({board.EdgeTiles.Count} edge).");
 
             CreateTableAndMat();
 
             FitCamera();
+        }
+
+        // ---------- Grid and floating icons ----------
+
+        // Shows the hex grid only while you are choosing a move or a target, so the island art reads
+        // as the ground. The Ascension tile (and special tiles, if they do not float) always show.
+        // Only runs when the board changes, never per frame.
+        private void RefreshGrid()
+        {
+            bool acting = !gridOnlyWhenActing
+                || _highlighted.Count > 0 || _reach.Count > 0 || _attackMarks.Count > 0;
+            foreach (KeyValuePair<HexCoord, SpriteRenderer> pair in _tiles)
+            {
+                bool show = acting || IsAscensionTile(pair.Key)
+                    || (!floatSpecialTiles && _specialTypes.ContainsKey(pair.Key));
+                if (pair.Value.enabled != show)
+                    pair.Value.enabled = show;
+            }
+        }
+
+        // Puts one floating icon over each special tile, reusing the pooled ones.
+        private void PlaceSpecialIcons()
+        {
+            _iconCount = 0;
+            if (floatSpecialTiles)
+            {
+                foreach (KeyValuePair<HexCoord, SpecialTileType> pair in _specialTypes)
+                    ShowIcon(_iconCount++, pair.Key, pair.Value);
+            }
+            for (int i = _iconCount; i < _icons.Count; i++)
+                _icons[i].gameObject.SetActive(false);
+        }
+
+        private void ShowIcon(int index, HexCoord tile, SpecialTileType type)
+        {
+            if (index >= _icons.Count)
+            {
+                var go = new GameObject("Special Icon");
+                go.transform.SetParent(transform, false);
+                var icon = go.AddComponent<SpriteRenderer>();
+                icon.sortingOrder = IconSortingOrder;
+                _icons.Add(icon);
+                _iconRest.Add(Vector3.zero);
+            }
+
+            SpriteRenderer spriteRenderer = _icons[index];
+            Sprite art = SpecialArt(type);
+            Sprite sprite = art != null ? art : _placeholderSprite;
+            spriteRenderer.sprite = sprite;
+            spriteRenderer.color = art != null ? Color.white : SpecialColor(type);
+            spriteRenderer.transform.localScale = Vector3.one * (ScaleFor(sprite) * specialIconSize);
+            // The board faces -Z, so up off the board is -Z.
+            _iconRest[index] = GetWorldPosition(tile) + new Vector3(0f, 0f, -specialFloatHeight);
+            spriteRenderer.transform.position = _iconRest[index];
+            spriteRenderer.gameObject.SetActive(true);
+        }
+
+        // Bobs the icons and turns them to the camera, like the avatars. No allocations.
+        private void LateUpdate()
+        {
+            if (_iconCount == 0)
+                return;
+            Camera cam = Camera.main;
+            if (cam == null)
+                return;
+            Quaternion facing = cam.transform.rotation;
+            float time = Time.time * specialBobSpeed * 2f * Mathf.PI;
+            for (int i = 0; i < _iconCount; i++)
+            {
+                // Each icon starts at a different point so they do not bob in step.
+                float bob = Mathf.Sin(time + i * 1.7f) * specialBobHeight;
+                Transform icon = _icons[i].transform;
+                icon.position = _iconRest[i] + new Vector3(0f, 0f, -bob);
+                icon.rotation = facing;
+            }
         }
     }
 }

@@ -49,6 +49,18 @@ namespace SoulBind.UI
         [SerializeField] private float previewRaise = 40f;
 
 
+        [Header("Hands on the screen")]
+        [Tooltip("On: your hand lies along the bottom of the screen with the Capacity bar, and the others' " +
+                 "card counts are on their name plates. Off: every hand lies on the table around the board.")]
+        [SerializeField] private bool handsOnScreen = true;
+        [Tooltip("Your cards' size on the screen (1 = 252 pixels tall on a 1080-pixel-high screen).")]
+        [SerializeField, Range(0.3f, 1f)] private float screenCardScale = 0.55f;
+        [Tooltip("How wide your hand may get before cards overlap, in pixels of a 1080-pixel-high screen.")]
+        [SerializeField] private float screenHandWidth = 1000f;
+        [Tooltip("Your hand's middle, left (-) or right (+) of the screen's middle, clear of your profile.")]
+        [SerializeField] private float screenHandOffset = -120f;
+        [SerializeField] private float screenBottomMargin = 12f;
+
         [Header("Cards on the table")]
         [Tooltip("Height of an opponent's card on the table, in world units (a hex tile is about 1).")]
         [SerializeField] private float cardWorldHeight = 1.4f;
@@ -308,7 +320,8 @@ namespace SoulBind.UI
             if (canvas == null)
                 canvas = gameObject.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.WorldSpace;
-            canvas.sortingOrder = 6; // above the piles, so a dragged card passes over them
+            // Above the piles, so a dragged card passes over them. On the screen, above the pieces too.
+            canvas.sortingOrder = handsOnScreen ? 60 : 6;
             canvas.worldCamera = _camera;
             if (GetComponent<GraphicRaycaster>() == null)
                 gameObject.AddComponent<GraphicRaycaster>(); // your cards can be hovered, clicked and dragged
@@ -325,7 +338,10 @@ namespace SoulBind.UI
                 EventSystem.current.pixelDragThreshold = Mathf.Max(EventSystem.current.pixelDragThreshold,
                     Mathf.RoundToInt(Screen.dpi * 0.08f));
 
-            PlaceOnTable();
+            if (handsOnScreen)
+                ScreenPlane.Fill(_rect, _camera);
+            else
+                PlaceOnTable();
             _ready = true;
             Refresh();
         }
@@ -422,10 +438,17 @@ namespace SoulBind.UI
                     CardScale = apostle.Id == viewer ? yourCardScale : 1f,
                 };
                 seat.Root = CreateRect($"Apostle {apostle.Id} Hand", _rect);
-                seat.Root.sizeDelta = new Vector2(length / scale, depth / scale);
-                Vector3 local = (center - board.transform.position) / scale;
-                seat.Root.anchoredPosition = new Vector2(local.x, local.y);
-                seat.Root.localRotation = Quaternion.Euler(0f, 0f, rotation);
+                if (handsOnScreen)
+                {
+                    PlaceOnScreen(seat, n, count);
+                }
+                else
+                {
+                    seat.Root.sizeDelta = new Vector2(length / scale, depth / scale);
+                    Vector3 local = (center - board.transform.position) / scale;
+                    seat.Root.anchoredPosition = new Vector2(local.x, local.y);
+                    seat.Root.localRotation = Quaternion.Euler(0f, 0f, rotation);
+                }
 
                 // Glows behind the tray: gold on the turn's Apostle, blue while it has DEF.
                 // The gold one is wide, the blue one tight to the tray, so both show when both apply.
@@ -443,7 +466,7 @@ namespace SoulBind.UI
                 edge.effectDistance = new Vector2(6f, -6f);
                 seat.Edge = edge;
 
-                if (showNameTags)
+                if (showNameTags && !handsOnScreen)
                 {
                     // The name tag: name and card count on a dark plate
                     // edged in the Apostle's colour, always upright.
@@ -679,6 +702,37 @@ namespace SoulBind.UI
         // Cards sit toward the board, leaving the outer edge for the name.
         private static float RowY(Seat seat) => LabelHeight / 2f;
 
+        // ---------- Hands on the screen ----------
+
+        // Yours along the bottom, beside your profile. The others' hands are kept (cards still fly from
+        // them) but hidden just above the top edge: their card counts show on their name plates.
+        private void PlaceOnScreen(Seat seat, int n, int count)
+        {
+            float half = _rect.sizeDelta.y / 2f;
+            if (seat.IsYours)
+            {
+                seat.CardScale = screenCardScale;
+                float depth = CardHeight * screenCardScale + 2f * trayPadding + LabelHeight;
+                seat.Root.sizeDelta = new Vector2(screenHandWidth, depth);
+                float y = -half + screenBottomMargin + depth / 2f - LabelHeight / 2f;
+                seat.Root.anchoredPosition = new Vector2(screenHandOffset, y);
+                return;
+            }
+
+            seat.CardScale = 0.35f;
+            float width = _rect.sizeDelta.x;
+            float x = -width / 2f + width * n / Mathf.Max(1, count);
+            seat.Root.sizeDelta = new Vector2(400f, CardHeight * 0.35f);
+            seat.Root.anchoredPosition = new Vector2(x, half + CardHeight);
+            CanvasGroup hide = seat.Root.gameObject.AddComponent<CanvasGroup>();
+            hide.alpha = 0f;
+            hide.blocksRaycasts = false;
+        }
+
+        // Cards standing up from the table only make sense on the table.
+        private float YourStand => handsOnScreen ? 0f : yourStandAngle;
+        private float OthersStand => handsOnScreen ? 0f : standAngle;
+
         // ---------- Where a hand is on screen (for the name plates) ----------
 
         private static readonly Vector3[] Corners = new Vector3[4];
@@ -697,7 +751,7 @@ namespace SoulBind.UI
                 if (_seats[i].ApostleId == apostleId)
                     seat = _seats[i];
             }
-            if (seat == null || cam == null || seat.Tray == null)
+            if (seat == null || cam == null || seat.Tray == null || handsOnScreen)
                 return false;
 
             float top = float.MinValue;
@@ -755,7 +809,7 @@ namespace SoulBind.UI
             rect.anchorMax = new Vector2(0.5f, 0.5f);
             rect.pivot = new Vector2(0.5f, 0.5f);
             rect.localScale = Vector3.one * seat.CardScale;
-            Stand(rect, yourStandAngle, CardHeight * seat.CardScale);
+            Stand(rect, YourStand, CardHeight * seat.CardScale);
             if (face.GetComponent<CanvasGroup>() == null)
                 face.gameObject.AddComponent<CanvasGroup>();
             face.HoverStarted += OnHoverStarted;
@@ -787,7 +841,7 @@ namespace SoulBind.UI
             back.pivot = new Vector2(0.5f, 0.5f);
             back.sizeDelta = new Vector2(CardWidth, CardHeight);
             back.localScale = Vector3.one;
-            Stand(back, standAngle, CardHeight);
+            Stand(back, OthersStand, CardHeight);
 
             // edged in the owner's colour, so each card shows whose hand it belongs to.
             if (back.GetComponent<Image>() != null)
@@ -940,7 +994,7 @@ namespace SoulBind.UI
 
                 RectTransform rect = face.Rect;
                 rect.anchoredPosition = Vector2.Lerp(rect.anchoredPosition, target, t);
-                rect.localRotation = Quaternion.Euler(-yourStandAngle, 0f, 0f);
+                rect.localRotation = Quaternion.Euler(-YourStand, 0f, 0f);
                 rect.localScale = Vector3.Lerp(rect.localScale, Vector3.one * scale, t);
             }
         }
