@@ -10,7 +10,7 @@ namespace SoulBind.UI
     /// (border, name, element, stats and effect), shown exactly as drawn. Cards without an image keep the
     /// placeholder look. The medallion and stat icon slots are only used when Front Is Complete is off.
     /// Create it with SoulBind > Add Card Art Support; fill it by dragging sprites in, or with
-    /// SoulBind > Fill Card Art From Folder.
+    /// SoulBind > Fill Card Art From Folder. It lives at Assets/Resources/CardArtLibrary.asset.
     /// </summary>
     [CreateAssetMenu(fileName = "CardArtLibrary", menuName = "SoulBind/Card Art Library")]
     public sealed class CardArtLibrary : ScriptableObject
@@ -47,6 +47,34 @@ namespace SoulBind.UI
         [SerializeField] private Color textColorOverArt = new Color(0.12f, 0.10f, 0.08f);
 
         private Sprite[] _byCard;
+
+        private static CardArtLibrary _current;
+        private static bool _looked;
+
+        // Looked up again on every Play, even with domain reload turned off.
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetOnPlay()
+        {
+            _looked = false;
+            _current = null;
+        }
+
+        /// <summary>
+        /// The library at Resources/CardArtLibrary, for screens with no card prefab to hold it
+        /// (the main menu's Collections). Null if there is none.
+        /// </summary>
+        public static CardArtLibrary Current
+        {
+            get
+            {
+                if (!_looked)
+                {
+                    _looked = true;
+                    _current = Resources.Load<CardArtLibrary>("CardArtLibrary");
+                }
+                return _current;
+            }
+        }
 
         public IReadOnlyList<CardArt> Cards => cards;
         public Sprite AttackIcon => attackIcon;
