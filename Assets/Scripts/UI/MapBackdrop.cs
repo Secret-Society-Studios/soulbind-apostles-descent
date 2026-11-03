@@ -84,9 +84,11 @@ namespace SoulBind.UI
             _islandRadiusY = ring * skin.IslandSize.y;
             _island = CreateFitted("Island", Pick(skin.Island, PlaceholderIsland), IslandOrder,
                 _islandRadiusX * 2f, _islandRadiusY * 2f, 0.05f);
-            // The glow is a bit bigger than the island, so it spills over the cliffs.
-            _glow = CreateFitted("LavaGlow", Pick(skin.LavaGlow, PlaceholderGlow), GlowOrder,
-                _islandRadiusX * 2.2f, _islandRadiusY * 2.2f, 0.1f);
+            // The glow is a bit bigger than the island, so it spills over the cliffs. The placeholder
+            // glow is an oval made for the placeholder island, so painted island art goes without it.
+            if (skin.LavaGlow != null || skin.Island == null)
+                _glow = CreateFitted("LavaGlow", Pick(skin.LavaGlow, PlaceholderGlow), GlowOrder,
+                    _islandRadiusX * 2.2f, _islandRadiusY * 2.2f, 0.1f);
 
             BuildRocks(skin);
             BuildEmbers(skin);
@@ -201,7 +203,8 @@ namespace SoulBind.UI
             float pulse = 0.5f + 0.5f * Mathf.Sin(time * _skin.GlowPulseSpeed * Mathf.PI * 2f);
             Color glow = _skin.GlowColor;
             glow.a = Mathf.Lerp(_skin.GlowAlpha.x, _skin.GlowAlpha.y, pulse);
-            _glow.color = glow;
+            if (_glow != null)
+                _glow.color = glow;
 
             for (int i = 0; i < _rocks.Length; i++)
             {
