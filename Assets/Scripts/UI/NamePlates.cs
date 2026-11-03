@@ -19,7 +19,7 @@ namespace SoulBind.UI
     {
         // Sizes in canvas pixels (the canvas is 1920 x 1080). Phones draw plates at PhoneScale.
         private const float Width = 200f;
-        private const float Height = 62f;
+        private const float Height = 80f;     // room for the cards and Capacity line at the bottom
         private const float BadgeSize = 40f;
         private const float BarLeft = 54f;
         private const float BarWidth = 138f;
@@ -45,6 +45,7 @@ namespace SoulBind.UI
             public TMP_Text Tag;
             public TMP_Text Vessel;
             public TMP_Text Defense;
+            public TMP_Text Cards; // "5 cards · 8 Capacity": their hand is no longer on the table
             public RectTransform VesselFill;
             public Image VesselFillImage;
             public RectTransform CorruptionFill;
@@ -175,6 +176,7 @@ namespace SoulBind.UI
                 plate.Souls.text = apostle.Souls.ToString();
                 plate.Vessel.text = $"{apostle.Vessel}/{GameConstants.MaxVessel}";
                 plate.Defense.text = apostle.Defense > 0 ? $"DEF {apostle.Defense}" : string.Empty;
+                ShowCards(plate, match, apostle, isCurrent);
                 SetFill(plate.VesselFill, plate.VesselFillImage, (float)apostle.Vessel / GameConstants.MaxVessel);
                 SetFill(plate.CorruptionFill, plate.CorruptionFillImage, (float)apostle.Corruption / CorruptionBarMax);
                 if (KeepsGameColours(plate.CorruptionFillImage))
@@ -190,6 +192,17 @@ namespace SoulBind.UI
                 plate.Background.raycastTarget = isPickable;
                 plate.Button.interactable = isPickable;
             }
+        }
+
+        // Hand size and Capacity: what is left on their turn, what their next turn starts with otherwise.
+        private static void ShowCards(Plate plate, Match match, ApostleState apostle, bool isCurrent)
+        {
+            int cards = match.GetHand(apostle.Id).Count;
+            int capacity = isCurrent && match.CurrentCapacity != null
+                ? match.CurrentCapacity.Remaining
+                : match.GetCapacityPreview(apostle.Id);
+            string word = cards == 1 ? "card" : "cards";
+            plate.Cards.text = $"{cards} {word} · {capacity} Capacity";
         }
 
         private static ApostleState FindApostle(Match match, int id)
@@ -306,6 +319,12 @@ namespace SoulBind.UI
             Place(plate.Defense.rectTransform, BarLeft + BarWidth - 48f, 41f, 48f, 18f);
             plate.Defense.alignment = TextAlignmentOptions.MidlineRight;
             plate.Defense.color = new Color(0.56f, 0.75f, 1f);
+
+            // Cards in hand and Capacity, along the bottom.
+            plate.Cards = NewText("Cards", plate.Rect, "", 12f, FontStyles.Normal);
+            Place(plate.Cards.rectTransform, BarLeft, 58f, BarWidth, 18f);
+            plate.Cards.color = new Color(0.85f, 0.82f, 0.75f);
+            plate.Cards.textWrappingMode = TextWrappingModes.NoWrap;
 
             // A small tag above the plate: AWAKENED, SOULLOCKED, or TAP TO PICK.
             plate.Tag = NewText("Tag", plate.Rect, "", 12f, FontStyles.Bold);

@@ -19,6 +19,12 @@ namespace SoulBind.UI
     public sealed class DiscardPileView : MonoBehaviour
     {
         [SerializeField] private MatchController matchController;
+        [Tooltip("On: the pile sits on the screen beside your hand. Off: it lies on the table by the board.")]
+        [SerializeField] private bool onScreen = true;
+        [Tooltip("Where it sits on the screen: pixels from the middle of a 1080-pixel-high screen.")]
+        [SerializeField] private Vector2 screenOffset = new Vector2(480f, -440f);
+        [Tooltip("The pile card's height on the screen, in pixels of a 1080-pixel-high screen.")]
+        [SerializeField] private float screenCardHeight = 150f;
         [SerializeField] private CardView cardPrefab;
         [Tooltip("The cards are created under this, oldest first, so the newest is drawn on top.")]
         [SerializeField] private RectTransform stack;
@@ -159,6 +165,11 @@ namespace SoulBind.UI
         // Lies flat on the mat, in its right corner beside the board.
         private void PlaceOnTable()
         {
+            if (onScreen)
+            {
+                PlaceOnScreen();
+                return;
+            }
             BoardView board = matchController.BoardView;
             float cardHeight = board != null ? board.PileCardHeight : 2.4f;
             float slotHeight = slot.rect.height > 0f ? slot.rect.height : 252f;
@@ -169,6 +180,16 @@ namespace SoulBind.UI
             // A hair toward the camera so it never fights with the mat.
             Vector3 spot = board != null ? board.DiscardPileSpot : transform.position;
             transform.position = spot + new Vector3(0f, 0f, -0.01f);
+        }
+
+        // Glued to the camera beside your hand, above the pieces, so it is always in reach.
+        private void PlaceOnScreen()
+        {
+            float slotHeight = slot.rect.height > 0f ? slot.rect.height : 252f;
+            ScreenPlane.Pin((RectTransform)transform, _camera, screenOffset, screenCardHeight / slotHeight);
+            Canvas canvas = GetComponent<Canvas>();
+            if (canvas != null)
+                canvas.sortingOrder = 55;
         }
 
         private CardView CreateView()

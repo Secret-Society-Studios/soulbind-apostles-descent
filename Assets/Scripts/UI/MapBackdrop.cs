@@ -79,11 +79,16 @@ namespace SoulBind.UI
             _sea = CreateTiled("FireSea", Pick(skin.FireSea, PlaceholderSea), SeaOrder,
                 skin.SeaTileSize, skin.SeaSize, skin.SeaDepth);
 
-            float ring = board.SeatRingRadius;
-            _islandRadiusX = ring * skin.IslandSize.x;
-            _islandRadiusY = ring * skin.IslandSize.y;
+            // The island is sized to the board itself, so the tiles stand on its flat top (like an
+            // auto-battler's arena) instead of a table around them.
+            float radius = board.BoardRadius;
+            _islandRadiusX = radius * skin.IslandSize.x;
+            _islandRadiusY = radius * skin.IslandSize.y;
             _island = CreateFitted("Island", Pick(skin.Island, PlaceholderIsland), IslandOrder,
                 _islandRadiusX * 2f, _islandRadiusY * 2f, 0.05f);
+            // Painted art has its flat top above the middle; move it down so the top is under the board.
+            if (skin.Island != null)
+                _island.transform.localPosition += new Vector3(0f, -skin.IslandTopShift * _islandRadiusY * 2f, 0f);
             // The glow is a bit bigger than the island, so it spills over the cliffs. The placeholder
             // glow is an oval made for the placeholder island, so painted island art goes without it.
             if (skin.LavaGlow != null || skin.Island == null)
