@@ -17,6 +17,8 @@ namespace SoulBind.UI
         private const int EmberOrder = -44;
         private const int IslandOrder = -30;
         private const int GlowOrder = -29;
+        private const int EdgeRockOrder = -28;
+        private const int RimSegments = 72; // corners around the 3D island's rim
 
         // Placeholder texture sizes, in pixels. Small on purpose: they read as pixel art.
         private const int SeaPixels = 64;
@@ -40,6 +42,9 @@ namespace SoulBind.UI
         private float[] _emberLife;
         private float _islandRadiusX; // world units
         private float _islandRadiusY;
+        private SpriteRenderer[] _edgeRockSprites; // painted edge rocks, turned to the camera each frame
+        private Vector3[] _edgeRockBase;           // where each one stands, on the rim
+        private float[] _edgeRockLift;             // pivot to bottom edge, so it stands on its base
 
         /// <summary>Builds the map under the board, or returns null if MapSkin turns the map off.</summary>
         public static MapBackdrop Create(BoardView board)
@@ -82,6 +87,12 @@ namespace SoulBind.UI
             // The island is sized to the board itself, so the tiles stand on its flat top (like an
             // auto-battler's arena) instead of a table around them.
             float radius = board.BoardRadius;
+            if (skin.Island3D && skin.Island != null && Build3DIsland(skin, radius))
+            {
+                BuildRocks(skin);
+                BuildEmbers(skin);
+                return;
+            }
             _islandRadiusX = radius * skin.IslandSize.x;
             _islandRadiusY = radius * skin.IslandSize.y;
             _island = CreateFitted("Island", Pick(skin.Island, PlaceholderIsland), IslandOrder,
@@ -97,6 +108,109 @@ namespace SoulBind.UI
 
             BuildRocks(skin);
             BuildEmbers(skin);
+        }
+
+        // ---------- 3D island ----------
+
+        // The island as a 3D rock with big rocks on its rim. Returns false (use the flat picture)
+        // if the island material is missing.
+        private bool Build3DIsland(MapSkin skin, float boardRadius)
+        {
+            Material shared = Resources.Load<Material>("IslandMaterial");
+            if (shared == null)
+            {
+                Debug.LogWarning("MapBackdrop: Resources/IslandMaterial is missing, using the flat island.");
+                return false;
+            }
+            Sprite art = Pick(skin.Island, PlaceholderIsland);
+            var material = new Material(shared) { mainTexture = art.texture };
+            Rect top = IslandMesh.ToTexture(art, skin.IslandTopArea);
+            Rect cliff = IslandMesh.ToTexture(art, skin.IslandCliffArea);
+
+            _islandRadiusX = boardRadius * skin.IslandTopSize.x;
+            _islandRadiusY = boardRadius * skin.IslandTopSize.y;
+            float[] rim = IslandMesh.MakeRim(RimSegments, skin.IslandRoughness, 5);
+            Mesh mesh = IslandMesh.BuildIsland(_islandRadiusX, _islandRadiusY, _islandRadiusX * skin.IslandDepth,
+                rim, skin.IslandRoughness, top, cliff, skin.CliffShade);
+            // Just under the tiles, so they never fight it.
+            CreateMesh("Island3D", mesh, material, IslandOrder, new Vector3(0f, 0f, 0.02f));
+
+            BuildEdgeRocks(skin, rim, material, cliff);
+            return true;
+        }
+
+        // Big rocks spaced around the rim: your art standing up like the avatars, or 3D placeholder rocks.
+        private void BuildEdgeRocks(MapSkin skin, float[] rim, Material material, Rect cliff)
+        {
+            int count = skin.EdgeRockCount;
+            bool painted = skin.HasEdgeRockArt;
+            _edgeRockSprites = painted ? new SpriteRenderer[count] : null;
+            _edgeRockBase = painted ? new Vector3[count] : null;
+            _edgeRockLift = painted ? new float[count] : null;
+            var random = new System.Random(13); // same layout every match
+
+            for (int i = 0; i < count; i++)
+            {
+                float turn = (i + (float)random.NextDouble() * 0.7f) / count;
+                int segment = Mathf.Clamp((int)(turn * RimSegments), 0, RimSegments - 1);
+                float angle = turn * Mathf.PI * 2f;
+                float reach = rim[segment] * (1f - skin.EdgeRockInset);
+                var spot = new Vector3(Mathf.Cos(angle) * _islandRadiusX * reach,
+                    Mathf.Sin(angle) * _islandRadiusY * reach, 0f);
+                float height = Mathf.Lerp(skin.EdgeRockHeight.x, skin.EdgeRockHeight.y, (float)random.NextDouble());
+
+                if (painted)
+                {
+                    Sprite sprite = Pick(skin.GetEdgeRock(i), PlaceholderRock);
+                    SpriteRenderer rock = CreateRenderer("EdgeRock", sprite, EdgeRockOrder);
+                    float scale = height / Mathf.Max(0.0001f, sprite.bounds.size.y);
+                    rock.transform.localScale = Vector3.one * scale;
+                    rock.flipX = random.Next(2) == 0;
+                    _edgeRockSprites[i] = rock;
+                    _edgeRockBase[i] = spot;
+                    _edgeRockLift[i] = -sprite.bounds.min.y * scale;
+                }
+                else
+                {
+                    Mesh mesh = IslandMesh.BuildRock(100 + i, cliff, skin.CliffShade);
+                    Transform rock = CreateMesh("EdgeRock", mesh, material, EdgeRockOrder, spot);
+                    float width = height * (0.7f + (float)random.NextDouble() * 0.5f);
+                    rock.localScale = new Vector3(width, width, height);
+                    rock.localRotation = Quaternion.AngleAxis((float)random.NextDouble() * 360f, Vector3.forward);
+                }
+            }
+        }
+
+        private Transform CreateMesh(string name, Mesh mesh, Material material, int order, Vector3 position)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(transform, false);
+            go.transform.localPosition = position;
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var renderer = go.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = material;
+            renderer.sortingOrder = order;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+            return go.transform;
+        }
+
+        // Painted edge rocks stand on the rim facing the camera, like the avatars. No allocations.
+        private void LateUpdate()
+        {
+            if (_edgeRockSprites == null)
+                return;
+            Camera cam = Camera.main;
+            if (cam == null)
+                return;
+            Quaternion facing = cam.transform.rotation;
+            Vector3 up = facing * Vector3.up;
+            for (int i = 0; i < _edgeRockSprites.Length; i++)
+            {
+                Transform rock = _edgeRockSprites[i].transform;
+                rock.rotation = facing;
+                rock.position = transform.TransformPoint(_edgeRockBase[i]) + up * _edgeRockLift[i];
+            }
         }
 
         private Sprite Pick(Sprite art, System.Func<Sprite> placeholder)
