@@ -20,12 +20,17 @@ namespace SoulBind.Entities
         [SerializeField] private float pieceLift = -0.05f;
         [Tooltip("Set to 180 if you see the back of the standee.")]
         [SerializeField] private float pieceYaw = 0f;
+        [Tooltip("On: the animated avatar from Resources/AvatarSkin. Off: the 3D pieces above.")]
+        [SerializeField] private bool useAnimatedAvatar = true;
 
         private SpriteRenderer _renderer;
         private SpriteRenderer _halo;
 
         // The standee's renderers, found once, so TopPoint allocates nothing each frame.
         private Renderer[] _pieceRenderers;
+
+        // The animated avatar, or null while the 3D piece (or just the disc) is shown.
+        private AvatarAnimator _avatar;
 
         public int ApostleId { get; private set; }
 
@@ -44,7 +49,22 @@ namespace SoulBind.Entities
             _renderer.color = color;
             _renderer.sortingOrder = SortingOrder;
 
-            SpawnPiece(apostleId);
+            if (!SpawnAvatar(color))
+                SpawnPiece(apostleId);
+        }
+
+        /// <summary>The avatar swings at a target: towards the right if directionX is 0 or more.</summary>
+        public void PlayAttack(float directionX)
+        {
+            if (_avatar != null)
+                _avatar.PlayAttack(directionX);
+        }
+
+        /// <summary>The avatar flinches, facing the side the hit came from.</summary>
+        public void PlayDamaged(bool fromRight)
+        {
+            if (_avatar != null)
+                _avatar.PlayDamaged(fromRight);
         }
 
         /// <summary>
@@ -87,6 +107,19 @@ namespace SoulBind.Entities
                     return;
             }
             _halo.enabled = isAwakened;
+        }
+
+        // Stands the animated avatar on the disc, tinted with the Apostle's colour. False if there are no frames.
+        private bool SpawnAvatar(Color color)
+        {
+            if (!useAnimatedAvatar)
+                return false;
+            _avatar = AvatarAnimator.Create(transform, AvatarSkin.Current, color, PieceSortingOrder);
+            if (_avatar == null)
+                return false;
+            _avatar.transform.localPosition = new Vector3(0f, 0f, pieceLift);
+            _pieceRenderers = new[] { _avatar.Renderer };
+            return true;
         }
 
         // Puts the Apostle's standee (or pawn) on top of its colored disc.
