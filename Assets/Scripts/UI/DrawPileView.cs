@@ -16,6 +16,12 @@ namespace SoulBind.UI
     public sealed class DrawPileView : MonoBehaviour
     {
         [SerializeField] private MatchController matchController;
+        [Tooltip("On: the pile sits on the screen beside your hand. Off: it lies on the table by the board.")]
+        [SerializeField] private bool onScreen = true;
+        [Tooltip("Where it sits on the screen: pixels from the middle of a 1080-pixel-high screen.")]
+        [SerializeField] private Vector2 screenOffset = new Vector2(-720f, -440f);
+        [Tooltip("The pile card's height on the screen, in pixels of a 1080-pixel-high screen.")]
+        [SerializeField] private float screenCardHeight = 150f;
         [Tooltip("One face-down card, kept inactive. The stack is built from copies of it.")]
         [SerializeField] private RectTransform cardBackTemplate;
         [Tooltip("The copies are created under this, bottom card first.")]
@@ -113,6 +119,11 @@ namespace SoulBind.UI
         // Lies flat on the mat, in its left corner beside the board.
         private void PlaceOnTable()
         {
+            if (onScreen)
+            {
+                PlaceOnScreen();
+                return;
+            }
             BoardView board = matchController.BoardView;
             float cardHeight = board != null ? board.PileCardHeight : 2.4f;
             float slotHeight = slot.rect.height > 0f ? slot.rect.height : 252f;
@@ -123,6 +134,16 @@ namespace SoulBind.UI
             // A hair toward the camera so it never fights with the mat.
             Vector3 spot = board != null ? board.DrawPileSpot : transform.position;
             transform.position = spot + new Vector3(0f, 0f, -0.01f);
+        }
+
+        // Glued to the camera beside your hand, above the pieces, so it is always in reach.
+        private void PlaceOnScreen()
+        {
+            float slotHeight = slot.rect.height > 0f ? slot.rect.height : 252f;
+            ScreenPlane.Pin((RectTransform)transform, _camera, screenOffset, screenCardHeight / slotHeight);
+            Canvas canvas = GetComponent<Canvas>();
+            if (canvas != null)
+                canvas.sortingOrder = 55;
         }
 
         private RectTransform CreateLayer(int index)

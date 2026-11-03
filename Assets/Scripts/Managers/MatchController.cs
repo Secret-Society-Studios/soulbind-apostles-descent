@@ -1257,16 +1257,31 @@ namespace SoulBind.Managers
         }
 
         // A left-click or a finger tap this frame (Pointer covers mouse, touchscreen and pen).
+        private static Vector2 _tapStart; // where the finger or mouse went down
+        private static bool _tapArmed;    // pressed, and has not swiped since
+
+        // A board tap fires when the finger lifts without having swiped, so swiping to pan or turn
+        // the camera never picks a tile by accident.
         private static bool TryGetPress(out Vector2 screenPoint)
         {
+            screenPoint = default;
             Pointer pointer = Pointer.current;
-            if (pointer == null || !pointer.press.wasPressedThisFrame)
-            {
-                screenPoint = default;
+            if (pointer == null)
                 return false;
+            if (pointer.press.wasPressedThisFrame)
+            {
+                _tapStart = pointer.position.ReadValue();
+                _tapArmed = true;
             }
+            if (MatchCamera.IsDragging)
+                _tapArmed = false;
+            if (!_tapArmed || !pointer.press.wasReleasedThisFrame)
+                return false;
+
+            _tapArmed = false;
             screenPoint = pointer.position.ReadValue();
-            return true;
+            float slop = MatchCamera.TapSlop();
+            return (screenPoint - _tapStart).sqrMagnitude <= slop * slop;
         }
 
         private void PickSpawn(HexCoord tile)

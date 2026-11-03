@@ -78,6 +78,9 @@ namespace SoulBind.UI
                 KeepClearOfScreenEdges(phone);
                 // Banners and the end-of-match screen.
                 MatchOverlay overlay = MatchOverlay.Create(_canvas.rootCanvas, matchController);
+                // The camera follows your avatar; swipe the top half to pan, the bottom half to turn.
+                if (matchController.BoardView != null && matchController.BoardView.FollowCamera)
+                    MatchCamera.Create(matchController);
                 // The dark gothic look, over what Build Match HUD made (nothing in the scene is rebuilt).
                 GothicTheme.ApplyToHud(transform);
                 GothicTheme.ApplyToOverlay(overlay.transform);

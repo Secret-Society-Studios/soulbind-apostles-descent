@@ -37,8 +37,10 @@ namespace SoulBind.UI
         [Header("Island (under the board and the hands)")]
         [Tooltip("Replaces the plain table. Stretched to the size below.")]
         [SerializeField] private Sprite island;
-        [Tooltip("Island size as a multiple of the ring where the hands lie (x = width, y = height).")]
-        [SerializeField] private Vector2 islandSize = new Vector2(1.35f, 1.25f);
+        [Tooltip("Island size as a multiple of the board's radius (x = width, y = height). " + "Make it big enough that every tile sits on the island's flat top.")]
+        [SerializeField] private Vector2 islandSize = new Vector2(1.35f, 2.15f);
+        [Tooltip("How far above the picture's middle the island's flat top is, as a share of the picture's " + "height. The island moves down by this much, so the board sits on the top and the cliffs hang below.")]
+        [SerializeField, Range(0f, 0.5f)] private float islandTopShift = 0.14f;
 
         [Header("Lava glow (over the island's edge, pulses)")]
         [SerializeField] private Sprite lavaGlow;
@@ -74,6 +76,7 @@ namespace SoulBind.UI
         public Vector2 SeaScroll => seaScroll;
         public Sprite Island => island;
         public Vector2 IslandSize => islandSize;
+        public float IslandTopShift => islandTopShift;
         public Sprite LavaGlow => lavaGlow;
         public Color GlowColor => glowColor;
         public float GlowPulseSpeed => glowPulseSpeed;
