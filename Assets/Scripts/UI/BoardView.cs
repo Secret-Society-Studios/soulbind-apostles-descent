@@ -14,6 +14,10 @@ namespace SoulBind.UI
         [SerializeField] private GameObject hexTilePrefab;
         [SerializeField] private float hexSize = 0.5f;
         [SerializeField, Range(0.8f, 1f)] private float tileScale = 0.95f;
+        [Tooltip("Draw the tiles as outlines (like an auto-battler's grid). Share of the tile's radius; 0 = solid.")]
+        [SerializeField, Range(0f, 0.3f)] private float outlineWidth = 0.08f;
+        [Tooltip("How see-through the inside of an outlined tile is: 0 = clear, 1 = solid.")]
+        [SerializeField, Range(0f, 1f)] private float outlineFill = 0.1f;
         [SerializeField] private Color tileColor = new Color(0.62f, 0.54f, 0.47f);
         [SerializeField] private Color edgeTileColor = new Color(0.80f, 0.70f, 0.56f);
         [SerializeField] private Color highlightColor = new Color(0.45f, 0.85f, 0.50f);
@@ -101,6 +105,7 @@ namespace SoulBind.UI
         private int _iconCount;                                                   // icons in use this Phase
         private const int IconSortingOrder = 10; // under the avatars (11)
         private Sprite _placeholderSprite;
+        private Sprite _solidHexSprite; // floating icons without art stay a filled hex
         private bool _hasAscensionTile;
         private HexCoord _ascensionTile;
         private float _centerX;
@@ -749,7 +754,8 @@ namespace SoulBind.UI
             }
 
             HexBoard board = StandardBoard.Create();
-            _placeholderSprite = HexSpriteFactory.Create(hexSize);
+            _placeholderSprite = HexSpriteFactory.Create(hexSize, outlineWidth, outlineFill);
+            _solidHexSprite = outlineWidth > 0f ? HexSpriteFactory.Create(hexSize) : _placeholderSprite;
             Vector2[] outline = HexSpriteFactory.GetCorners(hexSize);
 
             // Find the board's bounds so it can be centered on this object.
@@ -849,7 +855,7 @@ namespace SoulBind.UI
 
             SpriteRenderer spriteRenderer = _icons[index];
             Sprite art = SpecialArt(type);
-            Sprite sprite = art != null ? art : _placeholderSprite;
+            Sprite sprite = art != null ? art : _solidHexSprite;
             spriteRenderer.sprite = sprite;
             spriteRenderer.color = art != null ? Color.white : SpecialColor(type);
             spriteRenderer.transform.localScale = Vector3.one * (ScaleFor(sprite) * specialIconSize);
