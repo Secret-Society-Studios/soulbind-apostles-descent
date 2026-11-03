@@ -16,7 +16,7 @@ MonoBehaviour:
   - Card: 0
     Front: {fileID: -3992758806321180441, guid: 0c3a26651a43c244aa27b47d153f6820, type: 3}
   - Card: 1
-    Front: {fileID: 0}
+    Front: {fileID: -5259815324078833452, guid: 8505d47f95ca0ed40bab05a7ac65c0c9, type: 3}
   - Card: 2
     Front: {fileID: -2257430869594077242, guid: 2ac35d00f722dd74892f65636dc42d0f, type: 3}
   - Card: 3
@@ -26,7 +26,7 @@ MonoBehaviour:
   - Card: 5
     Front: {fileID: -3213800471159119467, guid: 780e2ddfb109e9c498aac98dba3347de, type: 3}
   - Card: 6
-    Front: {fileID: 0}
+    Front: {fileID: -6239602706019992269, guid: 151e3c2142ccb08478dfea5073d7c9b2, type: 3}
   - Card: 7
     Front: {fileID: 6844948494742506645, guid: 5e7fc95f6fa71d04fb7cc9c9a7b6b0a2, type: 3}
   - Card: 8
@@ -54,7 +54,7 @@ MonoBehaviour:
   - Card: 19
     Front: {fileID: -8398731560629403699, guid: 3f66720ce28a27449af1a34e1e04bfee, type: 3}
   - Card: 20
-    Front: {fileID: 0}
+    Front: {fileID: -2071120245452745208, guid: e2026c568e395e94eb11ff44b0083523, type: 3}
   - Card: 21
     Front: {fileID: -6535494078595949869, guid: 31480c16bf7fcc5489a2e3e7cd029ab7, type: 3}
   radiance: {fileID: 6260608743904350398, guid: bc4f849816a8b214d93c82137a3e2d47, type: 3}

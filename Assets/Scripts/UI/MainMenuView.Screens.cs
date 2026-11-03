@@ -3,6 +3,7 @@ using SoulBind.Core;
 using SoulBind.Utility;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 using Kit = SoulBind.UI.UiKit;
 
 namespace SoulBind.UI
@@ -76,39 +77,106 @@ namespace SoulBind.UI
 
         // ---------- Collections ----------
 
-        // The card gallery: every card with its element and numbers. Card art can be added to the tiles later.
+        private const int GalleryColumns = 8;
+        private const float GalleryLeft = 60f, GalleryTop = 130f;
+        private const float TileWidth = 84f, TileHeight = 118f, TileGap = 8f; // about the art's 5:7
+        private const float PreviewLeft = 820f, PreviewWidth = 300f, PreviewHeight = 420f;
+
+        private Image _previewArt;
+        private TMP_Text _previewName;
+        private TMP_Text _previewStats;
+        private TMP_Text _previewEffect;
+        private TMP_Text _previewMissing;
+
+        // The card gallery: every card's art in a grid. Tapping one shows it large, with its numbers.
         private void BuildCollections()
         {
             RectTransform frame = BuildSubScreen("CollectionsScreen", "Collections");
             _collectionsScreen = frame.gameObject;
 
-            const int columns = 6;
-            const float left = 101f, top = 136f, width = 168f, height = 96f, gap = 14f;
+            CardArtLibrary art = CardArtLibrary.Current;
             IReadOnlyList<CardDefinition> cards = CardCatalog.All;
             for (int i = 0; i < cards.Count; i++)
             {
-                CardDefinition card = cards[i];
-                float x = left + (i % columns) * (width + gap);
-                float y = top + (i / columns) * (height + gap);
-                RectTransform tile = Kit.Box(frame, card.Name, Kit.Panel, Kit.GoldLine, 10f);
-                Kit.At(tile, x, y, width, height);
-
-                TMP_Text name = Kit.Label(tile, "Name", card.Name, 16f, Kit.InterBold, Kit.Text);
-                Kit.At(name.rectTransform, 6f, 10f, width - 12f, 24f);
-                name.textWrappingMode = TextWrappingModes.NoWrap;
-                name.overflowMode = TextOverflowModes.Ellipsis;
-                TMP_Text element = Kit.Label(tile, "Element", card.Element.ToString().ToUpperInvariant(), 11f,
-                    Kit.InterSemiBold, Kit.Gold);
-                Kit.At(element.rectTransform, 6f, 36f, width - 12f, 18f);
-                element.characterSpacing = 8f;
-                TMP_Text numbers = Kit.Label(tile, "Numbers",
-                    $"ATK {card.Attack}   DEF {card.Defense}   CAP {card.Cap}", 13f, Kit.Inter, Kit.Soft);
-                Kit.At(numbers.rectTransform, 6f, 62f, width - 12f, 20f);
+                float x = GalleryLeft + (i % GalleryColumns) * (TileWidth + TileGap);
+                float y = GalleryTop + (i / GalleryColumns) * (TileHeight + TileGap);
+                BuildGalleryTile(frame, cards[i], art, x, y);
             }
 
-            TMP_Text note = Kit.Label(frame, "Note", "Card art, Apostles and emotes will appear here as they are added.",
-                14f, Kit.Inter, Kit.Muted);
-            Kit.At(note.rectTransform, 0f, 600f, 1280f, 22f);
+            BuildPreview(frame);
+            if (cards.Count > 0)
+                ShowCard(cards[0].Id);
+        }
+
+        // One card: its art, or its name on a plain tile while it has none.
+        private void BuildGalleryTile(RectTransform frame, CardDefinition card, CardArtLibrary art,
+            float x, float y)
+        {
+            ArcanaId id = card.Id;
+            TMP_Text label = Kit.Button(frame, card.Name, "", Kit.ButtonStyle.Ghost, () => ShowCard(id), 12f, 8f);
+            var tile = (RectTransform)label.transform.parent;
+            Kit.At(tile, x, y, TileWidth, TileHeight);
+
+            Sprite front = art != null ? art.GetFront(id) : null;
+            if (front != null)
+            {
+                AddArt(tile, front, 3f);
+                return;
+            }
+            tile.GetComponent<Image>().color = Kit.Panel;
+            label.text = card.Name;
+            label.textWrappingMode = TextWrappingModes.Normal;
+        }
+
+        private void BuildPreview(RectTransform frame)
+        {
+            RectTransform box = Kit.Box(frame, "Preview", Kit.Inset, Kit.GoldLine, 12f);
+            Kit.At(box, PreviewLeft, GalleryTop, PreviewWidth, PreviewHeight);
+            _previewArt = AddArt(box, null, 6f);
+            _previewMissing = Kit.Label(box, "NoArt", "No art yet", 18f, Kit.Inter, Kit.Muted);
+            Kit.Stretch(_previewMissing.rectTransform);
+
+            _previewName = Kit.Label(frame, "PreviewName", "", 22f, Kit.Display, Kit.Title);
+            Kit.At(_previewName.rectTransform, PreviewLeft - 40f, GalleryTop + PreviewHeight + 10f,
+                PreviewWidth + 80f, 30f);
+            _previewStats = Kit.Label(frame, "PreviewStats", "", 14f, Kit.InterSemiBold, Kit.Soft);
+            Kit.At(_previewStats.rectTransform, PreviewLeft - 40f, GalleryTop + PreviewHeight + 42f,
+                PreviewWidth + 80f, 20f);
+            _previewEffect = Kit.Label(frame, "PreviewEffect", "", 13f, Kit.Inter, Kit.Muted);
+            Kit.At(_previewEffect.rectTransform, PreviewLeft - 40f, GalleryTop + PreviewHeight + 66f,
+                PreviewWidth + 80f, 40f);
+
+            // The left side's bottom line, under the grid.
+            TMP_Text note = Kit.Label(frame, "Note", "Tap a card to see it large.", 14f, Kit.Inter, Kit.Muted);
+            float gridBottom = GalleryTop + 3f * (TileHeight + TileGap);
+            Kit.At(note.rectTransform, GalleryLeft, gridBottom + 6f,
+                GalleryColumns * (TileWidth + TileGap) - TileGap, 22f);
+        }
+
+        private void ShowCard(ArcanaId id)
+        {
+            CardDefinition card = CardCatalog.Get(id);
+            CardArtLibrary art = CardArtLibrary.Current;
+            Sprite front = art != null ? art.GetFront(id) : null;
+            _previewArt.sprite = front;
+            _previewArt.enabled = front != null;
+            _previewMissing.gameObject.SetActive(front == null);
+            _previewName.text = card.Name;
+            _previewStats.text = $"{card.Element.ToString().ToUpperInvariant()}   ATK {card.Attack}   " +
+                                 $"DEF {card.Defense}   CAP {card.Cap}";
+            _previewEffect.text = card.Effect;
+        }
+
+        // A sprite filling parent (kept in proportion), not clickable itself.
+        private static Image AddArt(RectTransform parent, Sprite sprite, float inset)
+        {
+            RectTransform rect = Kit.Stretch(Kit.CreateRect("Art", parent), inset);
+            var image = (Image)rect.gameObject.AddComponent(typeof(Image));
+            image.sprite = sprite;
+            image.preserveAspect = true;
+            image.raycastTarget = false;
+            image.enabled = sprite != null;
+            return image;
         }
 
         // ---------- Settings ----------
