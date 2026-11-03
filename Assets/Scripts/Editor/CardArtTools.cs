@@ -16,7 +16,7 @@ namespace SoulBind.EditorTools
     public static class CardArtTools
     {
         private const string CardPrefabPath = "Assets/Prefabs/Cards/CardView.prefab";
-        private const string LibraryPath = "Assets/Art/CardArtLibrary.asset";
+        private const string LibraryPath = "Assets/Resources/CardArtLibrary.asset";
         private const string DefaultArtFolder = "Assets/Art/Sprites/Cards";
 
         [MenuItem("SoulBind/Add Card Art Support")]

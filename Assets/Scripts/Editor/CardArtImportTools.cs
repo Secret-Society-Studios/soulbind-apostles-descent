@@ -14,7 +14,7 @@ namespace SoulBind.EditorTools
     /// </summary>
     public static class CardArtImportTools
     {
-        private const string LibraryPath = "Assets/Art/CardArtLibrary.asset";
+        private const string LibraryPath = "Assets/Resources/CardArtLibrary.asset";
 
         [MenuItem("SoulBind/Fix Card Art Import")]
         private static void FixCardArt()
