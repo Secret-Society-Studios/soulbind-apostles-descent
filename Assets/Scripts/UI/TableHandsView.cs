@@ -992,11 +992,29 @@ namespace SoulBind.UI
                     target.y += selectedLift;
                 float scale = seat.CardScale * (hovered ? hoverScale : 1f);
 
-                RectTransform rect = face.Rect;
-                rect.anchoredPosition = Vector2.Lerp(rect.anchoredPosition, target, t);
-                rect.localRotation = Quaternion.Euler(-YourStand, 0f, 0f);
-                rect.localScale = Vector3.Lerp(rect.localScale, Vector3.one * scale, t);
+                MoveCard(face.Rect, target, scale, t);
             }
+        }
+
+        // Eases a card to its place. A card already there is left alone: touching it would redraw
+        // the whole hand every frame, which costs a lot on a phone.
+        private void MoveCard(RectTransform rect, Vector2 target, float scale, float t)
+        {
+            Vector2 position = rect.anchoredPosition;
+            if ((position - target).sqrMagnitude > 0.01f)
+                rect.anchoredPosition = Vector2.Lerp(position, target, t);
+            else if (position != target)
+                rect.anchoredPosition = target;
+
+            Quaternion stand = Quaternion.Euler(-YourStand, 0f, 0f);
+            if (rect.localRotation != stand)
+                rect.localRotation = stand;
+
+            float current = rect.localScale.x;
+            if (Mathf.Abs(current - scale) > 0.001f)
+                rect.localScale = Vector3.one * Mathf.Lerp(current, scale, t);
+            else if (current != scale)
+                rect.localScale = Vector3.one * scale;
         }
 
         private void OnHoverStarted(CardView card)
@@ -1449,8 +1467,10 @@ namespace SoulBind.UI
         {
             float speed = Mathf.Max(0.1f, MotionStyle.Speed);
             float time = Time.unscaledTime * speed;
-            float breath = (Mathf.Sin(time * Mathf.PI * 2f / 2.4f) + 1f) / 2f;
-            float shimmer = (Mathf.Sin(time * Mathf.PI * 2f / 3.7f) + 1f) / 2f;
+            // On Low graphics the glows hold still; an unchanged colour does not redraw the hand.
+            bool animate = GraphicsQuality.AnimateUi;
+            float breath = animate ? (Mathf.Sin(time * Mathf.PI * 2f / 2.4f) + 1f) / 2f : 1f;
+            float shimmer = animate ? (Mathf.Sin(time * Mathf.PI * 2f / 3.7f) + 1f) / 2f : 1f;
             for (int i = 0; i < _seats.Count; i++)
             {
                 Seat seat = _seats[i];

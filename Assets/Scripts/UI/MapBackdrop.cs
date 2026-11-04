@@ -1,3 +1,4 @@
+using SoulBind.Managers;
 using UnityEngine;
 
 namespace SoulBind.UI
@@ -79,8 +80,11 @@ namespace SoulBind.UI
                 cam.backgroundColor = skin.SkyColor;
             }
 
-            _sky = CreateTiled("Sky", Pick(skin.Sky, PlaceholderSky), SkyOrder,
-                skin.SkyTileSize, skin.SeaSize * 3f, skin.SkyDepth);
+            // The sky sits behind the sea and the match camera never looks past the sea, so drawing it
+            // only costs a full screen of pixels. Only High keeps it.
+            if (GraphicsQuality.ShowFarLayers)
+                _sky = CreateTiled("Sky", Pick(skin.Sky, PlaceholderSky), SkyOrder,
+                    skin.SkyTileSize, skin.SeaSize * 3f, skin.SkyDepth);
             _sea = CreateTiled("FireSea", Pick(skin.FireSea, PlaceholderSea), SeaOrder,
                 skin.SeaTileSize, skin.SeaSize, skin.SeaDepth);
 
@@ -109,6 +113,10 @@ namespace SoulBind.UI
             BuildRocks(skin);
             BuildEmbers(skin);
         }
+
+        // Fewer effects on weaker devices (GraphicsQuality), but never none if the skin asks for some.
+        private static int ScaledCount(int count) =>
+            count <= 0 ? 0 : Mathf.Max(1, Mathf.RoundToInt(count * GraphicsQuality.EffectsScale));
 
         // ---------- 3D island ----------
 
@@ -261,7 +269,7 @@ namespace SoulBind.UI
         // Rocks float in a ring just outside the island, between it and the sea.
         private void BuildRocks(MapSkin skin)
         {
-            int count = skin.RockCount;
+            int count = ScaledCount(skin.RockCount);
             _rocks = new SpriteRenderer[count];
             _rockHome = new Vector3[count];
             _rockPhase = new float[count];
@@ -287,7 +295,7 @@ namespace SoulBind.UI
 
         private void BuildEmbers(MapSkin skin)
         {
-            int count = skin.EmberCount;
+            int count = ScaledCount(skin.EmberCount);
             _embers = new SpriteRenderer[count];
             _emberVelocity = new Vector3[count];
             _emberAge = new float[count];

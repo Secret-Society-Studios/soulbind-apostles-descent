@@ -68,7 +68,8 @@ namespace SoulBind.UI
         // quit button and its "are you sure?" box
         private const float QuitButtonTop = 124f;
         private GameObject _quitButton;   // the Menu button
-        private GameObject _menu;         // Resume / How to Play / Leave Match
+        private GameObject _menu;         // Resume / How to Play / Leave Match / Graphics
+        private TMP_Text _graphicsLabel;  // "Graphics: Auto (Medium)"
         private GameObject _leaveButton;
         private GameObject _quitConfirm;
         private TMP_Text _quitText;
@@ -628,7 +629,7 @@ namespace SoulBind.UI
 
             RectTransform box = CreateRect("Box", menu);
             box.anchorMin = box.anchorMax = new Vector2(0.5f, 0.5f);
-            box.sizeDelta = new Vector2(480f, 420f);
+            box.sizeDelta = new Vector2(480f, 510f);
             AddImage(box, PanelColor, true);
             Outline edge = box.gameObject.AddComponent<Outline>();
             edge.effectColor = GoldColor;
@@ -642,7 +643,18 @@ namespace SoulBind.UI
             MenuButton(box, "ResumeButton", "Resume", 100f, CloseMenu);
             MenuButton(box, "HelpButton", "How to Play", 190f, OpenHelp);
             _leaveButton = MenuButton(box, "LeaveButton", "Leave Match", 280f, AskToQuit);
+            GameObject graphics = MenuButton(box, "GraphicsButton", GraphicsQuality.Label, 370f, CycleGraphics);
+            _graphicsLabel = graphics.GetComponentInChildren<TMP_Text>();
+            _graphicsLabel.fontSize = 24f;
             _menu.SetActive(false);
+        }
+
+        // Auto, Low, Medium, High: frame rate, resolution and effects change at once (map effects next match).
+        private void CycleGraphics()
+        {
+            GraphicsQuality.Cycle();
+            if (_graphicsLabel != null)
+                _graphicsLabel.text = GraphicsQuality.Label;
         }
 
         private GameObject MenuButton(RectTransform box, string name, string label, float top,
