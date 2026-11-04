@@ -1082,6 +1082,55 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 450634444}
   m_CullTransparentMesh: 1
+--- !u!1 &455608657
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 455608659}
+  - component: {fileID: 455608658}
+  m_Layer: 0
+  m_Name: Global Volume
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &455608658
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 455608657}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 172515602e62fb746b5d573b38a5fe58, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Core.Runtime::UnityEngine.Rendering.Volume
+  m_IsGlobal: 1
+  priority: 0
+  blendDistance: 0
+  weight: 1
+  sharedProfile: {fileID: 11400000, guid: 4e7dd441cc09b954c99319bc4c1a723f, type: 2}
+--- !u!4 &455608659
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 455608657}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0.35021973, y: -0.034190655, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &488454030
 GameObject:
   m_ObjectHideFlags: 0
@@ -1276,7 +1325,7 @@ MonoBehaviour:
     m_Bits: 1
   m_VolumeTrigger: {fileID: 0}
   m_VolumeFrameworkUpdateModeOption: 2
-  m_RenderPostProcessing: 0
+  m_RenderPostProcessing: 1
   m_Antialiasing: 0
   m_AntialiasingQuality: 2
   m_StopNaN: 0
@@ -1360,7 +1409,8 @@ Transform:
   m_LocalPosition: {x: 0, y: 0, z: -10}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 619394802}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &536090343
@@ -1433,6 +1483,12 @@ MonoBehaviour:
   previewReason: {fileID: 1550286450}
   mobilePreviewScale: 0.6
   previewMobileInEditor: 0
+  previewRaise: 40
+  handsOnScreen: 1
+  screenCardScale: 0.55
+  screenHandWidth: 1000
+  screenHandOffset: -120
+  screenBottomMargin: 12
   cardWorldHeight: 1.4
   yourCardScale: 1.6
   labelFontSize: 44
@@ -1440,7 +1496,10 @@ MonoBehaviour:
   trayColor: {r: 0.04, g: 0.04, b: 0.07, a: 0.8}
   trayPadding: 12
   nameTagOnBoardSide: 1
+  showNameTags: 0
   maxCardsShown: 10
+  standAngle: 60
+  yourStandAngle: 0
   turnGlowColor: {r: 1, g: 0.8, b: 0.42, a: 1}
   defenseGlowColor: {r: 0.45, g: 0.7, b: 1, a: 1}
   hoverLift: 70
@@ -1691,12 +1750,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 619394800}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 10}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 0}
+  m_Father: {fileID: 519420032}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &823973660
 GameObject:
@@ -1888,22 +1947,34 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SoulBind.UI.BoardView
   hexTilePrefab: {fileID: 4576970506054415336, guid: 18f619f90b61f4e46aa0172b813900d3, type: 3}
   hexSize: 0.5
-  tileScale: 0.95
-  tileColor: {r: 0.62, g: 0.54, b: 0.47, a: 1}
-  edgeTileColor: {r: 0.8, g: 0.7, b: 0.56, a: 1}
-  highlightColor: {r: 0.45, g: 0.85, b: 0.5, a: 1}
-  healTileColor: {r: 0.9, g: 0.4, b: 0.45, a: 1}
-  purifyTileColor: {r: 0.5, g: 0.75, b: 0.95, a: 1}
-  soulTileColor: {r: 0.68, g: 0.45, b: 0.9, a: 1}
+  tileScale: 0.9
+  outlineWidth: 0.08
+  outlineFill: 0.1
+  tileColor: {r: 0.7686275, g: 0.7686275, b: 0.7686275, a: 0.15686275}
+  edgeTileColor: {r: 0.21960786, g: 0.21960786, b: 0.21960786, a: 0.15686275}
+  highlightColor: {r: 0.45, g: 0.85, b: 0.5, a: 0.5882353}
+  healTileColor: {r: 0.9, g: 0.4, b: 0.45, a: 0.3529412}
+  purifyTileColor: {r: 0.5, g: 0.75, b: 0.95, a: 0.3529412}
+  soulTileColor: {r: 0.68, g: 0.45, b: 0.9, a: 0.3529412}
   ascensionTileColor: {r: 1, g: 0.8, b: 0.2, a: 1}
   ascensionHighlightColor: {r: 1, g: 0.95, b: 0.6, a: 1}
   attackTargetColor: {r: 0.45, g: 0.08, b: 0.1, a: 1}
+  reachColor: {r: 0.55, g: 0.8, b: 0.6, a: 0.43137255}
+  reachStrength: 0.45
   plainTileSprite: {fileID: 0}
   edgeTileSprite: {fileID: 0}
   healTileSprite: {fileID: 21300000, guid: cf13af120a0b89249be6e6b5521e7e54, type: 3}
   purifyTileSprite: {fileID: 21300000, guid: 99138121ea46a7845ac19f27daccca2c, type: 3}
   soulTileSprite: {fileID: 21300000, guid: 060bb6d97d0b5d84ab2115fa475fa836, type: 3}
   fitCameraToBoard: 1
+  followCamera: 1
+  showMat: 0
+  gridOnlyWhenActing: 0
+  floatSpecialTiles: 1
+  specialFloatHeight: 0.45
+  specialBobHeight: 0.08
+  specialBobSpeed: 0.8
+  specialIconSize: 0.8
   cameraMargin: -0.3
   cameraTilt: 41
   fieldOfView: 61
@@ -2324,8 +2395,11 @@ MonoBehaviour:
   chooseSpawns: 1
   localApostleId: 1
   botsPlayOthers: 1
+  smartBots: 1
   botActionDelay: 0.6
   botTurnStartDelay: 0.6
+  useTurnTimer: 1
+  turnSeconds: 45
   animationSpeed: 1
   screenShake: 1
   defenseGlowColor: {r: 0.45, g: 0.7, b: 1, a: 1}
@@ -2517,6 +2591,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SoulBind.UI.DrawPileView
   matchController: {fileID: 1066798567}
+  onScreen: 1
+  screenOffset: {x: -720, y: -440}
+  screenCardHeight: 150
   cardBackTemplate: {fileID: 1970982186}
   stack: {fileID: 111584081}
   slot: {fileID: 1551840608}
@@ -5197,6 +5274,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SoulBind.UI.DiscardPileView
   matchController: {fileID: 1066798567}
+  onScreen: 1
+  screenOffset: {x: 480, y: -440}
+  screenCardHeight: 150
   cardPrefab: {fileID: 5896621125988605786, guid: 8736e988818637c44868eaa552be909e, type: 3}
   stack: {fileID: 1350220584}
   slot: {fileID: 1380733637}
@@ -5262,7 +5342,6 @@ SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
   - {fileID: 519420032}
-  - {fileID: 619394802}
   - {fileID: 386350828}
   - {fileID: 1427095256}
   - {fileID: 536090344}
@@ -5272,3 +5351,4 @@ SceneRoots:
   - {fileID: 2141627600}
   - {fileID: 549267693}
   - {fileID: 1556649930}
+  - {fileID: 455608659}
