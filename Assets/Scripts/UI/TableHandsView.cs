@@ -1117,6 +1117,7 @@ namespace SoulBind.UI
 
         private readonly List<RaycastResult> _hoverHits = new List<RaycastResult>(8);
         private PointerEventData _hoverEvent;
+        private EventSystem _hoverEventSystem; // the one _hoverEvent was made for
         private Vector2 _lastHoverPoint = new Vector2(-1f, -1f); // -1 = no point yet
 
         // Picks the card under the pointer by where the cards rest. The hovered card keeps its whole
@@ -1190,8 +1191,11 @@ namespace SoulBind.UI
             EventSystem events = EventSystem.current;
             if (events == null)
                 return false;
-            if (_hoverEvent == null || _hoverEvent.eventSystem != events)
+            if (_hoverEvent == null || _hoverEventSystem != events)
+            {
                 _hoverEvent = new PointerEventData(events);
+                _hoverEventSystem = events;
+            }
             _hoverEvent.position = point;
             _hoverHits.Clear();
             events.RaycastAll(_hoverEvent, _hoverHits);
