@@ -157,6 +157,21 @@ namespace SoulBind.UI
             return rect;
         }
 
+        /// <summary>
+        /// Draws this popup above every other canvas in the match (the hand, piles, name plates and
+        /// HUD panels each have their own), and lets it take taps there.
+        /// </summary>
+        public static void OnTop(GameObject popup, int order = 500)
+        {
+            Canvas canvas = popup.GetComponent<Canvas>();
+            if (canvas == null)
+                canvas = popup.AddComponent<Canvas>();
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = order;
+            if (popup.GetComponent<GraphicRaycaster>() == null)
+                popup.AddComponent<GraphicRaycaster>();
+        }
+
         public static RectTransform Stretch(RectTransform rect, float inset = 0f)
         {
             rect.anchorMin = Vector2.zero;

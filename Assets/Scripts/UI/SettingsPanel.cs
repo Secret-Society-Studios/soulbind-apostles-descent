@@ -125,6 +125,7 @@ namespace SoulBind.UI
             RectTransform dim = Kit.Stretch(Kit.CreateRect("SettingsPopup", canvasRoot));
             Image shade = dim.gameObject.AddComponent<Image>();
             shade.color = new Color(0f, 0f, 0f, 0.6f);
+            UiKit.OnTop(dim.gameObject, 510); // above the help popup too
             SettingsPopup popup = dim.gameObject.AddComponent<SettingsPopup>();
             Button outside = dim.gameObject.AddComponent<Button>();
             outside.transition = Selectable.Transition.None;

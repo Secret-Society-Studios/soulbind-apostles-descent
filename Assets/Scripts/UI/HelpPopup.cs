@@ -22,9 +22,11 @@ namespace SoulBind.UI
         private const float BoxWidth = 1160f;
         private const float BoxHeight = 780f;
         private const float DemoWidth = 1060f;
-        private const float DemoHeight = 300f;
+        private const float DemoHeight = 330f;
         private const float ChipWidth = 190f;
-        private const float ChipHeight = 92f;
+        private const float ChipHeight = 86f;
+        private const float HandRowY = 58f;   // the hand's row in the Cards and Combos demos
+        private const float QueueRowY = -52f; // the queue's row, under it
         private const int ChipCount = 4;
 
         private static readonly Color DimColor = new Color(0f, 0f, 0f, 0.7f);
@@ -39,7 +41,7 @@ namespace SoulBind.UI
         private static readonly Color FactColor = new Color(0.10f, 0.08f, 0.14f, 1f);
         private const int MaxFacts = 4;
         private const float FactsTop = 165f + DemoHeight + 22f; // below the demo, from the box's top
-        private const float FactHeight = 170f;
+        private const float FactHeight = 150f;
         private const float FactGap = 14f;
 
         private enum Demo { Goal, Turn, Cards, Combos, Corruption, Tiles }
@@ -122,6 +124,7 @@ namespace SoulBind.UI
             var rect = (RectTransform)go.transform;
             rect.SetParent(canvasRoot, false);
             Stretch(rect);
+            UiKit.OnTop(go); // over the play queue, name plates and hand, which have their own canvases
             HelpPopup popup = go.AddComponent<HelpPopup>();
             popup._tabs = BuildTabs();
             popup.Build(rect);
@@ -309,7 +312,7 @@ namespace SoulBind.UI
         private void RenderGoal()
         {
             int souls = Mathf.Min(13 + _step, GameConstants.SoulsToAwaken);
-            ShowBar($"Souls {souls}/{GameConstants.SoulsToAwaken}", (float)souls / GameConstants.SoulsToAwaken, SoulsColor);
+            ShowBar($"Souls {souls}/{GameConstants.SoulsToAwaken}", (float)souls / GameConstants.SoulsToAwaken, SoulsColor, -110f, -10f);
             ShowChip(0, "Enemy\nDEF 0", new Color(0.42f, 0.07f, 0.10f, 1f), 330f, -10f, false);
             _info.text = souls >= GameConstants.SoulsToAwaken ? "AWAKENED! Now reach the Ascension tile to win."
                 : _step == 0 ? "Break an enemy's DEF in an attack to steal a Soul."
@@ -344,7 +347,7 @@ namespace SoulBind.UI
                 int slot = _queue.IndexOf(i);
                 bool queued = slot >= 0;
                 float x = queued ? left + slot * step : left + i * step;
-                float y = queued ? -75f : 70f;
+                float y = queued ? QueueRowY : HandRowY;
                 string label = $"<b>{card.Name}</b>\nA{card.Attack} D{card.Defense} C{card.Cap}";
                 ShowChip(i, label, CardView.GetElementColor(card.Element) * 0.75f, x, y, queued);
                 if (queued)
@@ -391,9 +394,9 @@ namespace SoulBind.UI
         {
             int corruption = _step;
             bool corrupted = corruption >= GameConstants.CorruptionThreshold;
-            ShowBar($"Corruption {corruption}", corruption / 15f, corrupted ? CorruptedColor : CorruptionColor);
-            ShowChip(0, "Break a DEF\n+1", ChipColor, -150f, -10f, false);
-            ShowChip(1, "Celeste combo\n-1", CardView.GetElementColor(Element.Celeste) * 0.75f, 150f, -10f, false);
+            ShowBar($"Corruption {corruption}", corruption / 15f, corrupted ? CorruptedColor : CorruptionColor, 0f, 55f);
+            ShowChip(0, "Break a DEF\n+1", ChipColor, -150f, -50f, false);
+            ShowChip(1, "Celeste combo\n-1", CardView.GetElementColor(Element.Celeste) * 0.75f, 150f, -50f, false);
             _info.text = corruption >= GameConstants.SevereCorruptionThreshold
                     ? $"Severely Corrupted: -{GameConstants.SevereCorruptionDamage} Vessel every turn, no Souls."
                 : corrupted ? $"Corrupted: -{GameConstants.CorruptedDamage} Vessel every turn, and no Souls."
@@ -424,9 +427,11 @@ namespace SoulBind.UI
             chip.Label.text = label;
         }
 
-        private void ShowBar(string label, float fraction, Color color)
+        // x, y: the bar's middle, from the demo panel's middle.
+        private void ShowBar(string label, float fraction, Color color, float x, float y)
         {
             _bar.SetActive(true);
+            ((RectTransform)_bar.transform).anchoredPosition = new Vector2(x, y);
             _barFill.anchorMax = new Vector2(Mathf.Clamp01(fraction), 1f);
             _barFillImage.color = color;
             _barText.text = label;
@@ -543,8 +548,8 @@ namespace SoulBind.UI
                     continue;
                 float x = -DemoWidth / 2f + width / 2f + i * (width + FactGap);
                 Place(card.Rect, x, -FactsTop - FactHeight / 2f, width, FactHeight);
-                Place(card.Big.rectTransform, 0f, FactHeight / 2f - 46f, width - 24f, 48f);
-                Place(card.Line.rectTransform, 0f, -22f, width - 28f, 84f);
+                Place(card.Big.rectTransform, 0f, FactHeight / 2f - 40f, width - 24f, 46f);
+                Place(card.Line.rectTransform, 0f, -24f, width - 28f, 76f);
                 card.Stripe.color = facts[i].Color;
                 card.Big.color = facts[i].Color;
                 card.Big.text = facts[i].Big;
