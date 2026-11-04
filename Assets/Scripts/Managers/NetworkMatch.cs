@@ -17,6 +17,11 @@ namespace SoulBind.Online
     /// snapshot of what that player may see: their own hand, but only the size of everyone else's.
     /// Players send their actions to the host, which checks that the sender is the Apostle who acts
     /// now before applying anything.
+    ///
+    /// Safety on the host: a player's seat always comes from their connection, never from the message;
+    /// each player may send only a few messages a second (a flood is dropped, and a long flood is
+    /// disconnected); command bytes must be exactly the right size; and a player whose game version
+    /// differs is turned away with a message.
     /// </summary>
     [RequireComponent(typeof(NetworkObject))]
     public sealed class NetworkMatch : NetworkBehaviour
@@ -30,6 +35,7 @@ namespace SoulBind.Online
         private readonly Dictionary<ulong, string> _nameByClient = new Dictionary<ulong, string>(GameConstants.MaxPlayers);
         private readonly List<int> _remoteSeats = new List<int>(GameConstants.MaxPlayers);
         private readonly byte[] _commandBytes = new byte[MatchCommand.EncodedSize];
+        private readonly Dictionary<ulong, Budget> _budgets = new Dictionary<ulong, Budget>(GameConstants.MaxPlayers);
         private bool _started;
         private float _waited;
         private int _sequence;
@@ -54,7 +60,7 @@ namespace SoulBind.Online
                 controller.CommandSubmitted += SendCommand;
                 controller.SpawnSubmitted += SendSpawn;
                 controller.ChatSubmitted += SendChat;
-                ClientReadyRpc(PlayerNames.LocalName);
+                ClientReadyRpc(PlayerNames.LocalName, BuildInfo.ProtocolVersion);
             }
         }
 
@@ -180,9 +186,16 @@ namespace SoulBind.Online
         // ---- Players to host ----
 
         [Rpc(SendTo.Server)]
-        private void ClientReadyRpc(string playerName, RpcParams rpcParams = default)
+        private void ClientReadyRpc(string playerName, int protocol, RpcParams rpcParams = default)
         {
             ulong sender = rpcParams.Receive.SenderClientId;
+            if (!Allow(sender))
+                return;
+            if (protocol != BuildInfo.ProtocolVersion)
+            {
+                Kick(sender, BuildInfo.MismatchMessage(protocol));
+                return;
+            }
             _nameByClient[sender] = PlayerNames.Clean(playerName);
             if (_started)
             {
@@ -208,16 +221,22 @@ namespace SoulBind.Online
         private void SubmitCommandRpc(byte[] bytes, RpcParams rpcParams = default)
         {
             ulong sender = rpcParams.Receive.SenderClientId;
-            if (!_seatByClient.TryGetValue(sender, out int seat))
+            if (!_seatByClient.TryGetValue(sender, out int seat) || !Allow(sender))
                 return;
+            if (bytes == null || bytes.Length != MatchCommand.EncodedSize)
+                return; // not something this game sends
 
             CommandResult result = controller.ApplyRemoteCommand(seat, bytes);
             if (result != CommandResult.Applied)
             {
-                // Nothing changed. A fresh snapshot puts that player's screen back in step with the host.
+                // Nothing changed. A fresh snapshot puts that player's screen back in step with the host,
+                // at most a few times a second, so refused actions can't make the host flood the network.
                 Debug.Log($"NetworkMatch: Apostle {seat}'s action was not applied ({result}).");
-                _sequence++;
-                SendSnapshot(sender, seat);
+                if (CanResync(sender))
+                {
+                    _sequence++;
+                    SendSnapshot(sender, seat);
+                }
             }
         }
 
@@ -231,7 +250,7 @@ namespace SoulBind.Online
         private void PickSpawnRpc(int q, int r, RpcParams rpcParams = default)
         {
             ulong sender = rpcParams.Receive.SenderClientId;
-            if (!_seatByClient.TryGetValue(sender, out int seat))
+            if (!_seatByClient.TryGetValue(sender, out int seat) || !Allow(sender))
                 return;
             if (!controller.ApplyRemoteSpawn(seat, new HexCoord(q, r)))
                 Debug.Log($"NetworkMatch: APostle {seat}'s starting tile was refused.");
@@ -250,7 +269,7 @@ namespace SoulBind.Online
         private void SubmitChatRpc(byte chatId, RpcParams rpcParams = default)
         {
             ulong sender = rpcParams.Receive.SenderClientId;
-            if (_seatByClient.TryGetValue(sender, out int seat))
+            if (_seatByClient.TryGetValue(sender, out int seat) && Allow(sender))
                 controller.ReceiveRemoteChat(seat, chatId);
         }
 
@@ -266,8 +285,72 @@ namespace SoulBind.Online
             controller.ShowRemoteChat(seat, chatId);
         }
 
+        // ---- Flood control (host) ----
+
+        private const float MessagesPerSecond = 8f; // a tap-walk sends about 3 a second
+        private const float Burst = 16f;            // messages allowed at once after a quiet spell
+        private const int DropLimit = 64;           // dropped messages before the sender is disconnected
+        private const float ResyncGap = 0.25f;      // seconds between fix-up snapshots to one player
+
+        private sealed class Budget
+        {
+            public float Tokens = Burst;
+            public float Last;
+            public float LastResync = -1f;
+            public int Dropped;
+        }
+
+        // True if this player may send another message now. Each message spends a token; tokens come
+        // back at MessagesPerSecond. Someone who keeps flooding is disconnected.
+        private bool Allow(ulong clientId)
+        {
+            float now = Time.unscaledTime;
+            Budget budget = GetBudget(clientId, now);
+            budget.Tokens = Mathf.Min(Burst, budget.Tokens + (now - budget.Last) * MessagesPerSecond);
+            budget.Last = now;
+            if (budget.Tokens >= 1f)
+            {
+                budget.Tokens -= 1f;
+                return true;
+            }
+            budget.Dropped++;
+            if (budget.Dropped >= DropLimit)
+                Kick(clientId, "Disconnected: too many messages.");
+            return false;
+        }
+
+        private bool CanResync(ulong clientId)
+        {
+            float now = Time.unscaledTime;
+            Budget budget = GetBudget(clientId, now);
+            if (budget.LastResync >= 0f && now - budget.LastResync < ResyncGap)
+                return false;
+            budget.LastResync = now;
+            return true;
+        }
+
+        private Budget GetBudget(ulong clientId, float now)
+        {
+            if (!_budgets.TryGetValue(clientId, out Budget budget))
+            {
+                budget = new Budget { Last = now };
+                _budgets[clientId] = budget;
+            }
+            return budget;
+        }
+
+        // Sends a player away with a reason their game shows on the menu. Never the host itself.
+        private void Kick(ulong clientId, string reason)
+        {
+            if (NetworkManager == null || clientId == NetworkManager.ServerClientId)
+                return;
+            Debug.LogWarning($"NetworkMatch: disconnecting player {clientId}: {reason}");
+            NetworkManager.DisconnectClient(clientId, reason);
+        }
+
         private void OnClientDisconnected(ulong clientId)
         {
+            _budgets.Remove(clientId);
             _ready.Remove(clientId);
             _nameByClient.Remove(clientId);
             if (_seatByClient.TryGetValue(clientId, out int seat))

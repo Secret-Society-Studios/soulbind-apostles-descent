@@ -414,7 +414,10 @@ namespace SoulBind.Online
             if (_leaving || _session == null)
                 return;
 
-            LastMessage = wasHost ? "The online room was closed." : "Lost the connection to the host.";
+            // The host may have said why (a different game version, too many messages).
+            string reason = NetworkManager.Singleton != null ? NetworkManager.Singleton.DisconnectReason : null;
+            LastMessage = !string.IsNullOrEmpty(reason) ? reason
+                : wasHost ? "The online room was closed." : "Lost the connection to the host.";
             Debug.LogWarning("OnlineSession: " + LastMessage);
             Leave();
             if (SceneManager.GetActiveScene().buildIndex != 0)

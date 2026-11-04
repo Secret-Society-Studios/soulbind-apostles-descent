@@ -57,6 +57,7 @@ namespace SoulBind.UI
         private RectTransform _root;
         private Canvas _canvas;
         private TableHandsView _hands;
+        private bool _handsSearched;
 
         public static NamePlates Create(RectTransform hudRoot, MatchController controller)
         {
@@ -101,8 +102,11 @@ namespace SoulBind.UI
                     plate.Piece = _controller.GetPieceView(plate.ApostleId);
 
                 // Above the Apostle's cards on the table; above its piece if it has no hand there.
-                if (_hands == null)
+                if (_hands == null && !_handsSearched)
+                {
                     _hands = FindAnyObjectByType<TableHandsView>();
+                    _handsSearched = true; // searched once: the hands view is made with the scene, never later
+                }
                 Vector3 screen;
                 bool placed;
                 if (_hands != null && _hands.TryGetHandTop(plate.ApostleId, cam, out Vector2 handTop))
