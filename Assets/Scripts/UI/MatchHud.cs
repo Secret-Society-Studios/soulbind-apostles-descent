@@ -240,12 +240,9 @@ namespace SoulBind.UI
                     turnText.text = PlayerNames.Get(match.CurrentApostle.Id) + "'s turn";
             }
 
-            if (capacityText != null)
-            {
-                capacityText.text = match.CurrentCapacity != null
-                    ? $"Capacity {match.CurrentCapacity.Remaining}/{match.CurrentCapacity.Maximum}"
-                    : string.Empty;
-            }
+            // Capacity already shows on the bar above your hand, so the turn box leaves it out.
+            if (capacityText != null && capacityText.gameObject.activeSelf)
+                capacityText.gameObject.SetActive(false);
         }
 
         // Tells the board how much of the screen the HUD covers at the top and bottom.

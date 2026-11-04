@@ -46,6 +46,10 @@ namespace SoulBind.UI
         [SerializeField] private bool showNameOverArt = true;
         [SerializeField] private Color textColorOverArt = new Color(0.12f, 0.10f, 0.08f);
 
+        [Header("Card back")]
+        [Tooltip("The back of every card: shown when a card turns around in the Collections' 360 view.")]
+        [SerializeField] private Sprite back;
+
         private Sprite[] _byCard;
 
         private static CardArtLibrary _current;
@@ -84,6 +88,7 @@ namespace SoulBind.UI
         public bool HidePlatesOverArt => hidePlatesOverArt;
         public bool ShowNameOverArt => showNameOverArt;
         public Color TextColorOverArt => textColorOverArt;
+        public Sprite Back => back;
 
         /// <summary>The card's flat front, or null if none was assigned.</summary>
         public Sprite GetFront(ArcanaId card)
