@@ -78,6 +78,7 @@ namespace SoulBind.UI
 
         // What was last seen, to notice changes.
         private readonly bool[] _wasEliminated = new bool[GameConstants.MaxPlayers + 1];
+        private readonly HexCoord[] _lastPosition = new HexCoord[GameConstants.MaxPlayers + 1]; // by Apostle Id
         private int _lastAwakenedId;
         private int _lastDrawCount;
         private int _lastDiscardCount;
@@ -125,7 +126,10 @@ namespace SoulBind.UI
                 // A new match: remember its starting state without announcing anything.
                 _seenMatch = match;
                 for (int i = 0; i < apostles.Count; i++)
+                {
                     _wasEliminated[apostles[i].Id] = apostles[i].IsEliminated;
+                    _lastPosition[apostles[i].Id] = apostles[i].Position;
+                }
                 _lastAwakenedId = match.Ascension.AwakenedId;
                 _lastDrawCount = match.Deck.DrawCount;
                 _lastDiscardCount = match.Deck.DiscardCount;
@@ -145,6 +149,7 @@ namespace SoulBind.UI
                 if (apostle.IsEliminated && !_wasEliminated[apostle.Id])
                     QueueBanner(apostle.Id == viewer ? "You have been eliminated" : $"{Name(apostle.Id)} has been eliminated");
                 _wasEliminated[apostle.Id] = apostle.IsEliminated;
+                CheckSoulTile(match, apostle, viewer);
             }
 
             int awakened = match.Ascension.AwakenedId;
@@ -187,6 +192,29 @@ namespace SoulBind.UI
             RefreshQuit(match);
         }
 
+
+        // Stepping onto a Soul tile that gives nothing (the tile stays) needs saying, or it looks broken.
+        private void CheckSoulTile(Match match, ApostleState apostle, int viewer)
+        {
+            HexCoord position = apostle.Position;
+            if (position == _lastPosition[apostle.Id])
+                return;
+            _lastPosition[apostle.Id] = position;
+            if (apostle.IsEliminated || match.IsOver)
+                return;
+            if (!match.Battlefield.Specials.Active.TryGetValue(position, out SpecialTileType type))
+                return;
+            if (type != SpecialTileType.Soul)
+                return;
+
+            bool you = apostle.Id == viewer;
+            if (apostle.IsSoullocked)
+                QueueBanner(you
+                    ? $"Soullocked! No Souls until your Corruption is below {GameConstants.CorruptionThreshold}"
+                    : $"{Name(apostle.Id)} is Soullocked and can't take the Soul tile");
+            else if (apostle.HasMaxSouls)
+                QueueBanner(you ? "Your Souls are full: the Soul tile stays" : $"{Name(apostle.Id)}'s Souls are full");
+        }
 
         // ---- Quit ----
 

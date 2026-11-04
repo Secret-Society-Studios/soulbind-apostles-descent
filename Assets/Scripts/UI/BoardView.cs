@@ -29,6 +29,8 @@ namespace SoulBind.UI
         [SerializeField] private Color attackTargetColor = new Color(0.45f, 0.08f, 0.10f);
         [Tooltip("The faint tint on every tile the Apostle can still walk to this turn (its furthest reach).")]
         [SerializeField] private Color reachColor = new Color(0.55f, 0.80f, 0.60f);
+        [Tooltip("The tile tapped once to move: tap it again to go.")]
+        [SerializeField] private Color moveTargetColor = new Color(1.00f, 0.85f, 0.35f);
         [Tooltip("How strongly the reach tint covers a tile's own colour: 0 = not at all, 1 = fully.")]
         [SerializeField, Range(0f, 1f)] private float reachStrength = 0.45f;
 
@@ -259,6 +261,20 @@ namespace SoulBind.UI
                     _highlighted.Add(tiles[i]);
                 }
             }
+            RefreshGrid();
+        }
+
+        /// <summary>
+        /// Marks the tile a first tap picked, until the second tap moves there. Call it after
+        /// SetHighlights; ClearHighlights takes it away with the rest.
+        /// </summary>
+        public void SetMoveTarget(HexCoord tile)
+        {
+            if (!_tiles.TryGetValue(tile, out SpriteRenderer spriteRenderer))
+                return;
+            spriteRenderer.color = moveTargetColor;
+            if (!_highlighted.Contains(tile))
+                _highlighted.Add(tile);
             RefreshGrid();
         }
 

@@ -881,8 +881,8 @@ namespace SoulBind.UI
             Stand(rect, YourStand, CardHeight * seat.CardScale);
             if (face.GetComponent<CanvasGroup>() == null)
                 face.gameObject.AddComponent<CanvasGroup>();
-            face.HoverStarted += OnHoverStarted;
-            face.HoverEnded += OnHoverEnded;
+            // Hover is worked out in UpdateHover from where the cards rest, not from the card's own
+            // enter/exit: a lifted card would slide out from under the pointer and flicker.
             face.Clicked += OnClicked;
             face.DragStarted += OnDragStarted;
             face.Dragged += OnDragged;
@@ -1045,6 +1045,7 @@ namespace SoulBind.UI
                 return;
 
             int total = seat.SlotCount(maxCardsShown);
+            UpdateHover(seat, total);
             float t = 1f - Mathf.Exp(-moveSpeed * Time.unscaledDeltaTime);
             // The gentle float is skipped on Low graphics: a still hand is not redrawn every frame.
             bool bob = IsFanned(seat) && idleBob > 0f && _dragged == null && GraphicsQuality.AnimateUi;
@@ -1112,10 +1113,92 @@ namespace SoulBind.UI
             ShowPreview(card.CardId);
         }
 
-        private void OnHoverEnded(CardView card)
+        // ---------- Hover ----------
+
+        private readonly List<RaycastResult> _hoverHits = new List<RaycastResult>(8);
+        private PointerEventData _hoverEvent;
+        private Vector2 _lastHoverPoint = new Vector2(-1f, -1f); // -1 = no point yet
+
+        // Picks the card under the pointer by where the cards rest. The hovered card keeps its whole
+        // lifted, grown area, so lifting it never moves it out from under the pointer. On a phone a
+        // card is only hovered while the finger is down, as before.
+        private void UpdateHover(Seat seat, int total)
         {
-            if (_hovered == card)
+            if (_dragged != null)
+                return;
+            Pointer pointer = Pointer.current;
+            if (pointer == null)
+                return;
+            if (pointer is Touchscreen && !pointer.press.isPressed)
+            {
+                _lastHoverPoint = new Vector2(-1f, -1f);
+                if (_hovered != null)
+                    EndHover();
+                return;
+            }
+
+            Vector2 point = pointer.position.ReadValue();
+            if (point == _lastHoverPoint)
+                return;
+            _lastHoverPoint = point;
+
+            CardView found = FindRestingCard(seat, total, point);
+            if (found != null && IsCoveredByOtherUi(seat, point))
+                found = null;
+            if (found == _hovered)
+                return;
+            if (_hovered != null)
                 EndHover();
+            if (found != null)
+                OnHoverStarted(found);
+        }
+
+        private CardView FindRestingCard(Seat seat, int total, Vector2 point)
+        {
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(seat.Root, point, _camera, out Vector2 local))
+                return null;
+            float halfWidth = CardWidth * seat.CardScale / 2f;
+            float halfHeight = CardHeight * seat.CardScale / 2f;
+            int count = Mathf.Min(total, seat.Faces.Count);
+
+            int held = _hovered != null ? seat.Faces.IndexOf(_hovered) : -1;
+            if (held >= 0 && held < count && _hovered.gameObject.activeSelf)
+            {
+                Vector2 slot = SlotPosition(seat, held, total);
+                bool across = Mathf.Abs(local.x - slot.x) <= halfWidth * hoverScale;
+                bool up = local.y >= slot.y - halfHeight && local.y <= slot.y + hoverLift + halfHeight * hoverScale;
+                if (across && up)
+                    return _hovered;
+            }
+
+            // Later cards lie on top, so the first match from the right is the one you see.
+            for (int k = count - 1; k >= 0; k--)
+            {
+                CardView face = seat.Faces[k];
+                if (!face.gameObject.activeSelf || face == _dragged)
+                    continue;
+                Vector2 slot = SlotPosition(seat, k, total);
+                if (Mathf.Abs(local.x - slot.x) <= halfWidth && Mathf.Abs(local.y - slot.y) <= halfHeight)
+                    return face;
+            }
+            return null;
+        }
+
+        // True when a popup, the card preview or another panel is on top of the hand at this point.
+        private bool IsCoveredByOtherUi(Seat seat, Vector2 point)
+        {
+            EventSystem events = EventSystem.current;
+            if (events == null)
+                return false;
+            if (_hoverEvent == null || _hoverEvent.eventSystem != events)
+                _hoverEvent = new PointerEventData(events);
+            _hoverEvent.position = point;
+            _hoverHits.Clear();
+            events.RaycastAll(_hoverEvent, _hoverHits);
+            if (_hoverHits.Count == 0)
+                return false;
+            GameObject top = _hoverHits[0].gameObject;
+            return top != null && !top.transform.IsChildOf(seat.Root);
         }
 
         private void EndHover()

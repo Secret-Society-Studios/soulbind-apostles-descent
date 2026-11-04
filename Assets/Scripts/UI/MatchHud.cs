@@ -40,6 +40,9 @@ namespace SoulBind.UI
         [Tooltip("On phones the opponents' portraits start this " + "far in from the left (canvas pixels), clear of " + "rounded corners. A camera notch is added on top.")]
         [SerializeField, Range(0f, 200f)]
         private float mobileEdgeInset = 50f;
+        [Tooltip("On phones every HUD piece on an edge moves in this far (canvas pixels: x from the sides, " +
+                 "y from the top and bottom), on top of any camera notch, so rounded corners don't cut it off.")]
+        [SerializeField] private Vector2 phoneHudMargin = new Vector2(60f, 24f);
 
         private readonly List<ApostlePanelView> _panels = new List<ApostlePanelView>(GameConstants.MaxPlayers);
         private readonly Vector3[] _corners = new Vector3[4]; // reused every frame, so nothing is allocated
@@ -72,7 +75,7 @@ namespace SoulBind.UI
                 Debug.LogError("MatchHud: assign the Match Controller in the Inspector.", this);
             else if (_canvas != null)
             {
-                bool phone = Application.isMobilePlatform || (Application.isEditor && previewMobileInEditor);
+                bool phone = IsPhone;
                 if (phone)
                     EnlargePortraits(mobilePortraitScale);
                 KeepClearOfScreenEdges(phone);
@@ -105,7 +108,16 @@ namespace SoulBind.UI
                     opponentRow.gameObject.SetActive(false);
             }
             Refresh();
+
+            // Last, once everything is built: every edge piece moves in past the notch and the corners.
+            if (_canvas != null)
+            {
+                Vector2 margin = IsPhone ? phoneHudMargin : Vector2.zero;
+                SafeHud.Apply((RectTransform)_canvas.rootCanvas.transform, margin);
+            }
         }
+
+        private bool IsPhone => Application.isMobilePlatform || (Application.isEditor && previewMobileInEditor);
 
         private void Update()
         {

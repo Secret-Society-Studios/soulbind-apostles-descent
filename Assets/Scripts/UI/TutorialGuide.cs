@@ -53,7 +53,7 @@ namespace SoulBind.UI
             new Step
             {
                 Title = "1  Move",
-                Text = "Green tiles show how far you can walk this turn. Tap the purple Soul tile: your Apostle " +
+                Text = "Green tiles show how far you can walk this turn. Tap the purple Soul tile, then tap it again: your Apostle " +
                        $"walks there one tile at a time, {GameConstants.MoveCapacityCost} Capacity per step.",
                 Allowed = TutorialActions.Move, Done = Check.ReachTarget
             },
