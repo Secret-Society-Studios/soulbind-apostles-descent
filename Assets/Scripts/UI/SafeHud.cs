@@ -33,6 +33,7 @@ namespace SoulBind.UI
             Walk(root, inset, 0);
         }
 
+        // Pushes every edge-anchored child in from the screen edge, a few levels deep.
         private static void Walk(RectTransform parent, Vector4 inset, int depth)
         {
             for (int i = 0; i < parent.childCount; i++)

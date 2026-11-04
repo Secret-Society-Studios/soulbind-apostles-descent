@@ -43,6 +43,7 @@ namespace SoulBind.Core
             return null;
         }
 
+        // True when an Apostle stands on the tile.
         public bool IsOccupied(HexCoord tile) => GetApostleAt(tile) != null;
 
         /// <summary>Apostles may only spawn on a free edge tile.</summary>
@@ -213,6 +214,7 @@ namespace SoulBind.Core
             }
         }
 
+        // Guards against moving or removing an Apostle this battlefield does not own.
         private void RequireRegistered(ApostleState apostle)
         {
             if (apostle == null)
@@ -220,7 +222,7 @@ namespace SoulBind.Core
             if (!_apostles.Contains(apostle))
                 throw new ArgumentException("That Apostle has not been added to this battlefield.", nameof(apostle));
         }
-        
+
         /// <summary>
         /// Fills results with the living Apostles on the 6 tiles next to the attacker.
         /// The caller supplies the list so it can be reused without allocating.

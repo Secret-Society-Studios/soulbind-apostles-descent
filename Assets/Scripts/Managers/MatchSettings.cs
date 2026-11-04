@@ -23,6 +23,7 @@ namespace SoulBind.Managers
 
         public const int TutorialPlayers = 2; // you and one bot, so the board stays easy to follow
 
+        // Stores the menu choices for the match scene to read when it loads.
         public static void Set(int playerCount, bool botsPlayOthers, bool chooseSpawns)
         {
             PlayerCount = Mathf.Clamp(playerCount, 2, 6);

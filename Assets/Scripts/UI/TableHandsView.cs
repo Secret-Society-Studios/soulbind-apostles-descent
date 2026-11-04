@@ -4,7 +4,6 @@ using SoulBind.Core;
 using SoulBind.Managers;
 using SoulBind.Utility;
 using TMPro;
-using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -47,7 +46,6 @@ namespace SoulBind.UI
         [SerializeField] private bool previewMobileInEditor;
         [Tooltip("How far above the middle of the screen the card preview sits.")]
         [SerializeField] private float previewRaise = 40f;
-
 
         [Header("Hands on the screen")]
         [Tooltip("On: your hand lies along the bottom of the screen with the Capacity bar, and the others' " +
@@ -122,7 +120,7 @@ namespace SoulBind.UI
         [SerializeField] private float drawFlightTime = 0.5f;
         [Tooltip("How high a flying card arcs, in screen pixels.")]
         [SerializeField] private float arcHeight = 60f;
-        
+
         [Header("Wheel of Fortune")]
         [Tooltip("How long the two swapped cards stay marked, in seconds.")]
         [SerializeField] private float swapMarkSeconds = 6f;
@@ -153,7 +151,6 @@ namespace SoulBind.UI
             public int SwapIndex = -1; // its place in the hand
             public int SwapHandSize; // the hand's size when it was swapped: any change ends the mark
             public float SwapTimeLeft;
-
 
             // Your own hand always shows every card; opponents' face-down hands are capped at max
             // (their label still gives the real count).
@@ -203,7 +200,7 @@ namespace SoulBind.UI
         private readonly List<UnityEngine.UI.Image> _capacityPips = new List<UnityEngine.UI.Image>(MaxCapacityPips);
         private RectTransform _capacityBar;
         private TMP_Text _capacityText;
-        // Under a pinned preview: a tap anywhere else closes it, and never reacher the board.
+        // Under a pinned preview: a tap anywhere else closes it, and never reaches the board.
         private GameObject _previewBlocker;
         private int _pinnedFrame = -1; // the frame a card was pinned, so that same tap doesn't close it
 
@@ -290,6 +287,7 @@ namespace SoulBind.UI
         {
             public TableHandsView Owner;
 
+            // Lets clicks through to your cards when the pointer is over one.
             public bool IsRaycastLocationValid(Vector2 screenPoint, Camera eventCamera) =>
                 Owner == null || !Owner.IsOverYourCard(screenPoint);
         }
@@ -379,6 +377,7 @@ namespace SoulBind.UI
             _rect.position = board.transform.position + new Vector3(0f, 0f, -0.02f);
         }
 
+        // Rebuilds the seats for a new match, otherwise moves cards to match the hands.
         private void Refresh()
         {
             if (!_ready)
@@ -419,8 +418,9 @@ namespace SoulBind.UI
                 ShowPreview(_pinned);
         }
 
-        // ---- Seats ----
+        // ---------- Seats ----------
 
+        // Builds one seat per Apostle, with the viewer's at the bottom.
         private void BuildSeats(Match match, int viewer)
         {
             _pendingRebuild = false;
@@ -566,7 +566,6 @@ namespace SoulBind.UI
             IReadOnlyList<ArcanaId> discards = deck.DiscardPile;
             for (int i = Mathf.Max(0, discards.Count - discardGrowth); i < discards.Count; i++)
                 _newDiscards[(int)discards[i]]++;
-            
 
             // Cards drawn in this action. If the discard pile was shuffled in, every new card was drawn.
             int drawsLeft = deck.DrawCount < _lastDrawCount ? _lastDrawCount - deck.DrawCount
@@ -821,6 +820,7 @@ namespace SoulBind.UI
             return true;
         }
 
+        // The highest point of a rect on screen, in pixels.
         private static float HighestOnScreen(RectTransform rect, Camera cam)
         {
             rect.GetWorldCorners(Corners);
@@ -830,6 +830,7 @@ namespace SoulBind.UI
             return top;
         }
 
+        // Where a card rests in a seat: spread along the row, fanned for your hand.
         private Vector2 SlotPosition(Seat seat, int slot, int total)
         {
             float offset = slot - (total - 1) / 2f;
@@ -843,6 +844,7 @@ namespace SoulBind.UI
             return position;
         }
 
+        // True for your own hand when fanning is on.
         private bool IsFanned(Seat seat) => fanYourHand && seat == _yours;
 
         // -1 for the leftmost card, 0 in the middle, 1 for the rightmost. A small hand fans less.
@@ -870,6 +872,7 @@ namespace SoulBind.UI
             return Mathf.Clamp(room / (total - 1), 6f, widest);
         }
 
+        // Creates a face-up card for a seat.
         private CardView CreateFace(Seat seat)
         {
             CardView face = Instantiate(cardPrefab, seat.Root);
@@ -901,6 +904,7 @@ namespace SoulBind.UI
             card.anchoredPosition3D = position;
         }
 
+        // Creates a face-down card for a seat.
         private RectTransform CreateBack(Seat seat)
         {
             RectTransform back = Instantiate(drawPile.CardBackTemplate, seat.Root);
@@ -912,7 +916,7 @@ namespace SoulBind.UI
             back.localScale = Vector3.one;
             Stand(back, OthersStand, CardHeight);
 
-            // edged in the owner's colour, so each card shows whose hand it belongs to.
+            // Edged in the owner's colour, so each card shows whose hand it belongs to.
             if (back.GetComponent<Image>() != null)
             {
                 Outline ring = back.gameObject.AddComponent<Outline>();
@@ -922,7 +926,7 @@ namespace SoulBind.UI
             return back;
         }
 
-        // ---- Capacity bar ----
+        // ---------- Capacity bar ----------
 
         // The bar, its pips and its number, made once per seat build.
         // ShowCapacity sizes and fills them.
@@ -1023,8 +1027,7 @@ namespace SoulBind.UI
             _capacityText.color = lit;
         }
 
-
-        // ---- Your cards: lifting, hovering, clicking and dragging ----
+        // ---------- Your cards: lifting, hovering, clicking and dragging ----------
 
         private void Update()
         {
@@ -1104,6 +1107,7 @@ namespace SoulBind.UI
                 rect.localScale = Vector3.one * scale;
         }
 
+        // Lifts the card under the pointer and shows its preview.
         private void OnHoverStarted(CardView card)
         {
             if (_dragged != null)
@@ -1154,6 +1158,7 @@ namespace SoulBind.UI
                 OnHoverStarted(found);
         }
 
+        // The card whose resting slot is under the point, so a lifted card does not flicker.
         private CardView FindRestingCard(Seat seat, int total, Vector2 point)
         {
             if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(seat.Root, point, _camera, out Vector2 local))
@@ -1205,6 +1210,7 @@ namespace SoulBind.UI
             return top != null && !top.transform.IsChildOf(seat.Root);
         }
 
+        // Drops the lifted card back into its slot.
         private void EndHover()
         {
             if (_hovered != null)
@@ -1219,6 +1225,7 @@ namespace SoulBind.UI
             HidePreview();
         }
 
+        // Hides the big preview and the reason line.
         private void HidePreview()
         {
             if (preview != null)
@@ -1231,6 +1238,7 @@ namespace SoulBind.UI
                 _previewBlocker.SetActive(false);
         }
 
+        // Releases a pinned preview.
         private void Unpin()
         {
             if (!_hasPinned)
@@ -1269,6 +1277,7 @@ namespace SoulBind.UI
                 _yours.Faces[i].transform.SetAsLastSibling();
         }
 
+        // Shows the big preview of a card.
         private void ShowPreview(ArcanaId card)
         {
             if (preview != null)
@@ -1303,6 +1312,7 @@ namespace SoulBind.UI
                 _previewBlocker.SetActive(true);
         }
 
+        // Picks a playable card up to drag it to the queue.
         private void OnDragStarted(CardView card, PointerEventData eventData)
         {
             // Cards that can't be played (dimmed) stay in the hand.
@@ -1318,12 +1328,14 @@ namespace SoulBind.UI
             FollowPointer(card, eventData);
         }
 
+        // Moves the dragged card with the pointer.
         private void OnDragged(CardView card, PointerEventData eventData)
         {
             if (card == _dragged)
                 FollowPointer(card, eventData);
         }
 
+        // Drops the dragged card: over the hand it slides back, anywhere else it is played.
         private void OnDragEnded(CardView card, PointerEventData eventData)
         {
             if (card != _dragged)
@@ -1341,6 +1353,7 @@ namespace SoulBind.UI
                 matchController.DropCardOnPile(card.CardId);
         }
 
+        // True when the point is over your hand area.
         private bool IsOverYourHand(Vector2 screenPoint, Camera eventCamera)
         {
             if (_yours == null || _yours.Tray == null)
@@ -1360,6 +1373,7 @@ namespace SoulBind.UI
                 discardPile.SetDragging(true, discardPile.ContainsScreenPoint(eventData.position));
         }
 
+        // Ends the drag so the card catches taps again.
         private void EndDrag()
         {
             if (_dragged == null)
@@ -1372,7 +1386,7 @@ namespace SoulBind.UI
                 discardPile.SetDragging(false, false);
         }
 
-        // ---- Flying cards ----
+        // ---------- Flying cards ----------
 
         // A new discard no hand has claimed yet, or -1.
         private int TakeAnyNewDiscard()
@@ -1453,6 +1467,7 @@ namespace SoulBind.UI
                 _flights.ScaleForPixels(toPixels), true, !seat.IsYours, drawFlightTime, () => Landed(seat, match));
         }
 
+        // A card finished flying into a seat: lay the seat out again.
         private void Landed(Seat seat, Match match)
         {
             if (seat.Root == null)
@@ -1473,7 +1488,7 @@ namespace SoulBind.UI
             }
         }
 
-        // ---- Wheel of Fortune's swap ----
+        // ---------- Wheel of Fortune's swap ----------
 
         // Wheel of Fortune: the glow and tag around the card that was just swapped in this hand.
         private void ShowSwap(CardSwap swap)
@@ -1491,7 +1506,7 @@ namespace SoulBind.UI
             if (_flights != null && TrySeatSpot(player, out Vector2 a, out float aPixels, out float aAngle) && TrySeatSpot(target, out Vector2 b, out float bPixels, out float bAngle))
             {
                 float time = drawFlightTime * 1.6f;
-                // the card the player gave flies to the target; the one it got flies back.
+                // The card the player gave flies to the target; the one it got flies back.
                 _flights.Fly(known ? swap.Given : default, a, aAngle, _flights.ScaleForPixels(aPixels), b, bAngle, _flights.ScaleForPixels(bPixels), !known, !known, time, null);
                 _flights.Fly(known ? swap.Received : default, b, bAngle, _flights.ScaleForPixels(bPixels), a, aAngle, _flights.ScaleForPixels(aPixels), !known, !known, time, null);
             }
@@ -1518,6 +1533,7 @@ namespace SoulBind.UI
             seat.SwapTag = tag;
         }
 
+        // Marks a card swapped by the Wheel of Fortune.
         private void MarkSwap(Seat seat, int index)
         {
             if (seat.SwapMark == null)
@@ -1547,7 +1563,7 @@ namespace SoulBind.UI
             seat.SwapMark.gameObject.SetActive(true);
         }
 
-        // pulses the marks and fades them out at the end
+        // Pulses the marks and fades them out at the end.
         private void TickSwapMarks(float delta)
         {
             float pulse = (Mathf.Sin(Time.unscaledTime * Mathf.PI * 2f / 0.8f) + 1f) / 2f;
@@ -1570,6 +1586,7 @@ namespace SoulBind.UI
                     seat.SwapTag.alpha = Mathf.Clamp01(seat.SwapTimeLeft / 0.6f);
             }
         }
+        // The seat of an Apostle, or null.
         private Seat FindSeat(int apostleId)
         {
             for (int i = 0; i < _seats.Count; i++)
@@ -1610,7 +1627,7 @@ namespace SoulBind.UI
             return TableSpot.TryGet(rect, _camera, _corners, out spot, out pixels, out angle);
         }
 
-        // ---- Glows ----
+        // ---------- Glows ----------
 
         // Which hands glow: the turn's Apostle (gold) and every Apostle with DEF above 0 (blue).
         private void UpdateGlows(Match match)
@@ -1699,6 +1716,7 @@ namespace SoulBind.UI
             rect.anchoredPosition = tray.anchoredPosition;
         }
 
+        // Looks up an Apostle by id, or null when it is missing.
         private static ApostleState FindApostle(Match match, int id)
         {
             IReadOnlyList<ApostleState> apostles = match.Battlefield.Apostles;
@@ -1710,6 +1728,7 @@ namespace SoulBind.UI
             return null;
         }
 
+        // Creates a child RectTransform on the parent's layer.
         private static RectTransform CreateRect(string name, Transform parent)
         {
             var go = new GameObject(name, typeof(RectTransform));

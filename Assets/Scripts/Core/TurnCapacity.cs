@@ -20,6 +20,7 @@ namespace SoulBind.Core
             Remaining = maximum;
         }
 
+        // True when there is enough Capacity left to pay the cost.
         public bool CanSpend(int amount)
         {
             if (amount < 0)

@@ -65,7 +65,7 @@ namespace SoulBind.UI
         private GameObject _mainMenuButton;
         private GameObject _playAgainButton;
         private float _endScreenTimer = -1f;
-        // quit button and its "are you sure?" box
+        // The Menu button and its "Leave the match?" box.
         private const float QuitButtonTop = 124f;
         private const float HelpButtonRight = 290f; // left of Chat (which ends 262 from the edge, more on phones)
         private GameObject _quitButton;   // the Menu button
@@ -87,6 +87,7 @@ namespace SoulBind.UI
         private Match _seenMatch;
         private int _lastTurnId;
 
+        // Creates the overlay on the match canvas.
         public static MatchOverlay Create(Canvas canvas, MatchController controller)
         {
             var go = new GameObject("MatchOverlay", typeof(RectTransform));
@@ -110,8 +111,9 @@ namespace SoulBind.UI
                 _controller.StateChanged -= Refresh;
         }
 
-        // ---- Noticing what happened ----
+        // ---------- Noticing what happened ----------
 
+        // Checks the match for news worth a banner and shows the out or end screens.
         private void Refresh()
         {
             RefreshGuide();
@@ -187,7 +189,7 @@ namespace SoulBind.UI
                     QueueBanner(SwapText(swap, viewer));
             }
 
-            // a new turn: say whose it is.
+            // A new turn: say whose it is.
             int turnId = match.CurrentApostle != null ? match.CurrentApostle.Id : 0;
             if (turnId != 0 && turnId != _lastTurnId && !match.IsOver)
                 QueueBanner(turnId == viewer ? "Your turn" : $"{Name(turnId)}'s turn");
@@ -197,7 +199,6 @@ namespace SoulBind.UI
 
             RefreshQuit(match);
         }
-
 
         // Stepping onto a Soul tile that gives nothing (the tile stays) needs saying, or it looks broken.
         private void CheckSoulTile(Match match, ApostleState apostle, int viewer)
@@ -222,7 +223,7 @@ namespace SoulBind.UI
                 QueueBanner(you ? "Your Souls are full: the Soul tile stays" : $"{Name(apostle.Id)}'s Souls are full");
         }
 
-        // ---- Quit ----
+        // ---------- Quit ----------
 
         // Menu is there while the match runs; at the end the result screen has its own Main Menu button.
         // Leave Match, like that button, needs the menu scene to be first in the Build Settings.
@@ -239,20 +240,24 @@ namespace SoulBind.UI
             }
         }
 
+        // Opens the in-match Menu on top of the HUD.
         private void OpenMenu()
         {
             _menu.transform.SetAsLastSibling();
             _menu.SetActive(true);
         }
 
+        // Closes the in-match Menu.
         private void CloseMenu() => _menu.SetActive(false);
 
+        // Closes the Menu and opens the help popup.
         private void OpenHelp()
         {
             _menu.SetActive(false);
             HelpPopup.Open(transform);
         }
 
+        // Asks "Leave the match?", with a different warning online.
         private void AskToQuit()
         {
             _menu.SetActive(false);
@@ -261,6 +266,7 @@ namespace SoulBind.UI
             _quitConfirm.SetActive(true);
         }
 
+        // Closes the leave box without leaving.
         private void CancelQuit()
         {
             _quitConfirm.SetActive(false);
@@ -274,6 +280,7 @@ namespace SoulBind.UI
             _outPanel.SetActive(true);
         }
 
+        // Hides the "You are out" box so the player can spectate.
         private void KeepWatching() => _outPanel.SetActive(false);
 
         private void Update()
@@ -289,7 +296,7 @@ namespace SoulBind.UI
             }
         }
 
-        // ---- Starting tile guide ----
+        // ---------- Starting tile guide ----------
 
         // Before the first turn: tells the player to pick an edge tile, or who is picking now.
         private void RefreshGuide()
@@ -329,13 +336,15 @@ namespace SoulBind.UI
             _guideTitle.alpha = Mathf.Lerp(0.75f, 1f, wave);
         }
 
-        // ---- Banners ----
+        // ---------- Banners ----------
 
+        // Adds a banner line to show after the current one.
         private void QueueBanner(string text)
         {
             _bannerQueue.Enqueue(text);
         }
 
+        // Fades the current banner in and out, then moves on to the next one.
         private void UpdateBanner(float delta)
         {
             if (_bannerTimer <= 0f)
@@ -365,8 +374,9 @@ namespace SoulBind.UI
             _bannerGroup.alpha = left < FadeTime ? MotionStyle.InOut(left / FadeTime) : 1f;
         }
 
-        // ---- End screen ----
+        // ---------- End screen ----------
 
+        // Shows the result screen once the match is over.
         private void ShowEndScreen()
         {
             _outPanel.SetActive(false);
@@ -411,6 +421,7 @@ namespace SoulBind.UI
             _showResultButton.SetActive(false);
         }
 
+        // The result screen text: rounds, the winner and each Apostle's line.
         private static string BuildSummary(Match match, int viewer)
         {
             var text = new StringBuilder(512);
@@ -437,6 +448,7 @@ namespace SoulBind.UI
             return text.ToString();
         }
 
+        // Reloads the match scene for a rematch.
         private void PlayAgain()
         {
             Scene scene = SceneManager.GetActiveScene();
@@ -460,23 +472,27 @@ namespace SoulBind.UI
             SceneManager.LoadScene(0);
         }
 
+        // Hides the result so the player can look at the final board.
         private void ViewBoard()
         {
             _endScreen.SetActive(false);
             _showResultButton.SetActive(true);
         }
 
+        // Brings the result screen back.
         private void ShowResultAgain()
         {
             _endScreen.SetActive(true);
             _showResultButton.SetActive(false);
         }
 
+        // The Apostle's player name.
         private static string Name(int id) => PlayerNames.Get(id);
 
-        // cuts a long name so the result table stays lined up.
+        // Cuts a long name so the result table stays lined up.
         private static string Fit(string name, int max) => name.Length <= max ? name : name.Substring(0, max - 1) + ".";
 
+        // The banner line for a Wheel of Fortune swap; card names only for the two players in it.
         private static string SwapText(CardSwap swap, int viewer)
         {
             bool known = swap.CardsKnown && (viewer == swap.PlayerId || viewer == swap.TargetId);
@@ -487,11 +503,14 @@ namespace SoulBind.UI
             return $"{Name(swap.PlayerId)} swapped a card with {Name(swap.TargetId)}";
         }
 
+        // The card's display name.
         private static string CardName(ArcanaId card) => CardCatalog.Get(card).Name;
+        // "Your" for the viewer, otherwise the name with 's.
         private static string Possessive(int id, int viewer) => id == viewer ? "Your" : Name(id) + "'s";
 
-        // ---- Building the UI (once, at runtime) ----
+        // ---------- Building the UI (once, at runtime) ----------
 
+        // Builds the banner, the guide, the out box and the result screen once.
         private void Build(RectTransform root)
         {
             // Banner: top-center, below the portraits. Never catches the mouse.
@@ -606,6 +625,7 @@ namespace SoulBind.UI
             BuildQuit(root);
         }
 
+        // Builds the Menu button, the Menu box and the leave box.
         private void BuildQuit(RectTransform root)
         {
             // The small Menu button, top-right, under the turn info box.
@@ -749,6 +769,7 @@ namespace SoulBind.UI
             SettingsPopup.Open(transform);
         }
 
+        // Builds one row button inside the Menu box.
         private GameObject MenuButton(RectTransform box, string name, string label, float top,
             UnityEngine.Events.UnityAction onClick)
         {
@@ -767,6 +788,7 @@ namespace SoulBind.UI
             return rect.gameObject;
         }
 
+        // Builds a gothic button with a label at a position.
         private GameObject CreateButton(string name, RectTransform parent, string label, Vector2 position,
             UnityEngine.Events.UnityAction onClick)
         {
@@ -783,6 +805,7 @@ namespace SoulBind.UI
             return rect.gameObject;
         }
 
+        // Creates a child RectTransform on the parent's layer.
         private static RectTransform CreateRect(string name, Transform parent)
         {
             var go = new GameObject(name, typeof(RectTransform));
@@ -792,6 +815,7 @@ namespace SoulBind.UI
             return rect;
         }
 
+        // Stretches a rect to fill its parent.
         private static void Stretch(RectTransform rect)
         {
             rect.anchorMin = Vector2.zero;
@@ -810,6 +834,7 @@ namespace SoulBind.UI
             rect.offsetMax = new Vector2(-30f, -top);
         }
 
+        // Adds an Image that may or may not block taps.
         private static Image AddImage(RectTransform rect, Color color, bool catchesClicks)
         {
             Image image = rect.gameObject.AddComponent<Image>();
@@ -818,6 +843,7 @@ namespace SoulBind.UI
             return image;
         }
 
+        // Creates a TextMeshPro label.
         private static TMP_Text CreateText(string name, RectTransform parent, float size, FontStyles style)
         {
             RectTransform rect = CreateRect(name, parent);

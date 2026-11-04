@@ -19,9 +19,12 @@ namespace SoulBind.UI
 
         [SerializeField] private ApostleArt[] apostles = new ApostleArt[6];
 
+        // The Apostle's portrait for panels and name plates.
         public Sprite GetPortrait(int apostleId) => Get(apostleId).portrait;
+        // The Apostle's animated piece prefab, or null for the plain sprite.
         public GameObject GetPiece(int apostleId) => Get(apostleId).piece;
 
+        // The art entry for an Apostle; ids wrap around when there are fewer entries than seats.
         private ApostleArt Get(int apostleId)
         {
             if (apostles == null || apostles.Length == 0)

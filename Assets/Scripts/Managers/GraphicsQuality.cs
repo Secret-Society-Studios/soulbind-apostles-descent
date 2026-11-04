@@ -76,6 +76,7 @@ namespace SoulBind.Managers
             Application.quitting -= Restore;
         }
 
+        // A new scene brings new cameras, so set them up for the current level again.
         private static void OnSceneLoaded(Scene scene, LoadSceneMode mode) => ApplyCamera();
 
         // ---------- Changing ----------

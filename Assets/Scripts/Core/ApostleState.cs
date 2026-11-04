@@ -54,6 +54,7 @@ namespace SoulBind.Core
         /// <summary>Sets the position. Whether the move is legal is checked by the movement rules, not here.</summary>
         public void MoveTo(HexCoord destination) => Position = destination;
 
+        // Lowers the Vessel by the damage, never below zero.
         public void TakeDamage(int amount)
         {
             RequireNonNegative(amount, nameof(amount));
@@ -107,12 +108,14 @@ namespace SoulBind.Core
             return lost;
         }
 
+        // Adds Corruption; there is no cap here, the match checks the limit.
         public void AddCorruption(int amount)
         {
             RequireNonNegative(amount, nameof(amount));
             Corruption += amount;
         }
 
+        // Lowers Corruption, never below zero.
         public void ReduceCorruption(int amount)
         {
             RequireNonNegative(amount, nameof(amount));
@@ -262,6 +265,7 @@ namespace SoulBind.Core
                 _timedEffects.Add(timedEffects[i]);
         }
 
+        // Stops a negative amount from turning damage into healing (or the reverse).
         private static void RequireNonNegative(int value, string paramName)
         {
             if (value < 0)

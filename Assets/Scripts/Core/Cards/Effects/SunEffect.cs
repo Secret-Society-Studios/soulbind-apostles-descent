@@ -8,6 +8,7 @@ namespace SoulBind.Core
 
         public override bool ReducesCorruption => true;
 
+        // Cleanses Corruption and heals the player.
         public override void OnPlayed(CardPlayContext context)
         {
             context.Player.ReduceCorruption(CorruptionReduction);

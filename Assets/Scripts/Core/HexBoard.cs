@@ -88,8 +88,10 @@ namespace SoulBind.Core
             return new HexBoard(tiles);
         }
 
+        // True when the tile is part of the board.
         public bool Contains(HexCoord tile) => _tileSet.Contains(tile);
 
+        // True when the tile is on the outer ring, where Apostles spawn.
         public bool IsEdge(HexCoord tile) => _edgeSet.Contains(tile);
 
         /// <summary>Neighbors of a tile that are on the board (0 to 6 tiles). Does not allocate.</summary>

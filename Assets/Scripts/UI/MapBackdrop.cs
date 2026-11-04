@@ -63,6 +63,7 @@ namespace SoulBind.UI
 
         // ---------- Building ----------
 
+        // Builds the sky, sea, island and embers behind the board.
         private void Build(BoardView board, MapSkin skin)
         {
             _board = board;
@@ -189,6 +190,7 @@ namespace SoulBind.UI
             }
         }
 
+        // Creates a mesh object, such as the 3D island, with its material and sort order.
         private Transform CreateMesh(string name, Mesh mesh, Material material, int order, Vector3 position)
         {
             var go = new GameObject(name);
@@ -221,6 +223,7 @@ namespace SoulBind.UI
             }
         }
 
+        // Uses the skin's art, or a generated placeholder until the art is in.
         private Sprite Pick(Sprite art, System.Func<Sprite> placeholder)
         {
             Sprite sprite = art != null ? art : placeholder();
@@ -256,6 +259,7 @@ namespace SoulBind.UI
             return renderer;
         }
 
+        // Creates a sprite layer with its sort order.
         private SpriteRenderer CreateRenderer(string name, Sprite sprite, int order)
         {
             var go = new GameObject(name);
@@ -293,6 +297,7 @@ namespace SoulBind.UI
             }
         }
 
+        // Creates the drifting embers; fewer on lower graphics levels.
         private void BuildEmbers(MapSkin skin)
         {
             int count = ScaledCount(skin.EmberCount);
@@ -377,6 +382,7 @@ namespace SoulBind.UI
         private static Sprite _placeholderRock;
         private static Sprite _placeholderEmber;
 
+        // Clears cached placeholders when Play starts, since Unity may keep statics between runs.
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetOnPlay()
         {
@@ -518,6 +524,7 @@ namespace SoulBind.UI
             return _placeholderGlow;
         }
 
+        // Builds the placeholder rock sprite once.
         private static Sprite PlaceholderRock()
         {
             if (_placeholderRock != null)

@@ -11,6 +11,7 @@ namespace SoulBind.Core
 
         public override bool ReducesCorruption => true;
 
+        // Cleanses Corruption, twice as much when another cleanse was played this turn.
         public override void OnPlayed(CardPlayContext context)
         {
             if (context.CorruptionReducersPlayedThisTurn > 0)

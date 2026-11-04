@@ -43,6 +43,7 @@ namespace SoulBind.Core
 
         public string Name => "SmartBot";
 
+        // Tries the simple bot's choice and a few others on a scratch copy, then keeps the best.
         public BotAction Decide(Match match)
         {
             if (match == null)
@@ -86,6 +87,7 @@ namespace SoulBind.Core
 
         // ---------- What it could do ----------
 
+        // Fills the list of actions worth trying this step.
         private void BuildCandidates(Match match, BotAction simple)
         {
             _candidates.Clear();
@@ -118,6 +120,7 @@ namespace SoulBind.Core
             }
         }
 
+        // Adds one candidate per living opponent for a targeted card.
         private void AddPerOpponent(Match match, ArcanaId card)
         {
             IReadOnlyList<ApostleState> apostles = match.Battlefield.Apostles;
@@ -142,6 +145,7 @@ namespace SoulBind.Core
 
         // ---------- Trying a play ----------
 
+        // Reuses one scratch match per real match so trying moves does not allocate.
         private Match GetScratch(Match match, MatchSnapshot start)
         {
             if (_scratch == null || _scratchFor != match)
@@ -212,6 +216,7 @@ namespace SoulBind.Core
             return score;
         }
 
+        // Looks up an Apostle by id, or null when it is missing.
         private static ApostleState Find(Match match, int id)
         {
             IReadOnlyList<ApostleState> apostles = match.Battlefield.Apostles;

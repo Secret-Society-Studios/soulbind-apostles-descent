@@ -94,6 +94,7 @@ namespace SoulBind.UI
             Refresh();
         }
 
+        // Shows only the buttons that make sense right now, and only on the local player's turn.
         private void Refresh()
         {
             Match match = matchController != null ? matchController.CurrentMatch : null;
@@ -104,7 +105,7 @@ namespace SoulBind.UI
             bool choosingDirection = running && matchController.IsLocalPhaseChooser;
 
             // The play queue's ATTACK button strikes now.
-            SetVisible(strikeButton, false);    
+            SetVisible(strikeButton, false);
             if (engaged && strikeLabel != null)
                 strikeLabel.text = $"Strike  (ATK {match.PendingAttack})";
 
@@ -118,6 +119,7 @@ namespace SoulBind.UI
                 hintText.text = matchController != null ? matchController.Hint : string.Empty;
         }
 
+        // Toggles a button only when its state changes, to avoid rebuilding the layout.
         private static void SetVisible(Button button, bool visible)
         {
             if (button != null && button.gameObject.activeSelf != visible)

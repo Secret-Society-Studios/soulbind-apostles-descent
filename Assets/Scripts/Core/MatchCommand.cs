@@ -55,17 +55,22 @@ namespace SoulBind.Core
             Direction = direction;
         }
 
+        // A command that picks the turn direction at the start of a phase.
         public static MatchCommand ChooseDirection(TurnDirection direction) =>
             new MatchCommand(CommandKind.ChooseDirection, default, default, 0, 0, direction);
 
+        // A command that walks to a tile.
         public static MatchCommand Move(HexCoord destination) =>
             new MatchCommand(CommandKind.Move, destination, default, 0, 0, default);
 
+        // A command that plays a card, with optional target and combo target ids.
         public static MatchCommand PlayCard(ArcanaId card, int targetId = 0, int comboTargetId = 0) =>
             new MatchCommand(CommandKind.PlayCard, default, card, targetId, comboTargetId, default);
 
+        // A command that resolves the queued attack.
         public static MatchCommand Strike() => new MatchCommand(CommandKind.Strike, default, default, 0, 0, default);
 
+        // A command that ends the current turn.
         public static MatchCommand EndTurn() => new MatchCommand(CommandKind.EndTurn, default, default, 0, 0, default);
 
         // Takes queued card number index back into the hand (index rides in TargetId).
@@ -113,6 +118,7 @@ namespace SoulBind.Core
             return true;
         }
 
+        // Writes a 16-bit value little-endian so every platform reads it the same.
         private static void WriteShort(byte[] buffer, int offset, int value)
         {
             short s = (short)value;
@@ -120,6 +126,7 @@ namespace SoulBind.Core
             buffer[offset + 1] = (byte)((s >> 8) & 0xFF);
         }
 
+        // Reads a 16-bit little-endian value.
         private static short ReadShort(byte[] buffer, int offset) =>
             (short)(buffer[offset] | (buffer[offset + 1] << 8));
 
@@ -154,6 +161,7 @@ namespace SoulBind.Core
             return match.CurrentApostle != null ? match.CurrentApostle.Id : 0;
         }
 
+        // Checks the sender may act, then runs the command; the host calls this for every message.
         public static CommandResult Apply(Match match, int senderId, MatchCommand command)
         {
             if (match == null)

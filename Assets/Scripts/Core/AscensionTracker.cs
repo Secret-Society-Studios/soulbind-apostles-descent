@@ -74,6 +74,7 @@ namespace SoulBind.Core
             return !awakened.IsEliminated && awakened.Position == Tile;
         }
 
+        // Awakens the Apostle if it holds enough Souls and a free Ascension tile can be found.
         private bool TryAwaken(Battlefield battlefield, ApostleState apostle, Random random)
         {
             if (apostle.IsEliminated || apostle.Souls < GameConstants.SoulsToAwaken)
@@ -123,6 +124,7 @@ namespace SoulBind.Core
             return true;
         }
 
+        // Looks up an Apostle by id, or null when it is not on the battlefield.
         private static ApostleState FindApostle(Battlefield battlefield, int id)
         {
             IReadOnlyList<ApostleState> apostles = battlefield.Apostles;

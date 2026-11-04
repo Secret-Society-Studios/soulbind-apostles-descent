@@ -10,6 +10,7 @@ namespace SoulBind.Core
         public const int CapacityBonus = 2;
         public const int DurationTurns = 2;
 
+        // Raises Capacity now and for the next few turns.
         public override void OnPlayed(CardPlayContext context)
         {
             context.AddCapacityThisTurn(CapacityBonus);

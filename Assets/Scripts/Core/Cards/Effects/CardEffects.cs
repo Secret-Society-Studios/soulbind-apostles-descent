@@ -19,6 +19,7 @@ namespace SoulBind.Core
             return Effects[index];
         }
 
+        // Builds the lookup table once, one effect per card id (null for cards with no effect).
         private static CardEffect[] Build()
         {
             var effects = new CardEffect[CardCatalog.All.Count];

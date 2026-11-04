@@ -168,6 +168,7 @@ namespace SoulBind.Core
             return CreateSeated(playerCount, board, spawnTiles, seatOrder, random, deck);
         }
 
+        // Builds a match with a fixed seat order; shared by the normal, tutorial and snapshot paths.
         private static Match CreateSeated(int playerCount, HexBoard board, IReadOnlyList<HexCoord> spawnTiles,
             IReadOnlyList<int> seatOrder, Random random, Deck deck)
         {
@@ -574,6 +575,7 @@ namespace SoulBind.Core
         public bool IsComboTriggered(Element element) =>
             GetElementsPlayedThisTurn(element) >= ElementCombo.CardsNeeded;
 
+        // Applies the bonus for playing a combo of one element.
         private void ApplyCombo(Element element)
         {
             switch (element)
@@ -598,8 +600,7 @@ namespace SoulBind.Core
             }
         }
 
-
-        // ---- Called by card effects through CardPlayContext ----
+        // ---------- Called by card effects through CardPlayContext ----------
 
         /// <summary>The opponent picked for the card being played (Wheel of Fortune), or null.</summary>
         internal ApostleState PickedTarget => _pickedTargetId != 0 ? TryFindApostle(_pickedTargetId) : null;
@@ -609,6 +610,7 @@ namespace SoulBind.Core
 
         internal int CorruptionReducersThisTurn => _corruptionReducersThisTurn;
 
+        // Strength waits for a second cleanse card this turn to double up.
         internal void MarkStrengthAwaitingPartner() => _strengthAwaitingPartner = true;
 
         // How many copies of this card are already part of the current attack.
@@ -638,8 +640,10 @@ namespace SoulBind.Core
             CurrentCapacity = raised;
         }
 
+        // Asks the match to end the turn once the current card has resolved.
         internal void RequestEndTurn() => _endTurnRequested = true;
 
+        // Asks the match to skip everyone else's turns this round (The World).
         internal void SkipRestOfRound() => _skipRestOfRound = true;
 
         // Swaps one random card from the current Apostle's hand with one random card from the
@@ -662,6 +666,7 @@ namespace SoulBind.Core
             return true;
         }
 
+        // Arms the Emperor's bonus; only valid while an attack is under way.
         internal void ArmEmperor()
         {
             if (Engagement != EngagementState.Engaged)
@@ -1011,6 +1016,7 @@ namespace SoulBind.Core
             return new TurnCapacity(Math.Max(0, phaseCapacity.Maximum + change));
         }
 
+        // Clears the attack in progress and everything armed for it.
         private void ResetEngagement()
         {
             Engagement = EngagementState.Free;
@@ -1023,6 +1029,7 @@ namespace SoulBind.Core
             _emperorArmed = false;
         }
 
+        // Guards every turn action: the match must be running and the phase started.
         private void RequireActiveTurn()
         {
             if (UpdateGameOver())
@@ -1095,6 +1102,7 @@ namespace SoulBind.Core
         private bool IsAscensionTileClosedTo(ApostleState apostle, HexCoord tile) =>
             Ascension.HasAwakened && Ascension.Tile == tile && apostle.Id != Ascension.AwakenedId;
 
+        // Records the winner and how the match ended, and stops all turns.
         private void EndMatch(int winnerId, MatchEndReason reason)
         {
             IsOver = true;
@@ -1129,6 +1137,7 @@ namespace SoulBind.Core
             return null;
         }
 
+        // Looks up an Apostle by id and throws when it is missing, since that is a bug.
         private ApostleState FindApostle(int id)
         {
             ApostleState apostle = TryFindApostle(id);

@@ -20,6 +20,7 @@ namespace SoulBind.Core
             ExpiresOnTurn = expiresOnTurn;
         }
 
+        // True while the turn falls inside the effect's window.
         public bool IsActiveOn(int turn) => turn >= StartsOnTurn && turn < ExpiresOnTurn;
     }
 }

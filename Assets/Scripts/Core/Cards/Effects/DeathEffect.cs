@@ -9,6 +9,7 @@ namespace SoulBind.Core
     {
         public const int ExecuteBelowVessel = 5;
 
+        // Arms an execute: the target dies if the attack leaves its Vessel low enough.
         public override void OnPlayed(CardPlayContext context)
         {
             if (context.IsAttacking)

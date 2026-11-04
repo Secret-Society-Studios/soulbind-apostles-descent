@@ -32,6 +32,7 @@ namespace SoulBind.UI
             "Ascensions", "Cards played", "Combos", "Streak now"
         };
 
+        // Builds the grid of profile stat boxes.
         private void BuildProfileStats(RectTransform panel)
         {
             float width = (StatRowWidth - StatGap * (StatsPerRow - 1)) / StatsPerRow;

@@ -9,6 +9,7 @@ namespace SoulBind.Core
     /// </summary>
     public static class SpawnPlanner
     {
+        // Picks spawn tiles spread evenly around the edge.
         public static List<HexCoord> PickSpread(HexBoard board, int count)
         {
             if (board == null)

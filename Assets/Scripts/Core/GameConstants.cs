@@ -18,7 +18,7 @@ namespace SoulBind.Core
         public const int Phase1Capacity = 8;
         public const int Phase2To3Capacity = 12;
         public const int Phase4PlusCapacity = 15;
-        
+
         public const int CorruptionThreshold = 5;        // Corrupted and Soullocked at this value or higher
         public const int SevereCorruptionThreshold = 10; // heavier recurring damage at this value or higher
         public const int CorruptedDamage = 2;
@@ -37,6 +37,7 @@ namespace SoulBind.Core
         public const int CardsDrawnPerTurn = 1;
         public const int HandOverLimitCorruption = 1;
 
+        // Starting Souls per Apostle; fewer players start with more.
         public static int GetStartingSouls(int playerCount)
         {
             switch (playerCount)

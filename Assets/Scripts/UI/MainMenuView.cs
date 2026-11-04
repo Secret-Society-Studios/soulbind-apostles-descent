@@ -79,6 +79,7 @@ namespace SoulBind.UI
                 UpdateRoomList();
         }
 
+        // Shows one menu screen and hides the rest.
         private void ShowScreen(Screen screen)
         {
             _screen = screen;
@@ -101,12 +102,14 @@ namespace SoulBind.UI
 
         // ---------- Main screen actions ----------
 
+        // Changes the player count for a local match, from 2 to 6.
         private void ChangePlayers(int delta)
         {
             _players = Mathf.Clamp(_players + delta, 2, 6);
             ShowPlayers();
         }
 
+        // Shows the player count and who the bots play.
         private void ShowPlayers()
         {
             string count = _players.ToString();
@@ -114,11 +117,13 @@ namespace SoulBind.UI
             _botsLine.text = $"You play Apostle 1 · bots play the other {_players - 1}";
         }
 
+        // Starts a local match where bots play the other seats.
         private void PlayBots() => Play(true);
 
         // Pass & Play: everyone takes turns on this device; the view follows whoever's turn it is.
         private void PassAndPlay() => Play(false);
 
+        // Saves the match settings and loads the match scene.
         private void Play(bool bots)
         {
             MatchSettings.Set(_players, bots, true);
@@ -132,6 +137,7 @@ namespace SoulBind.UI
             SceneManager.LoadScene(gameSceneName);
         }
 
+        // Quits the game, or stops Play mode in the editor.
         private void Quit()
         {
 #if UNITY_EDITOR
@@ -143,6 +149,7 @@ namespace SoulBind.UI
 
         // ---------- Building ----------
 
+        // Builds the background and every menu screen once.
         private void Build()
         {
             RectTransform background = Kit.Stretch(Kit.CreateRect("Background", _root));
@@ -169,6 +176,7 @@ namespace SoulBind.UI
             Kit.Stretch(line, 24f);
         }
 
+        // Builds the main screen: profile card, play buttons and the rest.
         private void BuildMain()
         {
             RectTransform frame = Kit.CreateFrame(_root, "MainScreen");
@@ -293,6 +301,7 @@ namespace SoulBind.UI
             _profilePopup.SetActive(false);
         }
 
+        // Opens the profile popup with the saved name and stats.
         private void OpenProfile()
         {
             _nameField.text = PlayerNames.LocalName;
@@ -301,18 +310,21 @@ namespace SoulBind.UI
             _profilePopup.SetActive(true);
         }
 
+        // Saves the typed name and closes the popup.
         private void SaveProfile()
         {
             PlayerNames.LocalName = _nameField.text;
             CloseProfile();
         }
 
+        // Closes the profile popup and refreshes the name on the main screen.
         private void CloseProfile()
         {
             _profilePopup.SetActive(false);
             ShowProfileName();
         }
 
+        // Shows the saved name, or a prompt to set one.
         private void ShowProfileName()
         {
             string typed = PlayerNames.LocalName;

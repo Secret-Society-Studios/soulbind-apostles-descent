@@ -125,6 +125,7 @@ namespace SoulBind.UI
 
         private bool IsComplete => _step >= Steps.Length;
 
+        // Creates the tutorial guide box on the HUD.
         public static TutorialGuide Create(RectTransform hudRoot, MatchController controller)
         {
             RectTransform rect = Kit.Box(hudRoot, "TutorialGuide", new Color(0.03f, 0.02f, 0.05f, 0.92f),
@@ -157,6 +158,7 @@ namespace SoulBind.UI
 
         // ---------- Building ----------
 
+        // Builds the title, the text and the Next button.
         private void Build(RectTransform root)
         {
             _group = root.gameObject.AddComponent<CanvasGroup>();
@@ -195,6 +197,7 @@ namespace SoulBind.UI
             ShowFlash();
         }
 
+        // True on the last step, which is won by winning the match.
         private bool IsWinStep() => !IsComplete && Steps[_step].Done == Check.Win;
 
         // True once the player has done what the step asks.
@@ -223,6 +226,7 @@ namespace SoulBind.UI
             }
         }
 
+        // Looks up an Apostle by id, or null when it is missing.
         private static ApostleState Find(Match match, int id)
         {
             IReadOnlyList<ApostleState> apostles = match.Battlefield.Apostles;
@@ -261,6 +265,7 @@ namespace SoulBind.UI
                 _controller.SetTutorialMoveGoal(false, default);
         }
 
+        // Shows the current step, with Next only when the step waits for it.
         private void Show()
         {
             _shownStep = _step;
@@ -283,6 +288,7 @@ namespace SoulBind.UI
         // The player tried something this step does not allow: the coach flashes red.
         private void OnBlocked() => _flash = FlashTime;
 
+        // Flashes the border when a new step starts.
         private void ShowFlash()
         {
             if (_border == null)

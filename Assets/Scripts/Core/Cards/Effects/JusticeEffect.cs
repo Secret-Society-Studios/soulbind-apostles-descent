@@ -8,6 +8,7 @@ namespace SoulBind.Core
     {
         public const int CorruptionAdded = 2;
 
+        // Adds Corruption to every other living Apostle.
         public override void OnPlayed(CardPlayContext context)
         {
             for (int i = 0; i < context.Apostles.Count; i++)

@@ -53,7 +53,7 @@ namespace SoulBind.UI
             }
         }
 
-        // ---- Whole screens ----
+        // ---------- Whole screens ----------
 
         /// <summary>
         /// Restyles the HUD built by SoulBind > Build Match HUD: the turn info box, the buttons, the hint
@@ -122,7 +122,6 @@ namespace SoulBind.UI
         /// <summary>The table becomes dark, with a soft pool of light over the mat; the camera's empty background goes black.</summary>
         public static void ApplyToTable(BoardView board)
         {
-
             if (board != null)
             {
                 Transform table = board.transform.Find("Table");
@@ -138,7 +137,7 @@ namespace SoulBind.UI
                 cam.backgroundColor = TableEdge;
         }
 
-        // ---- Pieces ----
+        // ---------- Pieces ----------
 
         /// <summary>One Apostle's portrait box: panel, gold frame, framed portrait and gradient bars.</summary>
         public static void StylePortrait(ApostlePanelView panel)
@@ -193,6 +192,7 @@ namespace SoulBind.UI
                 glow.gameObject.SetActive(isCurrent);
         }
 
+        // Gives a button the gothic look; the red Strike button keeps its red.
         public static void StyleButton(Button button)
         {
             Image image = button.targetGraphic as Image;
@@ -218,6 +218,7 @@ namespace SoulBind.UI
                 Title(label, GoldBright);
         }
 
+        // Gives a panel the dark sliced look, with or without a gold frame.
         public static void StylePanel(Image image, bool framed)
         {
             image.sprite = PanelSprite;
@@ -240,6 +241,7 @@ namespace SoulBind.UI
             return (Image)parent.Find("ThemeFrame").GetComponent(typeof(Image));
         }
 
+        // Styles a bar's background and fill.
         private static void StyleBar(Transform bar)
         {
             if (bar == null)
@@ -265,8 +267,9 @@ namespace SoulBind.UI
                 AddShadow(label.gameObject);
         }
 
-        // ---- Small helpers ----
+        // ---------- Small helpers ----------
 
+        // Uses the title font and colour on a heading.
         private static void Title(TMP_Text text, Color color)
         {
             if (text == null)
@@ -322,6 +325,7 @@ namespace SoulBind.UI
             rect.gameObject.SetActive(false);
         }
 
+        // Creates a child RectTransform on the parent's layer.
         private static RectTransform NewChild(Transform parent, string name)
         {
             var go = new GameObject(name, typeof(RectTransform));
@@ -349,7 +353,7 @@ namespace SoulBind.UI
             return false;
         }
 
-        // ---- Sprites, drawn once ----
+        // ---------- Sprites, drawn once ----------
 
         // White, with a gentle top-to-bottom shading and rounded corners: tinted by the image's colour.
         private static Sprite PanelSprite => _panel != null ? _panel : (_panel = MakeSliced(64, 16, (x, y, s) =>
@@ -434,8 +438,10 @@ namespace SoulBind.UI
             }
         }
 
+        // Returns the colour of one pixel of a generated texture.
         private delegate Color Pixel(int x, int y, int size);
 
+        // Builds a 9-sliced sprite from a pixel function, so panels need no image files.
         private static Sprite MakeSliced(int size, int border, Pixel pixel)
         {
             var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)

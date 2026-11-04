@@ -115,6 +115,7 @@ namespace SoulBind.Utility
             PlayerPrefs.Save();
         }
 
+        // Writes the stats as one tagged, pipe-separated line in PlayerPrefs.
         private static void Save(Stats stats)
         {
             var text = new StringBuilder(160);
@@ -136,6 +137,7 @@ namespace SoulBind.Utility
             PlayerPrefs.Save();
         }
 
+        // Reads a saved count; anything broken or negative counts as 0.
         private static int Read(string text) => int.TryParse(text, out int value) && value > 0 ? value : 0;
     }
 }

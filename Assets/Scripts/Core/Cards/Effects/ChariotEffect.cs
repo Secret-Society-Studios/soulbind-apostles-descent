@@ -6,6 +6,7 @@ namespace SoulBind.Core
     /// </summary>
     public sealed class ChariotEffect : CardEffect
     {
+        // The Chariot hits harder early: +3 in Phase 1, +2 in Phases 2 and 3, then +1.
         public static int GetBonus(int phase)
         {
             if (phase <= 1)
@@ -15,8 +16,10 @@ namespace SoulBind.Core
             return 1;
         }
 
+        // Shows the phase bonus on the card before it is played.
         public override int GetAttackPreview(int phase, int sameBefore) => GetBonus(phase);
 
+        // Adds the phase bonus when the card is part of an attack.
         public override void OnPlayed(CardPlayContext context)
         {
             if (context.IsAttacking)

@@ -107,6 +107,7 @@ namespace SoulBind.Online
             }
         }
 
+        // The one session object, created on first use and kept across scenes.
         public static OnlineSession GetOrCreate()
         {
             if (Instance != null)
@@ -124,7 +125,7 @@ namespace SoulBind.Online
                 Instance.Leave();
         }
 
-        // ---- Host / Join ----
+        // ---------- Host / Join ----------
 
         /// <summary>
         /// Creates a room. A public room shows in everyone's room list; a private one
@@ -347,8 +348,9 @@ namespace SoulBind.Online
             }
         }
 
-        // ---- Setup ----
+        // ---------- Setup ----------
 
+        // Starts Unity Services and signs in anonymously, once.
         private static async Task SignInAsync()
         {
             if (UnityServices.State == ServicesInitializationState.Uninitialized)
@@ -391,6 +393,7 @@ namespace SoulBind.Online
             }
         }
 
+        // Resets the session state after hosting or joining, ready for the match scene.
         private void AfterEntering()
         {
             MatchStarted = false;

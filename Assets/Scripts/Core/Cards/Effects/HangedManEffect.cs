@@ -10,12 +10,14 @@ namespace SoulBind.Core
         public const int Bonus = 5;
         public const int DurationTurns = 2;
 
+        // Grants a timed attack bonus, but only to the Apostle with the lowest Vessel.
         public override void OnPlayed(CardPlayContext context)
         {
             if (HasLowestVessel(context))
                 context.Player.AddTimedEffect(TimedEffectKind.Attack, Bonus, DurationTurns);
         }
 
+        // True when no other living Apostle has a lower Vessel than the player.
         private static bool HasLowestVessel(CardPlayContext context)
         {
             int vessel = context.Player.Vessel;

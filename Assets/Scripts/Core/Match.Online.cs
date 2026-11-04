@@ -17,7 +17,7 @@ namespace SoulBind.Core
             }
             return count;
         }
-                
+
         /// <summary>The cards waiting in the queue, in order: an attack's while Engaged, plain plays while Free.</summary>
         public IReadOnlyList<ArcanaId> AttackCards => _queuedCards;
 

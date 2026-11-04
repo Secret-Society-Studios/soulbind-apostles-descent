@@ -51,6 +51,7 @@ namespace SoulBind.Managers
             }
         }
 
+        // Remembers the last card that changed hands so the profile can count element plays.
         private void NoteCard(ArcanaId card, int delta)
         {
             _noteCard = (int)card;

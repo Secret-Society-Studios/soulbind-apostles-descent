@@ -9,6 +9,7 @@ namespace SoulBind.Core
     {
         public const int AttackMultiplier = 2;
 
+        // Arms the Emperor's bonus for the current attack.
         public override void OnPlayed(CardPlayContext context)
         {
             if (context.IsAttacking)

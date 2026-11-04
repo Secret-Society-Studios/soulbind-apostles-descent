@@ -40,6 +40,7 @@ namespace SoulBind.UI
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetOnPlay() => IsAnyOpen = false;
 
+        // Creates the full discard list popup, hidden until opened.
         public static DiscardViewer Create(Canvas canvas, MatchController controller, CardView cardPrefab,
             Func<int> heldCount)
         {
@@ -58,6 +59,7 @@ namespace SoulBind.UI
             return viewer;
         }
 
+        // Opens the list on top of the HUD, scrolled to the newest card.
         public void Open()
         {
             transform.SetAsLastSibling(); // over the banners, the combo tracker and the buttons
@@ -66,6 +68,7 @@ namespace SoulBind.UI
                 _scroll.verticalNormalizedPosition = 1f; // start at the newest card
         }
 
+        // Hides the list.
         public void Close() => gameObject.SetActive(false);
 
         private void OnEnable()
@@ -117,6 +120,7 @@ namespace SoulBind.UI
             }
         }
 
+        // Builds the dim layer, the panel and the scrolling card grid.
         private void Build(RectTransform root)
         {
             // Darkens the table. Clicking it closes the viewer.
@@ -215,6 +219,7 @@ namespace SoulBind.UI
             return card;
         }
 
+        // Creates a child RectTransform on the parent's layer.
         private static RectTransform CreateRect(string name, Transform parent)
         {
             var go = new GameObject(name, typeof(RectTransform));
@@ -224,6 +229,7 @@ namespace SoulBind.UI
             return rect;
         }
 
+        // Creates a centred TextMeshPro label.
         private static TMP_Text CreateText(string name, Transform parent, float size, Color color, bool title)
         {
             TextMeshProUGUI text = CreateRect(name, parent).gameObject.AddComponent<TextMeshProUGUI>();
@@ -236,6 +242,7 @@ namespace SoulBind.UI
             return text;
         }
 
+        // Stretches a rect to fill its parent.
         private static void Stretch(RectTransform rect)
         {
             rect.anchorMin = Vector2.zero;

@@ -8,8 +8,10 @@ namespace SoulBind.Core
     {
         public const int BonusAttack = 1;
 
+        // Shows the flat attack bonus on the card before it is played.
         public override int GetAttackPreview(int phase, int sameBefore) => BonusAttack;
 
+        // Adds the flat bonus when the card is part of an attack.
         public override void OnPlayed(CardPlayContext context)
         {
             if (context.IsAttacking)

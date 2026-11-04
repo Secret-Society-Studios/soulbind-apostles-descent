@@ -33,12 +33,15 @@ namespace SoulBind.Core
 
         public static BotAction None => default;
 
+        // A bot action that picks the turn direction at the start of a phase.
         public static BotAction ChooseDirection(TurnDirection direction) =>
             new BotAction(BotActionKind.ChooseDirection, default, default, 0, 0, direction);
 
+        // A bot action that walks to a tile.
         public static BotAction Move(HexCoord destination) =>
             new BotAction(BotActionKind.Move, destination, default, 0, 0, default);
 
+        // A bot action that plays a card, with optional target and combo target ids.
         public static BotAction PlayCard(ArcanaId card, int targetId, int comboTargetId) =>
             new BotAction(BotActionKind.PlayCard, default, card, targetId, comboTargetId, default);
 

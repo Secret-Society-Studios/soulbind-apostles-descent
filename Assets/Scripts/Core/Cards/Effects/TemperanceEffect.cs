@@ -11,6 +11,7 @@ namespace SoulBind.Core
         public const int DurationTurns = 1;
         public const int DelayTurns = 1;
 
+        // Ends the turn now in exchange for delayed attack and defence bonuses.
         public override void OnPlayed(CardPlayContext context)
         {
             context.Player.AddTimedEffect(TimedEffectKind.Attack, Bonus, DurationTurns, DelayTurns);

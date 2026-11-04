@@ -38,7 +38,6 @@ namespace SoulBind.UI
         [Tooltip("The screen-space HUD canvas the discard viewer opens on. Empty: the MatchHud's canvas.")]
         [SerializeField] private Canvas screenCanvas;
 
-
         [Header("Stack")]
         [Tooltip("Only the top cards are drawn; the ones under them can't be seen anyway.")]
         [SerializeField, Range(1, 20)] private int maxShown = 8;
@@ -192,6 +191,7 @@ namespace SoulBind.UI
                 canvas.sortingOrder = 55;
         }
 
+        // Creates one card view for the visible top of the pile.
         private CardView CreateView()
         {
             CardView view = Instantiate(cardPrefab, stack);
@@ -228,6 +228,7 @@ namespace SoulBind.UI
             }
         }
 
+        // Shows the top cards of the discard pile.
         private void Refresh()
         {
             if (_views.Count == 0)
@@ -270,7 +271,6 @@ namespace SoulBind.UI
                 countText.text = count == 0 ? string.Empty : count.ToString();
         }
 
-
         // A click or tap that starts and ends on the pile opens the viewer. Opening on release (not press)
         // means the same press can't land on the viewer's background and close it straight away, and a card
         // dragged from the hand and dropped here is never mistaken for a click (that press began on the hand).
@@ -281,8 +281,6 @@ namespace SoulBind.UI
             if (pointer == null)
                 return;
             Vector2 screenPoint = pointer.position.ReadValue();
-
-            
 
             if (_viewer == null || _viewer.IsOpen)
             {

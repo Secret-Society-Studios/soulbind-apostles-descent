@@ -20,6 +20,7 @@ namespace SoulBind.Core
         /// <summary>Special tiles that have not been used yet.</summary>
         public IReadOnlyDictionary<HexCoord, SpecialTileType> Active => _active;
 
+        // Places a special tile; two on one tile is a bug.
         public void Add(HexCoord tile, SpecialTileType type)
         {
             if (!_active.TryAdd(tile, type))
@@ -67,6 +68,7 @@ namespace SoulBind.Core
             return added;
         }
 
+        // How many tiles of a type are on the board now.
         public int CountOf(SpecialTileType type)
         {
             int count = 0;

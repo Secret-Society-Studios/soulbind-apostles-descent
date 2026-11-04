@@ -39,6 +39,7 @@ namespace SoulBind.UI
 
         // ---------- Actions ----------
 
+        // Opening the online screen shows the saved name and lists rooms straight away.
         private void OnOpenOnline()
         {
             ShowProfileName();
@@ -46,12 +47,14 @@ namespace SoulBind.UI
             _nextRoomRefresh = 0f; // refresh now
         }
 
+        // Picks a private (code only) or open (listed) room.
         private void PickPrivacy(bool isPrivate)
         {
             _privateRoom = isPrivate;
             ShowPrivacy();
         }
 
+        // Lights the chosen privacy option and explains it.
         private void ShowPrivacy()
         {
             ShowSegment(_privacy, _privateRoom);
@@ -67,6 +70,7 @@ namespace SoulBind.UI
             _mainStatus.text = text ?? string.Empty;
         }
 
+        // Creates a room and moves on to the lobby; one request at a time.
         private async void HostOnline()
         {
             if (_busy)
@@ -82,6 +86,7 @@ namespace SoulBind.UI
                 OnlineSession.Instance.SetSeatCount(_players);
         }
 
+        // Joins the room whose code was typed.
         private async void JoinOnline()
         {
             if (_busy)
@@ -95,6 +100,7 @@ namespace SoulBind.UI
             ShowOnlineStatus(error);
         }
 
+        // Joins a room picked from the open room list.
         private async void JoinListedRoom(int row)
         {
             if (_busy || row >= _rooms.Count)
@@ -120,6 +126,7 @@ namespace SoulBind.UI
             RefreshRooms();
         }
 
+        // Asks the Lobby service for open rooms, at most once per RoomRefreshSeconds.
         private async void RefreshRooms()
         {
             _refreshing = true;
@@ -133,6 +140,7 @@ namespace SoulBind.UI
             ShowRooms(error);
         }
 
+        // Fills the room rows, or shows why the list could not load.
         private void ShowRooms(string error)
         {
             for (int i = 0; i < _roomRows.Length; i++)
@@ -167,6 +175,7 @@ namespace SoulBind.UI
         private const float RowsTop = 226f;
         private const float RowStep = 54f;
 
+        // Builds the online screen once: host, join and the open room list.
         private void BuildOnline()
         {
             RectTransform frame = Kit.CreateFrame(_root, "OnlineScreen");
@@ -185,6 +194,7 @@ namespace SoulBind.UI
             BuildHostCard(frame);
         }
 
+        // Builds one boxed card with a heading and a sub line.
         private static RectTransform BuildCard(RectTransform frame, string name, float x, float width,
             string heading, string sub)
         {

@@ -117,6 +117,7 @@ namespace SoulBind.UI
             popup.ShowTab(0);
         }
 
+        // Builds the popup once under the canvas.
         private static HelpPopup Create(Transform canvasRoot)
         {
             var go = new GameObject("HelpPopup", typeof(RectTransform));
@@ -133,6 +134,7 @@ namespace SoulBind.UI
 
         // ---------- The text ----------
 
+        // The help topics, each with its facts and demo.
         private static Tab[] BuildTabs()
         {
             Color gold = GothicTheme.GoldBright;
@@ -215,6 +217,7 @@ namespace SoulBind.UI
 
         // ---------- Tabs and buttons ----------
 
+        // Shows one topic: lights its tab, fills the fact cards and resets the demo.
         private void ShowTab(int index)
         {
             _tab = Mathf.Clamp(index, 0, _tabs.Length - 1);
@@ -228,6 +231,7 @@ namespace SoulBind.UI
             ResetDemo();
         }
 
+        // Goes to the next topic, or closes after the last one.
         private void Next()
         {
             if (_tab >= _tabs.Length - 1)
@@ -236,10 +240,12 @@ namespace SoulBind.UI
                 ShowTab(_tab + 1);
         }
 
+        // Hides the popup.
         private void Close() => gameObject.SetActive(false);
 
         // ---------- The demo ----------
 
+        // Starts the current topic's demo from the beginning.
         private void ResetDemo()
         {
             _step = 0;
@@ -247,6 +253,7 @@ namespace SoulBind.UI
             Render();
         }
 
+        // Moves the demo on when the player taps one of its chips.
         private void OnChip(int index)
         {
             switch (_tabs[_tab].Demo)
@@ -284,6 +291,7 @@ namespace SoulBind.UI
             _queue.Add(index);
         }
 
+        // Total Capacity of the cards queued in the demo.
         private int QueuedCap()
         {
             int cap = 0;
@@ -292,6 +300,7 @@ namespace SoulBind.UI
             return cap;
         }
 
+        // Hides every demo piece, then draws the current topic's demo.
         private void Render()
         {
             for (int i = 0; i < _chips.Length; i++)
@@ -309,6 +318,7 @@ namespace SoulBind.UI
             }
         }
 
+        // Demo: tapping adds Souls until the Apostle Awakens.
         private void RenderGoal()
         {
             int souls = Mathf.Min(13 + _step, GameConstants.SoulsToAwaken);
@@ -319,6 +329,7 @@ namespace SoulBind.UI
                 : $"Stolen! {GameConstants.SoulsToAwaken - souls} more to Awaken.";
         }
 
+        // Demo: the four steps of a turn, one note each.
         private void RenderTurn()
         {
             string[] steps = { "1  Move", "2  Play cards", "3  Attack", "4  End turn" };
@@ -379,6 +390,7 @@ namespace SoulBind.UI
             _info.text = combos.Length > 0 ? combos : "Hand above, queue below. Match two elements.";
         }
 
+        // The line shown when a demo combo of an element fires.
         private static string ComboText(Element element)
         {
             switch (element)
@@ -390,6 +402,7 @@ namespace SoulBind.UI
             }
         }
 
+        // Demo: Corruption rises until it hits the threshold.
         private void RenderCorruption()
         {
             int corruption = _step;
@@ -403,6 +416,7 @@ namespace SoulBind.UI
                 : $"Safe below {GameConstants.CorruptionThreshold}.";
         }
 
+        // Demo: what each special tile does.
         private void RenderTiles()
         {
             ShowChip(0, "Heal", new Color(0.20f, 0.55f, 0.30f, 1f), -260f, 30f, _step == 1);
@@ -417,6 +431,7 @@ namespace SoulBind.UI
             }
         }
 
+        // Shows one demo chip at a spot, lit when it is the active one.
         private void ShowChip(int index, string label, Color color, float x, float y, bool lit)
         {
             Chip chip = _chips[index];
@@ -439,6 +454,7 @@ namespace SoulBind.UI
 
         // ---------- Building ----------
 
+        // Builds the dim layer, the box, the tabs, the fact cards and the demo area.
         private void Build(RectTransform root)
         {
             // Dims the screen and catches every tap behind the box.
@@ -509,6 +525,7 @@ namespace SoulBind.UI
             _nextLabel = next.GetComponentInChildren<TMP_Text>();
         }
 
+        // Builds one fact card with its coloured stripe, title and text.
         private FactCard BuildFact(RectTransform box, int index)
         {
             var fact = new FactCard { Rect = NewRect("Fact" + (index + 1), box) };
@@ -557,6 +574,7 @@ namespace SoulBind.UI
             }
         }
 
+        // Builds one tappable demo chip.
         private Chip BuildChip(RectTransform demo, int index)
         {
             var chip = new Chip { Rect = NewRect("Chip" + (index + 1), demo) };
@@ -588,6 +606,7 @@ namespace SoulBind.UI
             rect.sizeDelta = new Vector2(width, height);
         }
 
+        // Builds a gothic button with a label.
         private Button NewButton(string name, RectTransform parent, string label, float size, float x, float y,
             float width, float height, UnityEngine.Events.UnityAction onClick)
         {
@@ -605,6 +624,7 @@ namespace SoulBind.UI
             return button;
         }
 
+        // Adds an Image that does not block taps.
         private static Image AddImage(GameObject go, Color color)
         {
             var image = (Image)go.AddComponent(typeof(Image));
@@ -613,6 +633,7 @@ namespace SoulBind.UI
             return image;
         }
 
+        // Creates a child RectTransform on the parent's layer.
         private static RectTransform NewRect(string name, Transform parent)
         {
             var go = new GameObject(name, typeof(RectTransform));
@@ -622,6 +643,7 @@ namespace SoulBind.UI
             return rect;
         }
 
+        // Stretches a rect to fill its parent.
         private static void Stretch(RectTransform rect)
         {
             rect.anchorMin = Vector2.zero;
@@ -630,6 +652,7 @@ namespace SoulBind.UI
             rect.offsetMax = Vector2.zero;
         }
 
+        // Creates a TextMeshPro label.
         private static TMP_Text NewText(string name, Transform parent, string text, float size, FontStyles style)
         {
             RectTransform rect = NewRect(name, parent);

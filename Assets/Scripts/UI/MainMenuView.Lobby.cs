@@ -51,6 +51,7 @@ namespace SoulBind.UI
 
         // ---------- Actions ----------
 
+        // Host only: starts the match with the chosen number of seats.
         private void StartOnline()
         {
             OnlineSession session = OnlineSession.Instance;
@@ -60,6 +61,7 @@ namespace SoulBind.UI
             _lobbyStatus.text = error ?? "Starting...";
         }
 
+        // Leaves the room and goes back to the online screen.
         private void LeaveRoom()
         {
             OnlineSession.LeaveIfActive();
@@ -67,6 +69,7 @@ namespace SoulBind.UI
             ShowScreen(Screen.Online);
         }
 
+        // Host only: changes the seat count, never below the players already in.
         private void ChangeSeats(int delta)
         {
             OnlineSession session = OnlineSession.Instance;
@@ -78,6 +81,7 @@ namespace SoulBind.UI
             _nextLobbyRead = 0f;
         }
 
+        // Copies the room code to the clipboard.
         private void CopyCode()
         {
             OnlineSession session = OnlineSession.Instance;
@@ -121,6 +125,7 @@ namespace SoulBind.UI
             DrawLobby(session, seats, joined);
         }
 
+        // True when the lobby on screen already matches the latest room state.
         private bool KeyMatches()
         {
             for (int i = 0; i < _lobbyKey.Length; i++)
@@ -131,6 +136,7 @@ namespace SoulBind.UI
             return true;
         }
 
+        // Redraws the seat cards, the code and the start button for the room.
         private void DrawLobby(OnlineSession session, int seats, int joined)
         {
             bool host = session.IsHost;
@@ -201,6 +207,7 @@ namespace SoulBind.UI
                 ShowTag(card, "READY", Kit.ReadyFill, Kit.ReadyText);
         }
 
+        // Sets a seat card's tag, such as HOST or BOT.
         private static void ShowTag(SeatCard card, string text, Color fill, Color ink)
         {
             card.Tag.text = text;
@@ -208,6 +215,7 @@ namespace SoulBind.UI
             card.TagFill.color = fill;
         }
 
+        // The host's name, or "You" when this player hosts.
         private string HostName()
         {
             for (int i = 0; i < _roomPlayers.Count; i++)
@@ -223,6 +231,7 @@ namespace SoulBind.UI
 
         // ---------- Layout ----------
 
+        // Builds the lobby screen once.
         private void BuildLobby()
         {
             RectTransform frame = Kit.CreateFrame(_root, "LobbyScreen");
@@ -257,6 +266,7 @@ namespace SoulBind.UI
             _lobbyScreen.SetActive(false);
         }
 
+        // Builds one seat card.
         private SeatCard CreateSeatCard(RectTransform frame, int index, float x, float y)
         {
             RectTransform rect = Kit.Box(frame, "Seat" + (index + 1), Kit.Panel, Kit.BronzeLine, 14f, 2f);
@@ -294,6 +304,7 @@ namespace SoulBind.UI
             return card;
         }
 
+        // Builds the match settings panel on the right.
         private void BuildMatchPanel(RectTransform frame)
         {
             RectTransform panel = Kit.Box(frame, "MatchPanel", Kit.Panel, Kit.GoldLine, 14f);

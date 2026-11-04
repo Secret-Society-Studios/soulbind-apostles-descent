@@ -10,6 +10,7 @@ namespace SoulBind.Core
         public const int TargetCorruption = 3;
         public const int PlayerCorruption = 1;
 
+        // Corrupts the target; does nothing without one.
         public override void OnPlayed(CardPlayContext context)
         {
             ApostleState target = context.Target;

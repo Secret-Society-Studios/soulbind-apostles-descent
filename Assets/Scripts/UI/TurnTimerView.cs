@@ -36,6 +36,7 @@ namespace SoulBind.UI
         private int _shownActor = -1;    // the key of the name shown, -1 = none
         private bool _shownLocal;
 
+        // Creates the turn timer on the HUD.
         public static TurnTimerView Create(RectTransform hudRoot, MatchController controller)
         {
             RectTransform rect = Kit.Box(hudRoot, "TurnTimer", new Color(0.03f, 0.02f, 0.05f, 0.9f), Kit.GoldLine, 12f, 2f);
@@ -54,6 +55,7 @@ namespace SoulBind.UI
 
         // ---------- Building ----------
 
+        // Builds the timer bar and label; hidden until a timed turn starts.
         private void Build(RectTransform root)
         {
             _group = root.gameObject.AddComponent<CanvasGroup>();

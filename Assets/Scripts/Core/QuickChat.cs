@@ -26,8 +26,10 @@ namespace SoulBind.Core
         /// <summary>How many ids there are: every line, then every emote.</summary>
         public static int Count => Lines.Length + EmoteCount;
 
+        // True for any line or emote id the chat knows.
         public static bool IsValid(int chatId) => chatId >= 0 && chatId < Count;
 
+        // True when the id is an emote rather than a text line.
         public static bool IsEmote(int chatId) => chatId >= Lines.Length && chatId < Count;
 
         /// <summary>Which emote slot an emote id is (0 to EmoteCount - 1).</summary>
@@ -58,6 +60,7 @@ namespace SoulBind.Core
             return true;
         }
 
+        // Lets everyone chat again straight away, e.g. for a new match.
         public void Clear() => Array.Clear(_nextAllowed, 0, _nextAllowed.Length);
     }
 }

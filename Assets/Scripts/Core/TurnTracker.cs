@@ -161,12 +161,13 @@ namespace SoulBind.Core
             return bestId;
         }
 
-        // ---- Snapshots (online play) ----
+        // ---------- Snapshots (online play) ----------
 
         internal IReadOnlyList<int> Seats => _seats;
         internal int SequenceCount => _sequenceCount;
         internal int SequenceIndex => _sequenceIndex;
         internal int StartSeat => _startSeat;
+        // One entry of the turn sequence, for snapshots.
         internal int GetSequenceEntry(int index) => _sequence[index];
 
         /// <summary>Sets where the turn order stands, as the host reported it.</summary>
@@ -183,6 +184,7 @@ namespace SoulBind.Core
             _sequenceIndex = sequenceIndex;
         }
 
+        // Builds the round's turn order from the start seat in the chosen direction.
         private void BuildSequence(IReadOnlyList<ApostleState> apostles)
         {
             int step = Direction == TurnDirection.Forward ? 1 : _seats.Length - 1;
@@ -202,6 +204,7 @@ namespace SoulBind.Core
             _sequenceIndex = 0;
         }
 
+        // The seat an Apostle sits in; throws when it has none.
         private int SeatOf(int apostleId)
         {
             for (int i = 0; i < _seats.Length; i++)
@@ -212,9 +215,11 @@ namespace SoulBind.Core
             throw new ArgumentException($"Apostle {apostleId} has no seat.", nameof(apostleId));
         }
 
+        // True when the Apostle is still in the match.
         private static bool IsAlive(IReadOnlyList<ApostleState> apostles, int id) =>
             !Find(apostles, id).IsEliminated;
 
+        // Looks up an Apostle by id; throws when it is missing.
         private static ApostleState Find(IReadOnlyList<ApostleState> apostles, int id)
         {
             for (int i = 0; i < apostles.Count; i++)

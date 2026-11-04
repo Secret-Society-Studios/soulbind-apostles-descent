@@ -56,6 +56,7 @@ namespace SoulBind.UI
         private float _pulseDuration;
         private float _pulseStrength;
 
+        // Creates the table effects under a parent.
         public static TableEffects Create(Transform parent)
         {
             var go = new GameObject("TableEffects");
@@ -65,6 +66,7 @@ namespace SoulBind.UI
             return effects;
         }
 
+        // Creates the aura, the dark pulse and the pooled hit effects.
         private void Build()
         {
             _aura = CreateRenderer("Aura", AuraOrder);
@@ -90,7 +92,7 @@ namespace SoulBind.UI
             _vignette.enabled = false;
         }
 
-        // ---- What other scripts call ----
+        // ---------- What other scripts call ----------
 
         /// <summary>A puff of dark smoke that spreads and fades, left behind a moving piece.</summary>
         public void Smoke(Vector3 position, float size)
@@ -169,6 +171,7 @@ namespace SoulBind.UI
             ring.transform.localScale = Vector3.one * (size * Mathf.Lerp(0.95f, 1.15f, pulse));
         }
 
+        // Shows or hides the shield glow under one Apostle.
         public void SetDefenseGlow(int index, bool visible, Vector3 position, Color color, float size)
         {
             if (index < 0 || index >= _defense.Length)
@@ -215,7 +218,7 @@ namespace SoulBind.UI
             _shakeTime = 0f;
         }
 
-        // ---- Running the effects ----
+        // ---------- Running the effects ----------
 
         private void Update()
         {
@@ -311,6 +314,7 @@ namespace SoulBind.UI
             _shaken = true;
         }
 
+        // Moves, sizes and fades one effect at time t (0 to 1).
         private void Place(Effect effect, float t)
         {
             Transform effectTransform = effect.Renderer.transform;
@@ -332,6 +336,7 @@ namespace SoulBind.UI
             effect.Renderer.color = color;
         }
 
+        // Starts an effect from the pool.
         private void Begin(Effect effect, Vector3 position, Vector3 direction, Color color, float duration,
             float startSize, float endSize, bool isSlash)
         {
@@ -353,6 +358,7 @@ namespace SoulBind.UI
             Place(effect, 0f);
         }
 
+        // A free effect from the pool, growing it only when every one is busy.
         private Effect Take(int sortingOrder)
         {
             Effect effect = null;
@@ -373,6 +379,7 @@ namespace SoulBind.UI
             return effect;
         }
 
+        // Creates a sprite renderer for an effect.
         private SpriteRenderer CreateRenderer(string name, int sortingOrder)
         {
             var go = new GameObject(name);

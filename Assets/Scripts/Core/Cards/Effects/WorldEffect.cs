@@ -8,6 +8,7 @@ namespace SoulBind.Core
     /// </summary>
     public sealed class WorldEffect : CardEffect
     {
+        // Skips everyone else's turns for the rest of the round.
         public override void OnPlayed(CardPlayContext context)
         {
             context.SkipRestOfRound();

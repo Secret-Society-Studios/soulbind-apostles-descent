@@ -65,6 +65,7 @@ namespace SoulBind.Core
         /// <summary>Total cards in a full deck (the sum of every card's Count).</summary>
         public static int DeckSize { get; } = SumCounts();
 
+        // The definition for a card id; throws for an id outside the catalog.
         public static CardDefinition Get(ArcanaId id)
         {
             int index = (int)id;
@@ -73,6 +74,7 @@ namespace SoulBind.Core
             return Cards[index];
         }
 
+        // Total copies of every card, which is the full deck size.
         private static int SumCounts()
         {
             int total = 0;

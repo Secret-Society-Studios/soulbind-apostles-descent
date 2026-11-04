@@ -27,6 +27,7 @@ namespace SoulBind.Core
             ".####..####......."
         };
 
+        // Builds the standard board from its row layout.
         public static HexBoard Create() => HexBoard.FromRows(Rows, FirstColumnQ);
     }
 }
