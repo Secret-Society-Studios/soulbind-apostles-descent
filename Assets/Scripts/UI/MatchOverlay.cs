@@ -71,6 +71,7 @@ namespace SoulBind.UI
         private GameObject _quitButton;   // the Menu button
         private GameObject _helpButton;   // the round ? button left of Chat (How to Play)
         private GameObject _menu;         // Resume / Settings / Leave Match
+        private GameObject _outPanel;     // "You are out": Keep Watching / Leave Match
         private GameObject _leaveButton;
         private GameObject _quitConfirm;
         private TMP_Text _quitText;
@@ -139,6 +140,7 @@ namespace SoulBind.UI
                 _endScreenTimer = -1f;
                 _endScreen.SetActive(false);
                 _showResultButton.SetActive(false);
+                _outPanel.SetActive(false);
                 RefreshQuit(match);
                 return;
             }
@@ -147,7 +149,11 @@ namespace SoulBind.UI
             {
                 ApostleState apostle = apostles[i];
                 if (apostle.IsEliminated && !_wasEliminated[apostle.Id])
+                {
                     QueueBanner(apostle.Id == viewer ? "You have been eliminated" : $"{Name(apostle.Id)} has been eliminated");
+                    if (apostle.Id == viewer && !match.IsOver)
+                        ShowOutPanel();
+                }
                 _wasEliminated[apostle.Id] = apostle.IsEliminated;
                 CheckSoulTile(match, apostle, viewer);
             }
@@ -260,6 +266,16 @@ namespace SoulBind.UI
             _quitConfirm.SetActive(false);
         }
 
+        // Out of the match: watch the rest, or leave now (online, the others play on).
+        private void ShowOutPanel()
+        {
+            _menu.SetActive(false);
+            _outPanel.transform.SetAsLastSibling();
+            _outPanel.SetActive(true);
+        }
+
+        private void KeepWatching() => _outPanel.SetActive(false);
+
         private void Update()
         {
             UpdateBanner(Time.unscaledDeltaTime);
@@ -353,6 +369,7 @@ namespace SoulBind.UI
 
         private void ShowEndScreen()
         {
+            _outPanel.SetActive(false);
             Match match = _controller.CurrentMatch;
             if (match == null || !match.IsOver)
                 return;
@@ -659,6 +676,40 @@ namespace SoulBind.UI
             CreateButton("StayButton", box, "Stay", new Vector2(-125f, 0f), CancelQuit);
             CreateButton("LeaveButton", box, "Leave", new Vector2(125f, 0f), MainMenu);
             _quitConfirm.SetActive(false);
+
+            BuildOutPanel(root);
+        }
+
+        // "You are out": shown once when this screen's Apostle is eliminated. Tapping outside means watch.
+        private void BuildOutPanel(RectTransform root)
+        {
+            RectTransform panel = CreateRect("OutPanel", root);
+            Stretch(panel);
+            AddImage(panel, DimColor, true);
+            Button outside = panel.gameObject.AddComponent<Button>();
+            outside.transition = Selectable.Transition.None;
+            outside.onClick.AddListener(KeepWatching);
+            _outPanel = panel.gameObject;
+
+            RectTransform box = CreateRect("Box", panel);
+            box.anchorMin = box.anchorMax = new Vector2(0.5f, 0.5f);
+            box.sizeDelta = new Vector2(640f, 300f);
+            AddImage(box, PanelColor, true);
+            Outline edge = box.gameObject.AddComponent<Outline>();
+            edge.effectColor = GoldColor;
+            edge.effectDistance = new Vector2(3f, -3f);
+
+            TMP_Text title = CreateText("Title", box, 40f, FontStyles.Bold);
+            Row(title.rectTransform, 24f, 56f);
+            title.text = "You are out";
+            title.color = GoldColor;
+            TMP_Text text = CreateText("Text", box, 24f, FontStyles.Normal);
+            Row(text.rectTransform, 90f, 80f);
+            text.text = "Watch the rest of the match, or leave now.";
+
+            CreateButton("WatchButton", box, "Keep Watching", new Vector2(-125f, 0f), KeepWatching);
+            CreateButton("LeaveButton", box, "Leave Match", new Vector2(125f, 0f), MainMenu);
+            _outPanel.SetActive(false);
         }
 
         // The Menu: dims everything; tapping outside the box means Resume.
