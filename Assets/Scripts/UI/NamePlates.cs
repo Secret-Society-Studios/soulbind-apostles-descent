@@ -132,7 +132,9 @@ namespace SoulBind.UI
                 Vector2 spot = local + new Vector2(0f, GapAbovePiece);
                 spot.x = Mathf.Clamp(spot.x, area.xMin + Width * scale / 2f, area.xMax - Width * scale / 2f);
                 spot.y = Mathf.Min(spot.y, area.yMax - Height * scale);
-                plate.Rect.anchoredPosition = spot;
+                // Only when it really moved: an unchanged plate does not redraw the HUD.
+                if ((plate.Rect.anchoredPosition - spot).sqrMagnitude > 0.25f)
+                    plate.Rect.anchoredPosition = spot;
             }
         }
 
