@@ -39,6 +39,7 @@ namespace SoulBind.UI
         private RectTransform _root;
         private Canvas _canvas;
         private TableHandsView _hands;
+        private bool _handsSearched;
         private GameObject _picker;
         private TMP_Text _muteLabel;
 
@@ -255,8 +256,11 @@ namespace SoulBind.UI
             if (cam == null || _canvas == null)
                 return;
             Camera uiCamera = _canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : _canvas.worldCamera;
-            if (_hands == null)
+            if (_hands == null && !_handsSearched)
+            {
                 _hands = FindAnyObjectByType<TableHandsView>();
+                _handsSearched = true; // searched once: the hands view is made with the scene, never later
+            }
 
             float now = Time.unscaledTime;
             for (int seat = 1; seat < _bubbles.Length; seat++)
