@@ -34,6 +34,13 @@ namespace SoulBind.UI
         private static readonly Color SoulsColor = new Color(0.95f, 0.78f, 0.35f);
         private static readonly Color CorruptionColor = new Color(0.55f, 0.30f, 0.70f);
         private static readonly Color CorruptedColor = new Color(0.85f, 0.15f, 0.30f);
+        private static readonly Color VesselColor = new Color(0.90f, 0.40f, 0.45f);
+        private static readonly Color PurifyColor = new Color(0.50f, 0.75f, 0.95f);
+        private static readonly Color FactColor = new Color(0.10f, 0.08f, 0.14f, 1f);
+        private const int MaxFacts = 4;
+        private const float FactsTop = 165f + DemoHeight + 22f; // below the demo, from the box's top
+        private const float FactHeight = 170f;
+        private const float FactGap = 14f;
 
         private enum Demo { Goal, Turn, Cards, Combos, Corruption, Tiles }
 
@@ -41,8 +48,31 @@ namespace SoulBind.UI
         {
             public string Name;
             public string Instruction;
-            public string Rules;
+            public Fact[] Facts;
             public Demo Demo;
+        }
+
+        // One key rule as a small card: a big coloured number or word, and one short line under it.
+        private sealed class Fact
+        {
+            public string Big;
+            public string Line;
+            public Color Color;
+
+            public Fact(string big, string line, Color color)
+            {
+                Big = big;
+                Line = line;
+                Color = color;
+            }
+        }
+
+        private sealed class FactCard
+        {
+            public RectTransform Rect;
+            public Image Stripe;
+            public TMP_Text Big;
+            public TMP_Text Line;
         }
 
         private sealed class Chip
@@ -63,7 +93,7 @@ namespace SoulBind.UI
         private readonly List<int> _queue = new List<int>(ChipCount); // chip indices, in play order
         private TMP_Text _instruction;
         private TMP_Text _info;
-        private TMP_Text _rules;
+        private readonly FactCard[] _facts = new FactCard[MaxFacts];
         private TMP_Text _nextLabel;
         private GameObject _back;
         private GameObject _bar;
@@ -102,61 +132,80 @@ namespace SoulBind.UI
 
         private static Tab[] BuildTabs()
         {
+            Color gold = GothicTheme.GoldBright;
             return new[]
             {
                 new Tab
                 {
                     Name = "Goal", Demo = Demo.Goal,
                     Instruction = "1. Tap the enemy to steal a Soul",
-                    Rules = $"Win by being the last Apostle standing, or by reaching {GameConstants.SoulsToAwaken} Souls: " +
-                            "you become Awakened, the Ascension tile appears, and stepping onto it wins the match. " +
-                            $"Everyone starts with {GameConstants.StartingVessel} Vessel (health); at 0 you are out.",
+                    Facts = new[]
+                    {
+                        new Fact($"{GameConstants.SoulsToAwaken} Souls", "Reach it to become Awakened, then step on the Ascension tile to win.", SoulsColor),
+                        new Fact("Last one", "Or be the last Apostle standing.", gold),
+                        new Fact($"{GameConstants.StartingVessel} Vessel", "Your health. At 0 you are out.", VesselColor),
+                    },
                 },
                 new Tab
                 {
                     Name = "Turn", Demo = Demo.Turn,
                     Instruction = "Tap each step of a turn",
-                    Rules = $"Each turn you get Capacity to spend: {GameConstants.Phase1Capacity} in Phase 1, " +
-                            $"{GameConstants.Phase2To3Capacity} in Phases 2-3, {GameConstants.Phase4PlusCapacity} after. " +
-                            $"A move costs {GameConstants.MoveCapacityCost}; cards cost their CAP. You attack at most once. " +
-                            $"Ending your turn draws {GameConstants.CardsDrawnPerTurn} card; holding more than " +
-                            $"{GameConstants.MaxHandSize} gives +{GameConstants.HandOverLimitCorruption} Corruption.",
+                    Facts = new[]
+                    {
+                        new Fact($"{GameConstants.Phase1Capacity} · {GameConstants.Phase2To3Capacity} · {GameConstants.Phase4PlusCapacity}",
+                            "Capacity each turn: Phase 1, Phases 2-3, Phase 4 on.", gold),
+                        new Fact($"{GameConstants.MoveCapacityCost} per step", "Moving costs Capacity. Cards cost their CAP.", SoulsColor),
+                        new Fact("1 attack", "At most one attack each turn.", CorruptedColor),
+                        new Fact($"+{GameConstants.CardsDrawnPerTurn} card", $"Drawn when you end your turn. Over {GameConstants.MaxHandSize} cards: +{GameConstants.HandOverLimitCorruption} Corruption.", PurifyColor),
+                    },
                 },
                 new Tab
                 {
                     Name = "Cards", Demo = Demo.Cards,
                     Instruction = "1. Tap a card to queue it   2. Tap it again to take it back",
-                    Rules = "Cards wait in the queue with their Capacity held, so you can take them back. Drag one onto " +
-                            "an adjacent enemy to attack, add more, then press ATTACK: the ATK is shared between every " +
-                            "adjacent enemy and their DEF blocks it. Each broken DEF steals " +
-                            $"{GameConstants.SoulsStolenPerAttack} Soul and gives you +{GameConstants.AttackCorruption} Corruption. " +
-                            "Without an attack, PLAY gives just their DEF and effects.",
+                    Facts = new[]
+                    {
+                        new Fact("Queue", "Tap cards to queue them. Tap again to take one back.", gold),
+                        new Fact("ATK vs DEF", "Drag onto an enemy next to you, then press ATTACK.", CorruptedColor),
+                        new Fact($"+{GameConstants.SoulsStolenPerAttack} Soul", $"For each DEF you break, plus +{GameConstants.AttackCorruption} Corruption.", SoulsColor),
+                        new Fact("PLAY", "No attack? PLAY uses just their DEF and effects.", PurifyColor),
+                    },
                 },
                 new Tab
                 {
                     Name = "Combos", Demo = Demo.Combos,
                     Instruction = "Queue two cards of the same element",
-                    Rules = "Two cards of one element in a turn trigger its combo, once: " +
-                            $"Radiance +{ElementCombo.RadianceShield} DEF, Celeste -{ElementCombo.CelesteCorruptionReduction} Corruption, " +
-                            $"Crimson +{ElementCombo.CrimsonAttack} ATK in an attack, Nocturne +{ElementCombo.NocturneCorruption} " +
-                            "Corruption to an opponent you pick. The queue glows when a combo is on.",
+                    Facts = new[]
+                    {
+                        new Fact($"+{ElementCombo.RadianceShield} DEF", "Radiance", CardView.GetElementColor(Element.Radiance)),
+                        new Fact($"-{ElementCombo.CelesteCorruptionReduction} Corr.", "Celeste", CardView.GetElementColor(Element.Celeste)),
+                        new Fact($"+{ElementCombo.CrimsonAttack} ATK", "Crimson, in an attack", CardView.GetElementColor(Element.Crimson)),
+                        new Fact($"+{ElementCombo.NocturneCorruption} Corr.", "Nocturne, to a foe you pick", CardView.GetElementColor(Element.Nocturne)),
+                    },
                 },
                 new Tab
                 {
                     Name = "Corruption", Demo = Demo.Corruption,
                     Instruction = "Tap to gain or lose Corruption",
-                    Rules = $"At {GameConstants.CorruptionThreshold} Corruption you are Corrupted: you lose " +
-                            $"{GameConstants.CorruptedDamage} Vessel each turn and cannot gain Souls (Soullocked). At " +
-                            $"{GameConstants.SevereCorruptionThreshold} it is {GameConstants.SevereCorruptionDamage} a turn. " +
-                            $"Dropping to 0 Souls adds {GameConstants.ZeroSoulCorruption} Corruption. Celeste cards and Purify tiles clean it.",
+                    Facts = new[]
+                    {
+                        new Fact($"{GameConstants.CorruptionThreshold}", $"Corrupted: -{GameConstants.CorruptedDamage} Vessel each turn, no Souls.", CorruptionColor),
+                        new Fact($"{GameConstants.SevereCorruptionThreshold}", $"Severe: -{GameConstants.SevereCorruptionDamage} Vessel each turn.", CorruptedColor),
+                        new Fact("0 Souls", $"Dropping to 0 Souls adds +{GameConstants.ZeroSoulCorruption} Corruption.", SoulsColor),
+                        new Fact("Clean it", "Celeste cards and Purify tiles lower it.", PurifyColor),
+                    },
                 },
                 new Tab
                 {
                     Name = "Tiles", Demo = Demo.Tiles,
                     Instruction = "Tap a tile to see what it does",
-                    Rules = $"Special tiles: Heal +{GameConstants.HealTileAmount} Vessel, Purify -{GameConstants.PurifyTileAmount} " +
-                            $"Corruption, Soul +{GameConstants.SoulTileAmount} Souls. Step on one to use it. Used tiles come back " +
-                            "on free tiles at the start of every Phase.",
+                    Facts = new[]
+                    {
+                        new Fact($"+{GameConstants.HealTileAmount} Vessel", "Heal tile", VesselColor),
+                        new Fact($"-{GameConstants.PurifyTileAmount} Corr.", "Purify tile", PurifyColor),
+                        new Fact($"+{GameConstants.SoulTileAmount} Souls", "Soul tile", SoulsColor),
+                        new Fact("Every Phase", "Used tiles come back on free tiles.", gold),
+                    },
                 },
             };
         }
@@ -170,7 +219,7 @@ namespace SoulBind.UI
             for (int i = 0; i < _tabImages.Length; i++)
                 _tabImages[i].color = i == _tab ? GothicTheme.StrikeButtonColor : GothicTheme.ButtonColor;
             _instruction.text = tab.Instruction;
-            _rules.text = tab.Rules;
+            ShowFacts(tab.Facts);
             _back.SetActive(_tab > 0);
             _nextLabel.text = _tab == _tabs.Length - 1 ? "Done" : "Next";
             ResetDemo();
@@ -443,12 +492,9 @@ namespace SoulBind.UI
             Place(_info.rectTransform, 0f, -DemoHeight / 2f + 26f, DemoWidth - 40f, 40f);
             _info.color = SubText;
 
-            // The rules paragraph.
-            _rules = NewText("Rules", box, "", 24f, FontStyles.Normal);
-            Place(_rules.rectTransform, 0f, -165f - DemoHeight - 90f, DemoWidth, 150f);
-            _rules.alignment = TextAlignmentOptions.TopLeft;
-            _rules.color = GothicTheme.TextColor;
-            _rules.textWrappingMode = TextWrappingModes.Normal;
+            // The key rules, as a row of small cards instead of a paragraph.
+            for (int i = 0; i < _facts.Length; i++)
+                _facts[i] = BuildFact(box, i);
 
             // Back, Close, Next.
             float y = -BoxHeight + 55f;
@@ -456,6 +502,54 @@ namespace SoulBind.UI
             NewButton("Close", box, "Close", 26f, 0f, y, 200f, 60f, Close);
             Button next = NewButton("Next", box, "Next", 26f, 300f, y, 200f, 60f, Next);
             _nextLabel = next.GetComponentInChildren<TMP_Text>();
+        }
+
+        private FactCard BuildFact(RectTransform box, int index)
+        {
+            var fact = new FactCard { Rect = NewRect("Fact" + (index + 1), box) };
+            AddImage(fact.Rect.gameObject, FactColor);
+            // A coloured stripe along the top ties the card to its colour.
+            RectTransform stripe = NewRect("Stripe", fact.Rect);
+            stripe.anchorMin = new Vector2(0f, 1f);
+            stripe.anchorMax = Vector2.one;
+            stripe.pivot = new Vector2(0.5f, 1f);
+            stripe.offsetMin = new Vector2(0f, -6f);
+            stripe.offsetMax = Vector2.zero;
+            fact.Stripe = AddImage(stripe.gameObject, Color.white);
+
+            fact.Big = NewText("Big", fact.Rect, "", 34f, FontStyles.Bold);
+            fact.Big.textWrappingMode = TextWrappingModes.NoWrap;
+            fact.Big.enableAutoSizing = true;
+            fact.Big.fontSizeMin = 20f;
+            fact.Big.fontSizeMax = 34f;
+            fact.Line = NewText("Line", fact.Rect, "", 19f, FontStyles.Normal);
+            fact.Line.color = GothicTheme.TextColor;
+            fact.Line.textWrappingMode = TextWrappingModes.Normal;
+            fact.Line.alignment = TextAlignmentOptions.Top;
+            return fact;
+        }
+
+        // Shows this tab's facts side by side, as wide as the demo panel above them.
+        private void ShowFacts(Fact[] facts)
+        {
+            int count = Mathf.Min(facts != null ? facts.Length : 0, _facts.Length);
+            float width = count > 0 ? (DemoWidth - FactGap * (count - 1)) / count : 0f;
+            for (int i = 0; i < _facts.Length; i++)
+            {
+                FactCard card = _facts[i];
+                bool used = i < count;
+                card.Rect.gameObject.SetActive(used);
+                if (!used)
+                    continue;
+                float x = -DemoWidth / 2f + width / 2f + i * (width + FactGap);
+                Place(card.Rect, x, -FactsTop - FactHeight / 2f, width, FactHeight);
+                Place(card.Big.rectTransform, 0f, FactHeight / 2f - 46f, width - 24f, 48f);
+                Place(card.Line.rectTransform, 0f, -22f, width - 28f, 84f);
+                card.Stripe.color = facts[i].Color;
+                card.Big.color = facts[i].Color;
+                card.Big.text = facts[i].Big;
+                card.Line.text = facts[i].Line;
+            }
         }
 
         private Chip BuildChip(RectTransform demo, int index)

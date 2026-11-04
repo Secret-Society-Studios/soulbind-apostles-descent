@@ -98,6 +98,18 @@ namespace SoulBind.UI
         [SerializeField] private float selectedLift = 45f;
         [SerializeField] private float moveSpeed = 14f;
 
+        [Header("Your hand: fan (like holding cards)")]
+        [Tooltip("Fans your hand in an arc, overlapping and tilted, like a hand of cards held up.")]
+        [SerializeField] private bool fanYourHand = true;
+        [Tooltip("How far the outer cards tilt, in degrees.")]
+        [SerializeField, Range(0f, 30f)] private float fanAngle = 10f;
+        [Tooltip("How much lower the outer cards sit than the middle ones, in canvas pixels.")]
+        [SerializeField, Min(0f)] private float fanDrop = 34f;
+        [Tooltip("How far apart neighbouring cards sit, as a share of a card's width (less = more overlap).")]
+        [SerializeField, Range(0.3f, 1f)] private float fanOverlap = 0.72f;
+        [Tooltip("Each card floats gently up and down, in canvas pixels. 0 = still. Off on Low graphics.")]
+        [SerializeField, Min(0f)] private float idleBob = 4f;
+
         [Header("Flights")]
         [SerializeField] private float playFlightTime = 0.4f;
         [SerializeField] private float drawFlightTime = 0.5f;
@@ -788,8 +800,31 @@ namespace SoulBind.UI
         private Vector2 SlotPosition(Seat seat, int slot, int total)
         {
             float offset = slot - (total - 1) / 2f;
-            return new Vector2(offset * Spacing(seat, total), RowY(seat));
+            var position = new Vector2(offset * Spacing(seat, total), RowY(seat));
+            // Fanned: the cards follow an arc, the outer ones lower.
+            if (IsFanned(seat))
+            {
+                float share = FanShare(slot, total);
+                position.y -= fanDrop * share * share;
+            }
+            return position;
         }
+
+        private bool IsFanned(Seat seat) => fanYourHand && seat == _yours;
+
+        // -1 for the leftmost card, 0 in the middle, 1 for the rightmost. A small hand fans less.
+        private static float FanShare(int slot, int total)
+        {
+            if (total <= 1)
+                return 0f;
+            float half = (total - 1) / 2f;
+            float spread = Mathf.Min(1f, (total - 1) / 6f);
+            return (slot - half) / half * spread;
+        }
+
+        // The tilt of a fanned card, in degrees: the left cards lean left, the right cards right.
+        private float FanAngle(Seat seat, int slot, int total) =>
+            IsFanned(seat) ? -FanShare(slot, total) * fanAngle : 0f;
 
         // Side by side with a small gap; squeezed together (overlapping) only if the row would not fit.
         private float Spacing(Seat seat, int total)
@@ -798,7 +833,8 @@ namespace SoulBind.UI
                 return 0f;
             float cardWidth = CardWidth * seat.CardScale;
             float room = seat.Root.sizeDelta.x - cardWidth - 2f * trayPadding - 16f;
-            return Mathf.Clamp(room / (total - 1), 6f, cardWidth + cardGap);
+            float widest = IsFanned(seat) ? cardWidth * fanOverlap : cardWidth + cardGap;
+            return Mathf.Clamp(room / (total - 1), 6f, widest);
         }
 
         private CardView CreateFace(Seat seat)
@@ -977,6 +1013,9 @@ namespace SoulBind.UI
 
             int total = seat.SlotCount(maxCardsShown);
             float t = 1f - Mathf.Exp(-moveSpeed * Time.unscaledDeltaTime);
+            // The gentle float is skipped on Low graphics: a still hand is not redrawn every frame.
+            bool bob = IsFanned(seat) && idleBob > 0f && _dragged == null && GraphicsQuality.AnimateUi;
+            float time = Time.unscaledTime;
             for (int k = 0; k < seat.Faces.Count && k < total; k++)
             {
                 CardView face = seat.Faces[k];
@@ -986,19 +1025,33 @@ namespace SoulBind.UI
                 bool hovered = face == _hovered || (_hasPinned && face.CardId == _pinned);
                 bool selected = matchController.HasSelectedCard && matchController.SelectedCard == face.CardId;
                 Vector2 target = SlotPosition(seat, k, total);
+                float angle = FanAngle(seat, k, total);
                 if (hovered)
+                {
+                    // A hovered card rises, straightens and grows, like picking it up.
                     target.y += hoverLift;
-                else if (selected)
-                    target.y += selectedLift;
+                    angle = 0f;
+                }
+                else
+                {
+                    if (selected)
+                        target.y += selectedLift;
+                    if (bob)
+                    {
+                        // Each card floats at its own pace, so the hand looks alive.
+                        target.y += Mathf.Sin(time * 1.7f + k * 0.9f) * idleBob;
+                        angle += Mathf.Sin(time * 1.3f + k * 1.1f) * 0.8f;
+                    }
+                }
                 float scale = seat.CardScale * (hovered ? hoverScale : 1f);
 
-                MoveCard(face.Rect, target, scale, t);
+                MoveCard(face.Rect, target, scale, angle, t);
             }
         }
 
         // Eases a card to its place. A card already there is left alone: touching it would redraw
         // the whole hand every frame, which costs a lot on a phone.
-        private void MoveCard(RectTransform rect, Vector2 target, float scale, float t)
+        private void MoveCard(RectTransform rect, Vector2 target, float scale, float angle, float t)
         {
             Vector2 position = rect.anchoredPosition;
             if ((position - target).sqrMagnitude > 0.01f)
@@ -1006,9 +1059,9 @@ namespace SoulBind.UI
             else if (position != target)
                 rect.anchoredPosition = target;
 
-            Quaternion stand = Quaternion.Euler(-YourStand, 0f, 0f);
+            Quaternion stand = Quaternion.Euler(-YourStand, 0f, angle);
             if (rect.localRotation != stand)
-                rect.localRotation = stand;
+                rect.localRotation = Quaternion.Slerp(rect.localRotation, stand, t);
 
             float current = rect.localScale.x;
             if (Mathf.Abs(current - scale) > 0.001f)

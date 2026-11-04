@@ -68,3 +68,4 @@ MonoBehaviour:
   hidePlatesOverArt: 1
   showNameOverArt: 1
   textColorOverArt: {r: 0.12, g: 0.1, b: 0.08, a: 1}
+  back: {fileID: 21300000, guid: c1d0938585ccf5941b1d823a6a485de2, type: 3}

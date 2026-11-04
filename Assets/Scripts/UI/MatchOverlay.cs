@@ -20,8 +20,8 @@ namespace SoulBind.UI
     /// (the Ascension tile appears), an Apostle loses Awakened status.
     /// End screen: who won and how, every Apostle's final Vessel, Souls and Corruption, and
     /// Play Again / View Board buttons.
-    /// During the match: a Menu button in the top-right corner (Resume, How to Play, Leave Match;
-    /// leaving asks first).
+    /// During the match: a Menu button in the top-right corner (Resume, Settings, Leave Match;
+    /// leaving asks first) and a round ? button for How to Play.
     /// MatchHud creates it at runtime on its Canvas, so it needs no setup. Display only.
     /// </summary>
     public sealed class MatchOverlay : MonoBehaviour
@@ -67,8 +67,10 @@ namespace SoulBind.UI
         private float _endScreenTimer = -1f;
         // quit button and its "are you sure?" box
         private const float QuitButtonTop = 124f;
+        private const float HelpButtonRight = 290f; // left of Chat (which ends 262 from the edge, more on phones)
         private GameObject _quitButton;   // the Menu button
-        private GameObject _menu;         // Resume / How to Play / Settings / Leave Match
+        private GameObject _helpButton;   // the round ? button left of Chat (How to Play)
+        private GameObject _menu;         // Resume / Settings / Leave Match
         private GameObject _leaveButton;
         private GameObject _quitConfirm;
         private TMP_Text _quitText;
@@ -194,6 +196,7 @@ namespace SoulBind.UI
         {
             bool running = !match.IsOver;
             _quitButton.SetActive(running);
+            _helpButton.SetActive(running);
             _leaveButton.SetActive(SceneManager.GetActiveScene().buildIndex > 0);
             if (!running)
             {
@@ -575,6 +578,21 @@ namespace SoulBind.UI
             GothicTheme.StyleButton(quitButton);
             _quitButton = quit.gameObject;
 
+            // How to Play, one tap away: a round ? on the same row, left of the Chat button.
+            RectTransform help = CreateRect("HelpButton", root);
+            help.anchorMin = help.anchorMax = new Vector2(1f, 1f);
+            help.pivot = new Vector2(1f, 1f);
+            help.anchoredPosition = new Vector2(-HelpButtonRight, -QuitButtonTop);
+            help.sizeDelta = new Vector2(56f, 56f);
+            AddImage(help, ButtonColor, true);
+            Button helpButton = help.gameObject.AddComponent<Button>();
+            helpButton.onClick.AddListener(OpenHelp);
+            TMP_Text helpLabel = CreateText("Label", help, 32f, FontStyles.Bold);
+            Stretch(helpLabel.rectTransform);
+            helpLabel.text = "?";
+            GothicTheme.StyleButton(helpButton);
+            _helpButton = help.gameObject;
+
             BuildMenu(root);
 
             // "Leave the match?": dims everything and blocks clicks. Tapping outside the box means Stay.
@@ -628,7 +646,7 @@ namespace SoulBind.UI
 
             RectTransform box = CreateRect("Box", menu);
             box.anchorMin = box.anchorMax = new Vector2(0.5f, 0.5f);
-            box.sizeDelta = new Vector2(480f, 510f);
+            box.sizeDelta = new Vector2(480f, 420f);
             AddImage(box, PanelColor, true);
             Outline edge = box.gameObject.AddComponent<Outline>();
             edge.effectColor = GoldColor;
@@ -640,9 +658,8 @@ namespace SoulBind.UI
             title.color = GoldColor;
 
             MenuButton(box, "ResumeButton", "Resume", 100f, CloseMenu);
-            MenuButton(box, "HelpButton", "How to Play", 190f, OpenHelp);
-            MenuButton(box, "SettingsButton", "Settings", 280f, OpenSettings);
-            _leaveButton = MenuButton(box, "LeaveButton", "Leave Match", 370f, AskToQuit);
+            MenuButton(box, "SettingsButton", "Settings", 190f, OpenSettings);
+            _leaveButton = MenuButton(box, "LeaveButton", "Leave Match", 280f, AskToQuit);
             _menu.SetActive(false);
         }
 
