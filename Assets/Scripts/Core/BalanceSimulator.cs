@@ -111,6 +111,7 @@ namespace SoulBind.Core
             return csv.ToString();
         }
 
+        // A copy of the card stats, biggest win lift first.
         private List<CardStat> Sorted()
         {
             var sorted = new List<CardStat>(Cards);
@@ -118,6 +119,7 @@ namespace SoulBind.Core
             return sorted;
         }
 
+        // Formats part / whole as a percentage, or "-" when there is nothing to divide by.
         private static string Percent(int part, int whole) =>
             whole > 0 ? $"{100.0 * part / whole:0.0}%" : "-";
     }
@@ -177,6 +179,7 @@ namespace SoulBind.Core
                 Fired = new bool[players + 1, ElementCombo.ElementCount];
             }
 
+            // Resets the per-match counters so the tally can be reused without allocating.
             public void Clear()
             {
                 Array.Clear(Played, 0, Played.Length);
@@ -185,6 +188,7 @@ namespace SoulBind.Core
             }
         }
 
+        // Plays one full bot match from the seed and adds what happened to the report.
         private static void PlayOne(IBot bot, int players, int seed, BalanceReport report, Tally tally)
         {
             HexBoard board = StandardBoard.Create();
@@ -255,6 +259,7 @@ namespace SoulBind.Core
             }
         }
 
+        // Adds one Apostle's result for one card to its stats.
         private static void Count(CardStat stat, bool played, bool had, bool won)
         {
             int win = won ? 1 : 0;

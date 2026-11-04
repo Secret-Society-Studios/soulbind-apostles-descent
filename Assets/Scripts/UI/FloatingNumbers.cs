@@ -31,6 +31,7 @@ namespace SoulBind.UI
         private float _rise = 0.9f;
         private float _fontSize = 5f;
 
+        // Creates a pool of floating numbers under a parent.
         public static FloatingNumbers Create(Transform parent, float duration, float rise, float fontSize)
         {
             var go = new GameObject("FloatingNumbers");
@@ -68,6 +69,7 @@ namespace SoulBind.UI
             Place(popup, 0f);
         }
 
+        // A free popup from the pool, growing it only when every popup is busy.
         private Popup Take()
         {
             for (int i = 0; i < _popups.Count; i++)
@@ -134,6 +136,7 @@ namespace SoulBind.UI
             }
         }
 
+        // Floats a number up the screen and fades it at time t (0 to 1).
         private void Place(Popup popup, float t)
         {
             Camera cam = Camera.main;

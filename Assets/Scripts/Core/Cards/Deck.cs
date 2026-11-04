@@ -92,6 +92,7 @@ namespace SoulBind.Core
             return true;
         }
 
+        // Puts a played card on the discard pile.
         public void Discard(ArcanaId card)
         {
             RequireKnown(card);
@@ -112,6 +113,7 @@ namespace SoulBind.Core
                 _discardPile.Add(discardPile[i]);
         }
 
+        // Moves the discard pile back into the draw pile and shuffles it once the draw pile runs dry.
         private void ReshuffleDiscardPile()
         {
             _drawPile.AddRange(_discardPile);
@@ -131,6 +133,7 @@ namespace SoulBind.Core
             }
         }
 
+        // Guards against a card id that is not in the catalog.
         private static void RequireKnown(ArcanaId card)
         {
             if ((int)card >= CardCatalog.All.Count)

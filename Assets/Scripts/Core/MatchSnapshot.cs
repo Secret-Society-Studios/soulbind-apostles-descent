@@ -80,8 +80,9 @@ namespace SoulBind.Core
         /// <summary>The last Wheel of Fortune swap, as this viewer may see it (cards only if they took part).</summary>
         public CardSwap LastSwap;
 
-        // ---- Bytes ----
+        // ---------- Bytes ----------
 
+        // Packs the snapshot into bytes for the network.
         public byte[] ToBytes()
         {
             using (var stream = new MemoryStream(512))
@@ -283,14 +284,17 @@ namespace SoulBind.Core
             }
         }
 
+        // Writes a tile as two shorts.
         private static void WriteHex(BinaryWriter w, HexCoord tile)
         {
             w.Write((short)tile.Q);
             w.Write((short)tile.R);
         }
 
+        // Reads a tile written by WriteHex.
         private static HexCoord ReadHex(BinaryReader r) => new HexCoord(r.ReadInt16(), r.ReadInt16());
 
+        // Writes a card list as a count byte followed by one byte per card.
         private static void WriteCards(BinaryWriter w, List<ArcanaId> cards)
         {
             w.Write((byte)cards.Count);
@@ -298,6 +302,7 @@ namespace SoulBind.Core
                 w.Write((byte)card);
         }
 
+        // Reads a card list and rejects any card id the catalog does not know.
         private static void ReadCards(BinaryReader r, List<ArcanaId> cards)
         {
             int count = r.ReadByte();
@@ -310,6 +315,7 @@ namespace SoulBind.Core
             }
         }
 
+        // Writes small ints (0 to 255) as a count byte followed by one byte each.
         private static void WriteBytes(BinaryWriter w, List<int> values)
         {
             w.Write((byte)values.Count);
@@ -317,6 +323,7 @@ namespace SoulBind.Core
                 w.Write((byte)value);
         }
 
+        // Reads a list written by WriteBytes.
         private static void ReadBytes(BinaryReader r, List<int> values)
         {
             int count = r.ReadByte();

@@ -104,6 +104,7 @@ namespace SoulBind.UI
             return _boardCenter != null ? _boardCenter.position : Vector3.zero;
         }
 
+        // Glides toward the target, keeping any pan until the avatar moves.
         private void Follow(float delta)
         {
             Vector3 target = GetTarget();
@@ -130,6 +131,7 @@ namespace SoulBind.UI
 
         // ---------- Swipes ----------
 
+        // Reads the mouse wheel and touch swipes that pan and turn the camera.
         private void ReadSwipes()
         {
             Mouse mouse = Mouse.current;
@@ -199,12 +201,14 @@ namespace SoulBind.UI
         /// <summary>How far, in screen pixels, a finger may wobble and still count as a tap.</summary>
         public static float TapSlop() => DragThreshold();
 
+        // How far a finger must move before a tap counts as a swipe, scaled by screen DPI.
         private static float DragThreshold()
         {
             float dpi = Screen.dpi > 0f ? Screen.dpi : 96f;
             return Mathf.Max(10f, dpi * 0.08f);
         }
 
+        // True when the pointer is over a UI element, so swipes there do not move the camera.
         private static bool IsOverUi() =>
             EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
     }

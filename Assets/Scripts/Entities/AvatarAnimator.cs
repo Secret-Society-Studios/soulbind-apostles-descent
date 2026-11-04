@@ -40,6 +40,7 @@ namespace SoulBind.Entities
 
         public Renderer Renderer => _renderer;
 
+        // Adds the renderer and starts the idle clip.
         private void Build(AvatarSkin skin, Color color, int sortingOrder)
         {
             _skin = skin;
@@ -135,6 +136,7 @@ namespace SoulBind.Entities
             Play(clip, frames, _skin.WalkFps, true);
         }
 
+        // Goes back to the looping idle clip.
         private void PlayIdle() => Play(Clip.Idle, _skin.Idle, _skin.IdleFps, true);
 
         // An empty clip (art not in yet) falls back to idle, so nothing ever disappears.
@@ -155,6 +157,7 @@ namespace SoulBind.Entities
             ShowFrame();
         }
 
+        // Shows the frame for the current clip time, only touching the renderer when it changes.
         private void ShowFrame()
         {
             int index = (int)(_time * _fps);

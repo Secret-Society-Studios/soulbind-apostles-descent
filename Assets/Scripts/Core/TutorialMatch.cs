@@ -38,6 +38,7 @@ namespace SoulBind.Core
             public HexCoord EnemyTile;
         }
 
+        // Builds the scripted tutorial match: fixed seats, hands and deck order.
         public static Setup Create(HexBoard board, Random random)
         {
             if (board == null)
@@ -93,6 +94,7 @@ namespace SoulBind.Core
             return top;
         }
 
+        // Takes one copy of a card out of the deck for a scripted hand.
         private static ArcanaId Take(List<ArcanaId> cards, ArcanaId card)
         {
             if (!cards.Remove(card))

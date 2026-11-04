@@ -119,6 +119,7 @@ namespace SoulBind.Core
             return new List<HexCoord>(_picks);
         }
 
+        // True when someone already picked this tile.
         private bool IsTaken(HexCoord tile)
         {
             for (int i = 0; i < _picks.Length; i++)
@@ -129,6 +130,7 @@ namespace SoulBind.Core
             return false;
         }
 
+        // True when the tile touches a tile someone already picked.
         private bool IsNextToPick(HexCoord tile)
         {
             for (int i = 0; i < _picks.Length; i++)

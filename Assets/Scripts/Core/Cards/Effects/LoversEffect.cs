@@ -13,6 +13,7 @@ namespace SoulBind.Core
         public override int GetAttackPreview(int phase, int sameBefore) =>
             sameBefore % 2 == 1 ? PairBonus : 0;
 
+        // Gives a bonus when a second Lovers completes a pair in the same attack.
         public override void OnPlayed(CardPlayContext context)
         {
             if (!context.IsAttacking)

@@ -61,6 +61,7 @@ namespace SoulBind.UI
         public event Action<CardView, PointerEventData> Dragged;
         public event Action<CardView, PointerEventData> DragEnded;
 
+        // Fills the card face with a card's art, cost and stats.
         public void Show(CardDefinition card)
         {
             CardId = card.Id;
@@ -139,6 +140,7 @@ namespace SoulBind.UI
                 capText.text = card.Cap.ToString();
         }
 
+        // Remembers the prefab's colours once so dimming can restore them.
         private void SaveColors()
         {
             if (_colorsSaved)
@@ -171,12 +173,14 @@ namespace SoulBind.UI
             }
         }
 
+        // Turns a graphic on or off when it exists.
         private static void SetGraphic(Graphic graphic, bool enabled)
         {
             if (graphic != null)
                 graphic.enabled = enabled;
         }
 
+        // Shows an icon sprite, hiding the image when there is none.
         private static bool ShowIcon(Image icon, Sprite sprite)
         {
             if (icon == null)
@@ -187,6 +191,7 @@ namespace SoulBind.UI
             return sprite != null;
         }
 
+        // Turns a group of graphics on or off.
         private static void SetEnabled(Graphic[] graphics, bool enabled)
         {
             if (graphics == null)
@@ -198,22 +203,27 @@ namespace SoulBind.UI
             }
         }
 
+        // Shows or hides the selected glow.
         public void SetSelected(bool selected)
         {
             if (highlight != null)
                 highlight.enabled = selected;
         }
 
+        // Greys the card out when it cannot be played.
         public void SetDimmed(bool dimmed)
         {
             if (dimOverlay != null)
                 dimOverlay.enabled = dimmed;
         }
 
+        // Tells the hand the pointer is over this card.
         public void OnPointerEnter(PointerEventData eventData) => HoverStarted?.Invoke(this);
 
+        // Tells the hand the pointer has left this card.
         public void OnPointerExit(PointerEventData eventData) => HoverEnded?.Invoke(this);
 
+        // A left click picks this card.
         public void OnPointerClick(PointerEventData eventData)
         {
             if (eventData.button == PointerEventData.InputButton.Left)
@@ -227,12 +237,14 @@ namespace SoulBind.UI
                 DragStarted?.Invoke(this, eventData);
         }
 
+        // Passes the drag on to the hand while the left button is held.
         public void OnDrag(PointerEventData eventData)
         {
             if (eventData.button == PointerEventData.InputButton.Left)
                 Dragged?.Invoke(this, eventData);
         }
 
+        // Tells the hand the drag ended, so it can drop or return the card.
         public void OnEndDrag(PointerEventData eventData)
         {
             if (eventData.button == PointerEventData.InputButton.Left)
@@ -251,6 +263,7 @@ namespace SoulBind.UI
             }
         }
 
+        // Short element label shown until the medallion art is in.
         private static string GetElementInitial(SoulBind.Core.Element element)
         {
             switch (element)

@@ -194,6 +194,7 @@ namespace SoulBind.UI
         // Away from the island's centre line, level with the board.
         private static Vector3 Outward(Vector3 point) => new Vector3(point.x, point.y, 0f);
 
+        // Points from the island's middle to a triangle's centre, to tell which way it faces.
         private static Vector3 Away(List<Vector3> vertices, Vector3 middle, int a, int b, int c) =>
             (vertices[a] + vertices[b] + vertices[c]) / 3f - middle;
 
@@ -214,6 +215,7 @@ namespace SoulBind.UI
             triangles.Add(c);
         }
 
+        // Packs the lists into a mesh and works out its bounds.
         private static Mesh Finish(string name, List<Vector3> vertices, List<Vector2> uvs, List<Color> colors,
             List<int> triangles)
         {

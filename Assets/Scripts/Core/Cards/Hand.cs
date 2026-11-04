@@ -17,8 +17,10 @@ namespace SoulBind.Core
         /// <summary>True when the hand holds more than the maximum (7).</summary>
         public bool IsOverLimit => _cards.Count > GameConstants.MaxHandSize;
 
+        // Adds a drawn card to the hand.
         public void Add(ArcanaId card) => _cards.Add(card);
 
+        // True when the hand holds at least one copy of the card.
         public bool Contains(ArcanaId card) => _cards.Contains(card);
 
         /// <summary>Removes one copy of the card. Returns false if the hand does not hold it.</summary>

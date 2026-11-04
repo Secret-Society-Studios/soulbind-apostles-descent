@@ -51,6 +51,7 @@ namespace SoulBind.UI
         private int _turnOwner = -1;
         private int _turnRound = -1;
 
+        // Creates the combo tracker on the HUD, below another panel when given.
         public static ComboTracker Create(RectTransform hudRoot, MatchController controller, RectTransform below)
         {
             var go = new GameObject("ComboTracker", typeof(RectTransform), typeof(CanvasGroup));
@@ -85,6 +86,7 @@ namespace SoulBind.UI
                 _controller.StateChanged -= Refresh;
         }
 
+        // Builds the panel and one box per element.
         private void Build(RectTransform root)
         {
             Image panel = root.gameObject.AddComponent<Image>();
@@ -169,6 +171,7 @@ namespace SoulBind.UI
                 _boxes[(int)SoulBind.Core.Element.Nocturne].Background.rectTransform.localScale = Vector3.one;
         }
 
+        // Shows how many cards of an element were played, or ACTIVE once the combo fires.
         private void Show(Box box, int played, bool triggered)
         {
             Color dim = Color.Lerp(new Color(0.05f, 0.04f, 0.07f), box.Color, played == 1 ? 0.3f : 0.12f);
@@ -218,8 +221,9 @@ namespace SoulBind.UI
             }
         }
 
-        // ---- Layout helpers (positions from the top-left corner, in pixels) ----
+        // ---------- Layout helpers (positions from the top-left corner, in pixels) ----------
 
+        // Creates a child RectTransform on the parent's layer.
         private static RectTransform NewRect(string name, Transform parent)
         {
             var go = new GameObject(name, typeof(RectTransform));
@@ -229,6 +233,7 @@ namespace SoulBind.UI
             return rect;
         }
 
+        // Places a rect from the top-left corner, in pixels.
         private static void Place(RectTransform rect, float x, float y, float width, float height)
         {
             rect.anchorMin = rect.anchorMax = new Vector2(0f, 1f);
@@ -237,6 +242,7 @@ namespace SoulBind.UI
             rect.sizeDelta = new Vector2(width, height);
         }
 
+        // Creates a TextMeshPro label.
         private static TMP_Text NewText(string name, Transform parent, string text, float size, FontStyles style)
         {
             RectTransform rect = NewRect(name, parent);

@@ -10,6 +10,7 @@ namespace SoulBind.Core
         public const int ShieldBonus = 2;
         public const int HealAmount = 1;
 
+        // Adds shield and heals the player.
         public override void OnPlayed(CardPlayContext context)
         {
             context.Player.AddShield(ShieldBonus);

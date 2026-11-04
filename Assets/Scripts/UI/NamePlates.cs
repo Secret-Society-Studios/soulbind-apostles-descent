@@ -59,6 +59,7 @@ namespace SoulBind.UI
         private TableHandsView _hands;
         private bool _handsSearched;
 
+        // Creates the name plates on the HUD.
         public static NamePlates Create(RectTransform hudRoot, MatchController controller)
         {
             var go = new GameObject("NamePlates", typeof(RectTransform));
@@ -141,6 +142,7 @@ namespace SoulBind.UI
             }
         }
 
+        // True while the Apostle is still in a running match.
         private bool IsAlive(int apostleId)
         {
             Match match = _controller.CurrentMatch;
@@ -198,6 +200,7 @@ namespace SoulBind.UI
             }
         }
 
+        // Looks up an Apostle by id, or null when it is missing.
         private static ApostleState FindApostle(Match match, int id)
         {
             IReadOnlyList<ApostleState> apostles = match.Battlefield.Apostles;
@@ -222,6 +225,7 @@ namespace SoulBind.UI
             fill.anchorMax = new Vector2(fraction, 1f);
         }
 
+        // True when bar fills should keep the game's colours instead of the skin's art.
         private static bool KeepsGameColours(Image fill)
         {
             UiSkin skin = UiSkin.Current;
@@ -240,6 +244,7 @@ namespace SoulBind.UI
 
         // ---------- Building ----------
 
+        // Builds one plate per Apostle, smaller on phones.
         private void Build(Match match)
         {
             float scale = Application.isMobilePlatform ? PhoneScale : 1f;
@@ -258,6 +263,7 @@ namespace SoulBind.UI
                 skin.ApplyToPortrait(_plates[i].Rect);
         }
 
+        // Builds one plate that sits above an Apostle's piece.
         private Plate BuildPlate(int apostleId)
         {
             var plate = new Plate { ApostleId = apostleId };
@@ -347,6 +353,7 @@ namespace SoulBind.UI
 
         // ---------- Layout helpers (positions from the top-left corner, in pixels) ----------
 
+        // Adds an Image that does not block taps.
         private static Image AddImage(GameObject go)
         {
             var image = (Image)go.AddComponent(typeof(Image));
@@ -354,6 +361,7 @@ namespace SoulBind.UI
             return image;
         }
 
+        // Creates a child RectTransform on the parent's layer.
         private static RectTransform NewRect(string name, Transform parent)
         {
             var go = new GameObject(name, typeof(RectTransform));
@@ -363,6 +371,7 @@ namespace SoulBind.UI
             return rect;
         }
 
+        // Places a rect from the top-left corner, in pixels.
         private static void Place(RectTransform rect, float x, float y, float width, float height)
         {
             rect.anchorMin = rect.anchorMax = new Vector2(0f, 1f);
@@ -371,6 +380,7 @@ namespace SoulBind.UI
             rect.sizeDelta = new Vector2(width, height);
         }
 
+        // Stretches a rect to fill its parent.
         private static void Stretch(RectTransform rect)
         {
             rect.anchorMin = Vector2.zero;
@@ -379,6 +389,7 @@ namespace SoulBind.UI
             rect.offsetMax = Vector2.zero;
         }
 
+        // Creates a TextMeshPro label.
         private static TMP_Text NewText(string name, Transform parent, string text, float size, FontStyles style)
         {
             RectTransform rect = NewRect(name, parent);

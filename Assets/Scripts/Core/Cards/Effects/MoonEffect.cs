@@ -10,6 +10,7 @@ namespace SoulBind.Core
         public const int CorruptionForFailedAttack = 2;
         public const int DurationTurns = 1;
 
+        // For a few turns, an attack on the player that fails corrupts the attacker.
         public override void OnPlayed(CardPlayContext context)
         {
             context.Player.AddTimedEffect(TimedEffectKind.FailedAttackCorruption,

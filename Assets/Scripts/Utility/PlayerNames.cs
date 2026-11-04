@@ -1,5 +1,4 @@
 using System;
-using System.Security.Claims;
 using System.Text;
 using SoulBind.Core;
 using UnityEngine;
@@ -43,12 +42,14 @@ namespace SoulBind.Utility
             return named ? Names[apostleId] : $"Apostle {apostleId}";
         }
 
+        // Stores a cleaned name for a seat.
         public static void Set(int apostleId, string name)
         {
             if (apostleId > 0 && apostleId < Names.Length)
                 Names[apostleId] = Clean(name);
         }
 
+        // Forgets every name, e.g. for a new match.
         public static void Clear() => Array.Clear(Names, 0, Names.Length);
 
         /// <summary>All names in one string, to send online.</summary>
@@ -94,7 +95,7 @@ namespace SoulBind.Utility
             return text.ToString();
         }
 
+        // Letters, digits, spaces and a few safe symbols only.
         public static bool IsAllowed(char c) => char.IsLetterOrDigit(c) || c == ' ' || c == '-' || c == '_' || c == '.' || c == '\'';
     }
-    
 }

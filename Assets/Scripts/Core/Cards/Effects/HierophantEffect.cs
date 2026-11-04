@@ -13,6 +13,7 @@ namespace SoulBind.Core
 
         public override int AttackBonus => Bonus;
 
+        // Grants a timed defence bonus, and its attack bonus when played outside an attack.
         public override void OnPlayed(CardPlayContext context)
         {
             context.Player.AddTimedEffect(TimedEffectKind.Defense, Bonus, DurationTurns);

@@ -279,7 +279,6 @@ namespace SoulBind.EditorTools
             so.FindProperty("glow").objectReferenceValue = glow;
             so.ApplyModifiedPropertiesWithoutUndo();
             return view;
-
         }
 
         /// <summary>
@@ -750,7 +749,7 @@ namespace SoulBind.EditorTools
             Stretch(text.rectTransform, 0f, 0f, 0f, 0f);
         }
 
-        // ---- Small layout helpers ----
+        // ---------- Small layout helpers ----------
 
         private static RectTransform CreateRect(string name, Transform parent)
         {

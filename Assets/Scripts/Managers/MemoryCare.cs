@@ -32,6 +32,7 @@ namespace SoulBind.Managers
             SceneManager.sceneLoaded -= OnSceneLoaded;
         }
 
+        // The old scene's art is no longer used, so free it.
         private static void OnSceneLoaded(Scene scene, LoadSceneMode mode) => CleanUp();
 
         /// <summary>Lets go of unused art and runs the garbage collector. A short pause: never call it mid-turn.</summary>

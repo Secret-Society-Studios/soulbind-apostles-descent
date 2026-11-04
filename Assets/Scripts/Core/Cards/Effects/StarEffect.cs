@@ -11,6 +11,7 @@ namespace SoulBind.Core
         public const int DefenseBonus = 4;
         public const int DurationRounds = 2;
 
+        // Heals the player and grants defence for a few rounds.
         public override void OnPlayed(CardPlayContext context)
         {
             context.Player.Heal(HealAmount);

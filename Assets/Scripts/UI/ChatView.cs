@@ -56,6 +56,7 @@ namespace SoulBind.UI
             public float ShownAt = -1f; // -1 = hidden
         }
 
+        // Creates the quick chat on the HUD.
         public static ChatView Create(RectTransform hudRoot, MatchController controller)
         {
             var go = new GameObject("QuickChat", typeof(RectTransform));
@@ -81,6 +82,7 @@ namespace SoulBind.UI
 
         // ---------- Building ----------
 
+        // Builds the chat button, the picker and one bubble per seat.
         private void Build()
         {
             float scale = Application.isMobilePlatform ? PhoneScale : 1f;
@@ -103,6 +105,7 @@ namespace SoulBind.UI
                 _bubbles[seat] = BuildBubble(seat, scale);
         }
 
+        // Fills the picker with the chat lines, emotes and the mute toggle.
         private void BuildPicker(RectTransform picker)
         {
             TMP_Text title = Kit.Label(picker, "Title", "QUICK CHAT", 13f, Kit.InterBold, Kit.Muted,
@@ -147,6 +150,7 @@ namespace SoulBind.UI
             ShowMute();
         }
 
+        // Builds the speech bubble shown over one seat's Apostle.
         private Bubble BuildBubble(int seat, float scale)
         {
             RectTransform rect = Kit.Box(_root, "Bubble " + seat, new Color(0.96f, 0.92f, 0.85f, 0.97f), Kit.Gold, 18f, 2f);
@@ -174,6 +178,7 @@ namespace SoulBind.UI
             return bubble;
         }
 
+        // Adds an emote picture inside a parent.
         private static Image AddEmoteImage(RectTransform parent, Sprite art, float inset)
         {
             RectTransform rect = Kit.Stretch(Kit.CreateRect("Art", parent), inset);
@@ -195,6 +200,7 @@ namespace SoulBind.UI
 
         // ---------- Picking ----------
 
+        // Opens or closes the picker, on top of everything else.
         private void TogglePicker()
         {
             bool open = !_picker.activeSelf;
@@ -203,18 +209,21 @@ namespace SoulBind.UI
                 _picker.transform.SetAsLastSibling();
         }
 
+        // Sends a chat line or emote and closes the picker.
         private void Say(int chatId)
         {
             _picker.SetActive(false);
             _controller.SayChat(chatId);
         }
 
+        // Mutes or unmutes everyone else's chat.
         private void ToggleMute()
         {
             ChatSettings.MuteOthers = !ChatSettings.MuteOthers;
             ShowMute();
         }
 
+        // Shows the current mute state on the toggle.
         private void ShowMute()
         {
             _muteLabel.text = ChatSettings.MuteOthers ? "Other players: muted (tap to unmute)" : "Mute other players";
@@ -300,6 +309,7 @@ namespace SoulBind.UI
             return point.z > 0f;
         }
 
+        // Hides a bubble and marks it as free.
         private static void Hide(Bubble bubble)
         {
             bubble.ShownAt = -1f;

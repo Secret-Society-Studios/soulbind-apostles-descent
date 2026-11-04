@@ -58,6 +58,7 @@ namespace SoulBind.UI
         /// <summary>Raised with the Apostle's id when the portrait is left-clicked.</summary>
         public event Action<int> Clicked;
 
+        // Sets up the panel for one Apostle: id, colour stripe and name.
         public void Initialize(int apostleId, Color color)
         {
             ApostleId = apostleId;
@@ -104,9 +105,9 @@ namespace SoulBind.UI
                 statsText.alignment = TextAlignmentOptions.Right;
         }
 
+        // The Image on a bar fill, or null when the bar is missing.
         private static Image FillImage(RectTransform fill) =>
             fill != null ? (Image)fill.GetComponent(typeof(Image)) : null;
-        
 
         /// <summary>Swaps the placeholder color square for the Apostle's portrait.</summary>
         public void SetPortrait(Sprite portrait)
@@ -184,6 +185,7 @@ namespace SoulBind.UI
             return fill.type != Image.Type.Filled || skin == null || skin.TintFills;
         }
 
+        // A left click on the panel selects that Apostle.
         public void OnPointerClick(PointerEventData eventData)
         {
             if (eventData.button == PointerEventData.InputButton.Left)

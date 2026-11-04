@@ -187,6 +187,7 @@ namespace SoulBind.UI
             return tile;
         }
 
+        // Builds the big card preview on the Collections screen.
         private void BuildPreview(RectTransform frame)
         {
             RectTransform box = Kit.Box(frame, "Preview", Kit.Inset, Kit.GoldLine, 12f);
@@ -212,6 +213,7 @@ namespace SoulBind.UI
                 GalleryColumns * (TileWidth + TileGap) - TileGap, 22f);
         }
 
+        // Shows a card in the preview with its art, stats and text.
         private void ShowCard(ArcanaId id)
         {
             CardDefinition card = CardCatalog.Get(id);
@@ -240,6 +242,7 @@ namespace SoulBind.UI
 
         // ---------- Settings ----------
 
+        // Builds the Settings screen: graphics, volume and chat.
         private void BuildSettings()
         {
             RectTransform frame = BuildSubScreen("SettingsScreen", "Settings");
@@ -260,12 +263,14 @@ namespace SoulBind.UI
             SettingsPanel.Build(column, 0f, 150f, 500f);
         }
 
+        // Mutes or unmutes other players' chat for every match.
         private void ToggleChatMute()
         {
             ChatSettings.MuteOthers = !ChatSettings.MuteOthers;
             ShowChatMute();
         }
 
+        // Shows the current chat mute state.
         private void ShowChatMute()
         {
             _chatMuteLabel.text = ChatSettings.MuteOthers ? "Match chat: other players muted" : "Match chat: on";

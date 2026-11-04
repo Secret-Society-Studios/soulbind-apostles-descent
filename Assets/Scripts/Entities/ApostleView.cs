@@ -34,6 +34,7 @@ namespace SoulBind.Entities
 
         public int ApostleId { get; private set; }
 
+        // Sets up the piece for one Apostle: id, art and colour.
         public void Initialize(int apostleId, Sprite sprite, Color color)
         {
             ApostleId = apostleId;

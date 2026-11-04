@@ -9,6 +9,7 @@ namespace SoulBind.Core
     /// </summary>
     public static class PhaseRules
     {
+        // Which Phase a round belongs to, starting at 1.
         public static int GetPhase(int roundNumber)
         {
             if (roundNumber < 1)
@@ -17,6 +18,7 @@ namespace SoulBind.Core
             return (roundNumber - 1) / GameConstants.RoundsPerPhase + 1;
         }
 
+        // Capacity every Apostle gets per turn in a Phase.
         public static int GetBaseCapacity(int phase)
         {
             if (phase < 1)
@@ -29,6 +31,7 @@ namespace SoulBind.Core
             return GameConstants.Phase4PlusCapacity;
         }
 
+        // Base Capacity for the Phase that a round falls in.
         public static int GetBaseCapacityForRound(int roundNumber) =>
             GetBaseCapacity(GetPhase(roundNumber));
     }

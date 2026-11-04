@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 
-
 namespace SoulBind.Core
 {
     /// <summary>
@@ -51,12 +50,12 @@ namespace SoulBind.Core
             ApostleState me = match.CurrentApostle;
             if (me == null)
                 return BotAction.None;
-            
+
             switch (match.Engagement)
             {
                 case EngagementState.Engaged:
                     return DecideWhileEngaged(match);
-                
+
                 case EngagementState.Free:
                     return DecideWhileFree(match, me);
 
@@ -99,12 +98,12 @@ namespace SoulBind.Core
                     return true;
                 default:
                     return false;
-                
             }
         }
 
-        // ---- Engaged: add ATK until the attack is lethal (or nothing more is affordable), then Strike ----
+        // ---------- Engaged: add ATK until the attack is lethal (or nothing more is affordable), then Strike ----------
 
+        // While attacking: add cards until the hit is lethal or nothing fits, then strike.
         private BotAction DecideWhileEngaged(Match match)
         {
             ApostleState target = FindById(match, match.EngagedTargetId);
@@ -114,8 +113,9 @@ namespace SoulBind.Core
             return BotAction.Strike;
         }
 
-        // ---- Free: chase, attack, look after itself, play the rest ----
+        // ---------- Free: chase, attack, look after itself, play the rest ----------
 
+        // While free: heal, chase Souls or pick a target, depending on the board.
         private BotAction DecideWhileFree(Match match, ApostleState me)
         {
             AscensionTracker ascension = match.Ascension;
@@ -123,7 +123,7 @@ namespace SoulBind.Core
             ApostleState awakenedFoe = ascension.HasAwakened && !iAmAwakened ? FindById(match, ascension.AwakenedId) : null;
             if (awakenedFoe != null && awakenedFoe.IsEliminated)
                 awakenedFoe = null;
-            
+
             // 1. The Awakened bot walks to the Ascension tile.
             if (iAmAwakened && TryStepToward(match, me, ascension.Tile, 0, out HexCoord ascensionStep))
                 return BotAction.Move(ascensionStep);
@@ -148,7 +148,6 @@ namespace SoulBind.Core
             {
                 int potential = AffordableAttack(match);
                 return BotAction.PlayCard(attackCard, MostDangerous(_targets, match.Ascension.AwakenedId, potential).Id, 0);
-
             }
 
             // 4. Look after itself on the way: a nearby special tile it needs.
@@ -171,7 +170,7 @@ namespace SoulBind.Core
             return BotAction.EndTurn;
         }
 
-        // ---- Choosing targets ----
+        // ---------- Choosing targets ----------
 
         // How much this bot wants to hit this Apostle now. potentialAttack = the most ATK its affordable
         // cards add up to this turn, to spot targets it can eliminate.
@@ -185,6 +184,7 @@ namespace SoulBind.Core
             return score;
         }
 
+        // The target with the highest priority score.
         private static ApostleState MostDangerous(List<ApostleState> targets, int awakenedId, int potentialAttack)
         {
             ApostleState best = targets[0];
@@ -201,7 +201,7 @@ namespace SoulBind.Core
             return best;
         }
 
-        // the oppoonent most worth walking toward: dangerous and not too far away.
+        // The opponent most worth walking toward: dangerous and not too far away.
         private static ApostleState BestToHunt(Match match, ApostleState me)
         {
             int awakenedId = match.Ascension.AwakenedId;
@@ -223,7 +223,7 @@ namespace SoulBind.Core
             return best;
         }
 
-        // ---- Special tiles ----
+        // ---------- Special tiles ----------
 
         // A step toward the nearest special tile this Apostle needs now, if one is close enough.
         private bool TryStepToNeededTile(Match match, ApostleState me, out HexCoord step)
@@ -254,7 +254,7 @@ namespace SoulBind.Core
             return found && TryStepToward(match, me, goal, 0, out step);
         }
 
-        // ---- Cards ----
+        // ---------- Cards ----------
 
         // The affordable card with the most ATK (withAttack), or the affordable card with the most DEF
         // among cards without ATK (!withAttack).
@@ -291,7 +291,7 @@ namespace SoulBind.Core
                     _caps.Add(i);
             }
 
-            // strongest first (a few cards at most, so a simple sort is fine)
+            // Strongest first (a few cards at most, so a simple sort is fine).
             _caps.Sort((a, b) => CardAttack.Of(hand[b]).CompareTo(CardAttack.Of(hand[a])));
 
             int total = 0;
@@ -306,6 +306,7 @@ namespace SoulBind.Core
             return total;
         }
 
+        // The lowest Capacity cost of any attack card in hand.
         private static int CheapestAttackCap(Match match)
         {
             int cheapest = 0;
@@ -323,7 +324,7 @@ namespace SoulBind.Core
             return cheapest;
         }
 
-        // ---- Moving ----
+        // ---------- Moving ----------
 
         // A legal step that gets strictly closer to the goal, stopping once within stopDistance.
         private bool TryStepToward(Match match, ApostleState me, HexCoord goal, int stopDistance, out HexCoord step)
@@ -347,6 +348,7 @@ namespace SoulBind.Core
             return best < current;
         }
 
+        // Looks up an Apostle by id, or null for id 0 or a missing one.
         private static ApostleState FindById(Match match, int id)
         {
             if (id == 0)

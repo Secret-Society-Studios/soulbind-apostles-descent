@@ -52,6 +52,7 @@ namespace SoulBind.Core
             Rarity = GetRarity(count); // also rejects a count below 1
         }
 
+        // Rarity comes from how many copies of the card are in the deck.
         public static CardRarity GetRarity(int count)
         {
             if (count < 1)

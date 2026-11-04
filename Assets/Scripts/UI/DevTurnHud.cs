@@ -146,6 +146,7 @@ namespace SoulBind.UI
             _directionPressed = false;
         }
 
+        // Draws the developer turn panel with IMGUI (editor testing only).
         private void OnGUI()
         {
             if (matchController == null)
@@ -284,6 +285,7 @@ namespace SoulBind.UI
             _nocturneLabel = $"Nocturne combo target: A{_nocturneTargetId}  (click to change)";
         }
 
+        // Moves the Nocturne combo target on to the next opponent.
         private void CycleNocturneTarget()
         {
             if (_opponentIds.Count == 0)
@@ -293,6 +295,7 @@ namespace SoulBind.UI
             _nocturneLabel = $"Nocturne combo target: A{_nocturneTargetId}  (click to change)";
         }
 
+        // Draws one button per card in the local hand.
         private void DrawHandButtons()
         {
             _attackMode = GUILayout.Toggle(_attackMode, " Attack with ATK cards (lowest-Id adjacent target)");
@@ -314,6 +317,7 @@ namespace SoulBind.UI
             }
         }
 
+        // Rebuilds the cached text and labels when the match changes, not every frame.
         private void Rebuild()
         {
             Match match = matchController.CurrentMatch;

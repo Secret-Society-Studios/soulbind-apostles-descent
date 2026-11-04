@@ -28,6 +28,7 @@ namespace SoulBind.UI
             return panel;
         }
 
+        // Builds the Graphics and Volume rows.
         private void BuildRows(RectTransform root, float width)
         {
             float control = width - LabelWidth - 20f;
@@ -58,20 +59,24 @@ namespace SoulBind.UI
         // Volume is saved to disk when the rows close, not on every slider step.
         private void OnDisable() => GameAudio.Save();
 
+        // Moves to the next graphics level and shows it.
         private void CycleGraphics()
         {
             GraphicsQuality.Cycle();
             _graphics.text = GraphicsQuality.ShortLabel;
         }
 
+        // Sets the master volume from the slider.
         private void SetVolume(float volume)
         {
             GameAudio.Volume = volume;
             ShowPercent(volume);
         }
 
+        // Shows the volume as a percentage, without allocating a string.
         private void ShowPercent(float volume) => _percent.SetText("{0}%", Mathf.RoundToInt(volume * 100f));
 
+        // Builds a row label on the left.
         private static void RowLabel(RectTransform root, string name, string text, float y)
         {
             TMP_Text label = Kit.Label(root, name, text, 20f, Kit.InterSemiBold, Kit.Soft, TextAlignmentOptions.Left);
@@ -119,6 +124,7 @@ namespace SoulBind.UI
             popup.transform.SetAsLastSibling();
         }
 
+        // Builds the in-match Settings popup once.
         private static GameObject Create(Transform canvasRoot)
         {
             // A dim layer over everything; tapping outside the box closes it.
@@ -145,6 +151,7 @@ namespace SoulBind.UI
             return dim.gameObject;
         }
 
+        // Hides the popup.
         private void Close() => gameObject.SetActive(false);
     }
 }

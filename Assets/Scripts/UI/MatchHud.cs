@@ -91,7 +91,7 @@ namespace SoulBind.UI
                 // The island, fire sea and sky around the board (art slots in Resources/MapSkin).
                 MapBackdrop.Create(matchController.BoardView);
                 // Which element combos are building up or active this turn, under the turn info.
-                
+
                 // The cards of the attack in progress, on the right edge.
                 PlayQueue.Create((RectTransform)transform, matchController);
                 // A plate above every piece: name, Souls, Vessel, Corruption and DEF.
@@ -124,6 +124,7 @@ namespace SoulBind.UI
             KeepBoardClearOfHud();
         }
 
+        // Builds the panels once the match exists, then keeps them up to date.
         private void Refresh()
         {
             Match match = matchController != null ? matchController.CurrentMatch : null;
@@ -169,6 +170,7 @@ namespace SoulBind.UI
             ScaleFromCorner(playerSlot, new Vector2(1f, 0f), scale);
         }
 
+        // Scales a HUD piece from one corner so it stays against the screen edge.
         private static void ScaleFromCorner(RectTransform rect, Vector2 pivot, float scale)
         {
             if (rect == null)
@@ -195,6 +197,7 @@ namespace SoulBind.UI
                 opponentRow.anchoredPosition += new Vector2(mobileEdgeInset, 0f);
         }
 
+        // Creates one panel per Apostle: yours in its slot, the others in the opponent row.
         private void CreatePanels(Match match)
         {
             if (panelPrefab == null || opponentRow == null || playerSlot == null)
@@ -212,7 +215,7 @@ namespace SoulBind.UI
                     panel.SetPortrait(apostleArt.GetPortrait(apostle.Id));
                 GothicTheme.StylePortrait(panel); // after the portrait art, so the gold frame sits on top
 
-                // a ring in the apostle's colour around the portrait: the same colour as their disc and their hand
+                // A ring in the Apostle's colour around the portrait: the same colour as their disc and their hand
                 Transform portrait = panel.transform.Find("Portrait");
                 if (portrait != null && portrait.GetComponent<Graphic>() != null)
                 {
@@ -235,6 +238,7 @@ namespace SoulBind.UI
                 matchController.ChooseComboTarget(apostleId);
         }
 
+        // Shows the round, the Phase and whose turn it is.
         private void ShowTurnInfo(Match match)
         {
             if (roundText != null)

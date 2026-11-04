@@ -9,6 +9,7 @@ namespace SoulBind.Core
     /// </summary>
     public sealed class WheelOfFortuneEffect : CardEffect
     {
+        // Swaps a random card with the picked (or engaged) Apostle.
         public override void OnPlayed(CardPlayContext context)
         {
             ApostleState other = context.PickedTarget ?? context.Target;

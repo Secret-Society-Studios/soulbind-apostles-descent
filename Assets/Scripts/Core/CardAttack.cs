@@ -7,6 +7,7 @@ namespace SoulBind.Core
     /// </summary>
     public static class CardAttack
     {
+        // The card's printed attack plus any flat bonus its effect adds.
         public static int Of(ArcanaId card)
         {
             CardEffect effect = CardEffects.Get(card);

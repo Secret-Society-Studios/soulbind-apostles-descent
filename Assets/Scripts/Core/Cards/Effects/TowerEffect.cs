@@ -10,6 +10,7 @@ namespace SoulBind.Core
         public const int DurationTurns = 1;
         public const int DelayTurns = 1;
 
+        // Lowers every other living Apostle's Capacity on their coming turns.
         public override void OnPlayed(CardPlayContext context)
         {
             for (int i = 0; i < context.Apostles.Count; i++)

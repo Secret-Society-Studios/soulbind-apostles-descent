@@ -47,6 +47,7 @@ namespace SoulBind.UI
             viewer.transform.SetAsLastSibling();
         }
 
+        // Puts a card's front and back art on the viewer and resets the spin.
         private void Show(CardDefinition card)
         {
             CardArtLibrary art = CardArtLibrary.Current;
@@ -83,6 +84,7 @@ namespace SoulBind.UI
             Apply();
         }
 
+        // Turns the card and shows whichever face points at the camera.
         private void Apply()
         {
             _yaw = Mathf.Repeat(_yaw, 360f);
@@ -99,12 +101,14 @@ namespace SoulBind.UI
                 _plain.SetActive(plain);
         }
 
+        // Stops the free spin while the player drags.
         public void OnBeginDrag(PointerEventData eventData)
         {
             _dragging = true;
             _spin = 0f;
         }
 
+        // Turns the card with the drag and remembers the speed for the spin after release.
         public void OnDrag(PointerEventData eventData)
         {
             float turn = eventData.delta.x * DragSpin;
@@ -114,6 +118,7 @@ namespace SoulBind.UI
             _spin = Mathf.Lerp(_spin, -turn / delta, 0.5f); // keeps the flick's speed for the let-go
         }
 
+        // Lets go: the card keeps spinning at the drag speed and slows down.
         public void OnEndDrag(PointerEventData eventData)
         {
             _dragging = false;
@@ -130,10 +135,12 @@ namespace SoulBind.UI
             Close();
         }
 
+        // Hides the viewer.
         private void Close() => gameObject.SetActive(false);
 
         // ---------- Building ----------
 
+        // Builds the viewer once: a dim layer, the card with two faces, and a hint.
         private static CardViewer360 Create(RectTransform frame)
         {
             // A dim layer over the whole screen: it catches drags anywhere, so spinning is easy on a phone.
@@ -183,6 +190,7 @@ namespace SoulBind.UI
             return viewer;
         }
 
+        // Adds one face of the card as a stretched image.
         private static Image AddFace(RectTransform card, string name)
         {
             RectTransform rect = Kit.Stretch(Kit.CreateRect(name, card));

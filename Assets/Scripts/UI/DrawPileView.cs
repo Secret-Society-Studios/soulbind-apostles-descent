@@ -35,7 +35,6 @@ namespace SoulBind.UI
         [Header("Art (optional: empty keeps the placeholder back)")]
         [SerializeField] private Sprite cardBackSprite;
 
-
         [Header("Stack")]
         [Tooltip("One card edge is drawn for every this many cards, so a full deck looks thick.")]
         [SerializeField, Range(1, 20)] private int cardsPerLayer = 6;
@@ -146,6 +145,7 @@ namespace SoulBind.UI
                 canvas.sortingOrder = 55;
         }
 
+        // Creates one card back layer of the pile.
         private RectTransform CreateLayer(int index)
         {
             RectTransform layer = Instantiate(cardBackTemplate, stack);
@@ -171,6 +171,7 @@ namespace SoulBind.UI
             }
         }
 
+        // Shows a pile height that matches the cards left to draw.
         private void Refresh()
         {
             if (_layers.Count == 0)

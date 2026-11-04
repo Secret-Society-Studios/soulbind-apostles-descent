@@ -148,6 +148,7 @@ namespace SoulBind.UI
 
         private void OnValidate() => _byCard = null; // rebuilt after edits in the Inspector
 
+        // Builds an array indexed by card id so lookups are fast and allocation free.
         private void BuildLookup()
         {
             int size = 0;

@@ -46,6 +46,7 @@ namespace SoulBind.UI
             Outline    // dark purple, bright gold border, Montserrat capitals
         }
 
+        // A colour from a 0xRRGGBB number.
         public static Color Hex(uint rgb) => new Color(
             ((rgb >> 16) & 0xFF) / 255f, ((rgb >> 8) & 0xFF) / 255f, (rgb & 0xFF) / 255f);
 
@@ -92,6 +93,7 @@ namespace SoulBind.UI
             _interBold = Make("Fonts/Inter-Bold") ?? _interSemiBold;
         }
 
+        // Makes a TextMeshPro font from a font in Resources, or null when it is missing.
         private static TMP_FontAsset Make(string path)
         {
             Font font = Resources.Load<Font>(path);
@@ -139,6 +141,7 @@ namespace SoulBind.UI
 
         // ---------- Building blocks ----------
 
+        // Creates a child RectTransform on the parent's layer.
         public static RectTransform CreateRect(string name, Transform parent)
         {
             var go = new GameObject(name, typeof(RectTransform));
@@ -172,6 +175,7 @@ namespace SoulBind.UI
                 popup.AddComponent<GraphicRaycaster>();
         }
 
+        // Stretches a rect to fill its parent, with an optional inset.
         public static RectTransform Stretch(RectTransform rect, float inset = 0f)
         {
             rect.anchorMin = Vector2.zero;
@@ -220,6 +224,7 @@ namespace SoulBind.UI
             return rect;
         }
 
+        // Creates a TextMeshPro label with a font, colour and alignment.
         public static TMP_Text Label(Transform parent, string name, string text, float size, TMP_FontAsset font,
             Color color, TextAlignmentOptions align = TextAlignmentOptions.Center)
         {
@@ -301,6 +306,7 @@ namespace SoulBind.UI
         // Drawn at twice the design size (Image.pixelsPerUnitMultiplier = 2) so edges stay smooth.
         private const float Detail = 2f;
 
+        // A rounded box sprite, cached per corner radius.
         private static Sprite RoundedFill(float radius)
         {
             int key = Mathf.RoundToInt(radius * Detail);
@@ -311,6 +317,7 @@ namespace SoulBind.UI
             return sprite;
         }
 
+        // A rounded outline sprite, cached per radius and width.
         private static Sprite RoundedRing(float radius, float width)
         {
             int r = Mathf.RoundToInt(radius * Detail);

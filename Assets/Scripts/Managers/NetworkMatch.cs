@@ -92,11 +92,11 @@ namespace SoulBind.Online
             StartMatch();
         }
 
+        // Seats everyone who is ready, starts the match on the host and tells each client its seat.
         private void StartMatch()
         {
             _started = true;
             int seats = Mathf.Clamp(Mathf.Max(MatchSettings.PlayerCount, _ready.Count + 1), 2, GameConstants.MaxPlayers);
-
 
             // Seats in the order the players connected. The host is seat 1.
             int next = 2;
@@ -126,9 +126,6 @@ namespace SoulBind.Online
             }
             NamesRpc(PlayerNames.Pack());
 
-            
-
-
             // Seats first, so each player knows who they are before the first snapshot arrives.
             foreach (KeyValuePair<ulong, int> pair in _seatByClient)
                 AssignSeatRpc(pair.Value, seats, RpcTarget.Single(pair.Key, RpcTargetUse.Temp));
@@ -136,8 +133,9 @@ namespace SoulBind.Online
             controller.StartOnlineHost(seats, _remoteSeats); // its first MatchChanged sends the snapshots
         }
 
-        // ---- Host to players ----
+        // ---------- Host to players ----------
 
+        // Sends every player its own view of the match (hidden hands stay hidden).
         private void SendSnapshots()
         {
             if (controller.CurrentMatch == null)
@@ -147,12 +145,14 @@ namespace SoulBind.Online
                 SendSnapshot(pair.Key, pair.Value);
         }
 
+        // Sends one player its view of the match.
         private void SendSnapshot(ulong clientId, int seat)
         {
             byte[] bytes = controller.CurrentMatch.CaptureSnapshot(seat, _sequence).ToBytes();
             SnapshotRpc(bytes, RpcTarget.Single(clientId, RpcTargetUse.Temp));
         }
 
+        // Host to one client: your seat, or 0 when the match is full or already started.
         [Rpc(SendTo.SpecifiedInParams)]
         private void AssignSeatRpc(int seat, int seats, RpcParams rpcParams)
         {
@@ -162,14 +162,14 @@ namespace SoulBind.Online
                 controller.StartOnlineClient(seat, seats);
         }
 
+        // Host to one client: the latest match state.
         [Rpc(SendTo.SpecifiedInParams)]
         private void SnapshotRpc(byte[] bytes, RpcParams rpcParams)
         {
             controller.ReceiveSnapshot(bytes);
-            
         }
 
-        // the host and the bots pick on the host, so it sends every pick to everyone.
+        // The host and the bots pick on the host, so it sends every pick to everyone.
         private void SendDraft()
         {
             int[] data = controller.GetDraftData();
@@ -177,14 +177,16 @@ namespace SoulBind.Online
                 DraftRpc(data);
         }
 
+        // Host to everyone: the spawn picks so far.
         [Rpc(SendTo.NotServer)]
         private void DraftRpc(int[] data)
         {
             controller.ReceiveDraft(data);
         }
 
-        // ---- Players to host ----
+        // ---------- Players to host ----------
 
+        // Client to host: I am ready, with my name and protocol version.
         [Rpc(SendTo.Server)]
         private void ClientReadyRpc(string playerName, int protocol, RpcParams rpcParams = default)
         {
@@ -205,18 +207,21 @@ namespace SoulBind.Online
             _ready.Add(sender);
         }
 
+        // Host to everyone: every seat's name.
         [Rpc(SendTo.NotServer)]
         private void NamesRpc(string packed)
         {
             PlayerNames.Unpack(packed);
         }
 
+        // Packs a command into the reused buffer and sends it to the host.
         private void SendCommand(MatchCommand command)
         {
             command.Encode(_commandBytes, 0);
             SubmitCommandRpc(_commandBytes);
         }
 
+        // Client to host: a command. The host checks the size and the seat before running it.
         [Rpc(SendTo.Server)]
         private void SubmitCommandRpc(byte[] bytes, RpcParams rpcParams = default)
         {
@@ -240,12 +245,13 @@ namespace SoulBind.Online
             }
         }
 
+        // Sends a spawn pick to the host.
         private void SendSpawn(HexCoord tile)
         {
             PickSpawnRpc(tile.Q, tile.R);
         }
 
-        // the seat comes from the connection, never from the message.
+        // The seat comes from the connection, never from the message.
         [Rpc(SendTo.Server)]
         private void PickSpawnRpc(int q, int r, RpcParams rpcParams = default)
         {
@@ -253,10 +259,10 @@ namespace SoulBind.Online
             if (!_seatByClient.TryGetValue(sender, out int seat) || !Allow(sender))
                 return;
             if (!controller.ApplyRemoteSpawn(seat, new HexCoord(q, r)))
-                Debug.Log($"NetworkMatch: APostle {seat}'s starting tile was refused.");
+                Debug.Log($"NetworkMatch: Apostle {seat}'s starting tile was refused.");
         }
 
-        // ---- Quick chat ----
+        // ---------- Quick chat ----------
 
         // Player: only the chat id goes to the host.
         private void SendChat(int chatId)
@@ -279,13 +285,14 @@ namespace SoulBind.Online
             ChatRpc((byte)seat, (byte)chatId);
         }
 
+        // Host to everyone: a chat line from a seat.
         [Rpc(SendTo.NotServer)]
         private void ChatRpc(byte seat, byte chatId)
         {
             controller.ShowRemoteChat(seat, chatId);
         }
 
-        // ---- Flood control (host) ----
+        // ---------- Flood control (host) ----------
 
         private const float MessagesPerSecond = 8f; // a tap-walk sends about 3 a second
         private const float Burst = 16f;            // messages allowed at once after a quiet spell
@@ -319,6 +326,7 @@ namespace SoulBind.Online
             return false;
         }
 
+        // A client may ask for a fresh snapshot at most once per ResyncGap.
         private bool CanResync(ulong clientId)
         {
             float now = Time.unscaledTime;
@@ -329,6 +337,7 @@ namespace SoulBind.Online
             return true;
         }
 
+        // The client's message budget, created on first use.
         private Budget GetBudget(ulong clientId, float now)
         {
             if (!_budgets.TryGetValue(clientId, out Budget budget))
@@ -348,6 +357,7 @@ namespace SoulBind.Online
             NetworkManager.DisconnectClient(clientId, reason);
         }
 
+        // Forgets a client that left and frees its seat.
         private void OnClientDisconnected(ulong clientId)
         {
             _budgets.Remove(clientId);

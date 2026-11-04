@@ -76,6 +76,7 @@ namespace SoulBind.UI
         private Button _attack;
         private TMP_Text _attackLabel;
 
+        // Creates the play queue panel on the HUD.
         public static PlayQueue Create(RectTransform hudRoot, MatchController controller)
         {
             var go = new GameObject("PlayQueue", typeof(RectTransform));
@@ -105,6 +106,7 @@ namespace SoulBind.UI
 
         // ---------- Building ----------
 
+        // Builds the panel, the queued card rows, the element chips and the button.
         private void Build(RectTransform root)
         {
             Image panel = AddImage(root.gameObject);
@@ -163,6 +165,7 @@ namespace SoulBind.UI
                 _controller.PlayQueued();
         }
 
+        // Builds one queued card row.
         private Row BuildRow(RectTransform root, int index)
         {
             float inner = Width - 2f * Pad;
@@ -232,6 +235,7 @@ namespace SoulBind.UI
             return row;
         }
 
+        // Builds one element chip that counts toward a combo.
         private Chip BuildChip(RectTransform root, int element)
         {
             var chip = new Chip
@@ -326,6 +330,7 @@ namespace SoulBind.UI
             _root.sizeDelta = new Vector2(Width, y + Pad);
         }
 
+        // Fills a row with a queued card's number, name and attack.
         private static void ShowRow(Row row, int index, CardDefinition card, int attack, bool combo)
         {
             Color element = CardView.GetElementColor(card.Element);
@@ -365,6 +370,7 @@ namespace SoulBind.UI
 
         // ---------- Layout helpers (positions from the top-left corner, in pixels) ----------
 
+        // Adds an Image that does not block taps.
         private static Image AddImage(GameObject go)
         {
             var image = (Image)go.AddComponent(typeof(Image));
@@ -372,6 +378,7 @@ namespace SoulBind.UI
             return image;
         }
 
+        // Creates a child RectTransform on the parent's layer.
         private static RectTransform NewRect(string name, Transform parent)
         {
             var go = new GameObject(name, typeof(RectTransform));
@@ -381,6 +388,7 @@ namespace SoulBind.UI
             return rect;
         }
 
+        // Places a rect from the top-left corner, in pixels.
         private static void Place(RectTransform rect, float x, float y, float width, float height)
         {
             rect.anchorMin = rect.anchorMax = new Vector2(0f, 1f);
@@ -389,6 +397,7 @@ namespace SoulBind.UI
             rect.sizeDelta = new Vector2(width, height);
         }
 
+        // Stretches a rect to fill its parent.
         private static void Stretch(RectTransform rect)
         {
             rect.anchorMin = Vector2.zero;
@@ -397,6 +406,7 @@ namespace SoulBind.UI
             rect.offsetMax = Vector2.zero;
         }
 
+        // Creates a TextMeshPro label.
         private static TMP_Text NewText(string name, Transform parent, string text, float size, FontStyles style)
         {
             RectTransform rect = NewRect(name, parent);

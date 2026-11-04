@@ -166,6 +166,7 @@ namespace SoulBind.UI
             Begin(flight, from, Quaternion.Euler(0f, 0f, fromAngle), fromScale, duration, landed);
         }
 
+        // Starts a flight from where the card is now.
         private void Begin(Flight flight, Vector3 from, Quaternion fromRotation, float fromScale, float duration, Action landed)
         {
             flight.From = from;
@@ -268,6 +269,7 @@ namespace SoulBind.UI
             }
         }
 
+        // Moves a flying card along its path at time t (0 to 1).
         private void Place(Flight flight, float t)
         {
             if (flight.IsPlay)
@@ -305,7 +307,7 @@ namespace SoulBind.UI
                     flight.Back.gameObject.SetActive(flight.StartFaceDown);
             }
         }
-    
+
         // Lift (ease out), hang with a slow drift (an opponent's card turns face-up here), then drop
         // (ease in, so it lands with weight).
         private void PlacePlay(Flight flight, float t)
@@ -393,6 +395,7 @@ namespace SoulBind.UI
             PlaceEmber(ember, 0f);
         }
 
+        // Moves every live ember and retires the ones that have faded.
         private void UpdateEmbers(float delta)
         {
             for (int i = 0; i < _embers.Count; i++)
@@ -412,6 +415,7 @@ namespace SoulBind.UI
             }
         }
 
+        // Sizes, moves and fades one ember at time t (0 to 1).
         private void PlaceEmber(Ember ember, float t)
         {
             float lossy = Mathf.Max(0.0001f, transform.lossyScale.y);

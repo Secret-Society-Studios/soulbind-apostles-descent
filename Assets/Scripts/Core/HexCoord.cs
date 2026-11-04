@@ -66,6 +66,7 @@ namespace SoulBind.Core
             return new HexCoord(q, r);
         }
 
+        // The tile next to this one in a direction from 0 to 5.
         public HexCoord Neighbor(int direction)
         {
             if (direction < 0 || direction >= DirectionCount)
@@ -75,6 +76,7 @@ namespace SoulBind.Core
             return new HexCoord(Q + d.Q, R + d.R);
         }
 
+        // All six neighbours, on or off the board. Allocates, so keep it out of per-frame code.
         public HexCoord[] GetNeighbors()
         {
             var result = new HexCoord[DirectionCount];
@@ -83,6 +85,7 @@ namespace SoulBind.Core
             return result;
         }
 
+        // Steps between two tiles on an axial hex grid.
         public static int Distance(HexCoord a, HexCoord b)
         {
             int dq = a.Q - b.Q;
@@ -90,6 +93,7 @@ namespace SoulBind.Core
             return (Math.Abs(dq) + Math.Abs(dr) + Math.Abs(dq + dr)) / 2;
         }
 
+        // True when the two tiles touch.
         public static bool AreAdjacent(HexCoord a, HexCoord b) => Distance(a, b) == 1;
 
         public bool Equals(HexCoord other) => Q == other.Q && R == other.R;

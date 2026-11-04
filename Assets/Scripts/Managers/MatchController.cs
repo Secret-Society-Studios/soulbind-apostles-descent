@@ -6,7 +6,6 @@ using SoulBind.Utility;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
-using UnityEngine.InputSystem.Composites;
 
 namespace SoulBind.Managers
 {
@@ -92,7 +91,7 @@ namespace SoulBind.Managers
 
         /// <summary>On a player who joined online: an action to send to the host.</summary>
         public event System.Action<MatchCommand> CommandSubmitted;
-        
+
         /// <summary>Host: a starting tile was picked (NetworkMatch tells the players).</summary>
         public event System.Action DraftChanged;
 
@@ -134,7 +133,7 @@ namespace SoulBind.Managers
             return null;
         }
 
-        // ---- Turn timer (read by the HUD) ----
+        // ---------- Turn timer (read by the HUD) ----------
 
         private TurnTimer _turnTimer;
 
@@ -153,7 +152,7 @@ namespace SoulBind.Managers
         /// <summary>The Soul tile the tutorial asks the player to walk to first.</summary>
         public HexCoord TutorialTarget { get; private set; }
 
-        // ---- Tutorial (set by TutorialGuide) ----
+        // ---------- Tutorial (set by TutorialGuide) ----------
 
         private TutorialActions _tutorialAllowed = TutorialActions.All;
 
@@ -176,7 +175,7 @@ namespace SoulBind.Managers
             _moveGoal = goal;
         }
 
-        // ---- Walking to a tile further away ----
+        // ---------- Walking to a tile further away ----------
 
         private const float WalkStepTimeout = 3f; // online: give up if the host has not shown a step by then
         private readonly List<HexCoord> _walkPath = new List<HexCoord>(16);
@@ -187,7 +186,7 @@ namespace SoulBind.Managers
         /// <summary>True while the piece walks, one tile at a time, toward a tile further away.</summary>
         public bool IsWalking => _walkPath.Count > 0;
 
-        // ---- Hand play state (read by the HUD) ----
+        // ---------- Hand play state (read by the HUD) ----------
 
         /// <summary>True while an ATK card is selected and waiting for a target click.</summary>
         public bool HasSelectedCard { get; private set; }
@@ -271,7 +270,7 @@ namespace SoulBind.Managers
         private bool _statsTaken;
         private FloatingNumbers _numbers;
 
-        // ---- Whose screen this is ----
+        // ---------- Whose screen this is ----------
 
         /// <summary>
         /// The Apostle whose hand and portrait this screen shows. Fixed while bots play the other seats;
@@ -413,6 +412,7 @@ namespace SoulBind.Managers
             }
         }
 
+        // Creates the match from the chosen spawns (and seat order, online) and shows it.
         private void StartMatch(List<HexCoord> spawns, int[] seatOrder)
         {
             _draft = null;
@@ -435,7 +435,7 @@ namespace SoulBind.Managers
             AfterMatchChange();
         }
 
-        // ---- Online (called by NetworkMatch) ----
+        // ---------- Online (called by NetworkMatch) ----------
 
         /// <summary>
         /// Host: starts the match. This screen is Apostle 1; remoteSeats are the players who joined;
@@ -463,7 +463,7 @@ namespace SoulBind.Managers
                 return;
             }
 
-            // everyone picks a starting tile in turn order, as offline.
+            // Everyone picks a starting tile in turn order, as offline.
             _seatOrder = TurnTracker.CreateRandomSeatOrder(playerCount, _random);
             _draft = new SpawnDraft(boardView.Board, _seatOrder);
             _botWait = botTurnStartDelay + botActionDelay;
@@ -513,7 +513,7 @@ namespace SoulBind.Managers
                 return;
             _lastSequence = snapshot.Sequence;
 
-            // the match has started, so the tile is over.
+            // The match has started, so the tile is over.
             _draft = null;
             if (CurrentMatch == null)
                 CurrentMatch = Match.FromSnapshot(boardView.Board, snapshot);
@@ -585,10 +585,10 @@ namespace SoulBind.Managers
                     _pendingDraft = data;
                 return;
             }
-            // once the match exists, snapshots take over.
+            // Once the match exists, snapshots take over.
             if (CurrentMatch != null || data == null || data.Length < playerCount)
                 return;
-            
+
             _seatOrder = new int[playerCount];
             System.Array.Copy(data, _seatOrder, playerCount);
             _draft = new SpawnDraft(boardView.Board, _seatOrder);
@@ -603,7 +603,7 @@ namespace SoulBind.Managers
 
             if (_draft.IsComplete)
             {
-                // the host's first snapshot starts the match.
+                // The host's first snapshot starts the match.
                 _draft = null;
                 boardView.ClearHighlights();
                 ShowOnlineMessage("Starting...");
@@ -623,8 +623,6 @@ namespace SoulBind.Managers
             return true;
         }
 
-        
-
         /// <summary>Shows a line in the hint area while there is no match to describe.</summary>
         public void ShowOnlineMessage(string message)
         {
@@ -632,9 +630,11 @@ namespace SoulBind.Managers
             StateChanged?.Invoke();
         }
 
+        // True when a remote player, not this machine, sits in the seat (host only).
         private bool IsRemoteSeat(int apostleId) =>
             _online == OnlineRole.Host && apostleId > 0 && apostleId < _remoteSeat.Length && _remoteSeat[apostleId];
 
+        // True when the local Apostle holds the card.
         private bool HandContains(ArcanaId card)
         {
             IReadOnlyList<ArcanaId> hand = CurrentMatch.GetHand(localApostleId);
@@ -765,6 +765,7 @@ namespace SoulBind.Managers
                 _numbers.Show(boardView.GetWorldPosition(tile) + Vector3.up * 0.3f, "Tap again to move", Color.white);
         }
 
+        // Forgets the first tap of a two-tap move.
         private void ClearMoveTarget()
         {
             if (!_hasMoveTarget)
@@ -781,7 +782,7 @@ namespace SoulBind.Managers
             RefreshAttackMarks();
         }
 
-        // ---- Playing cards from the hand (the real UI) ----
+        // ---------- Playing cards from the hand (the real UI) ----------
 
         /// <summary>
         /// Why this card cannot be played right now, or null if it can. Shown when hovering a dimmed card.
@@ -835,7 +836,7 @@ namespace SoulBind.Managers
                 return;
             }
 
-            // only one enemy in reach: there is nothing to choose, so attack it straight away.
+            // Only one enemy in reach: there is nothing to choose, so attack it straight away.
             if (_attackTargets.Count == 1)
             {
                 PlayFromHand(card, _attackTargets[0].Id, 0);
@@ -955,13 +956,14 @@ namespace SoulBind.Managers
             }
         }
 
-
+        // True when the Apostle is in reach of an attack this turn.
         private bool IsAttackTarget(ApostleState apostle)
         {
             CurrentMatch.GetAttackTargets(_attackTargets);
             return _attackTargets.Contains(apostle);
         }
 
+        // Plays a card from the hand, asking for a combo target first when the card needs one.
         private void PlayFromHand(ArcanaId card, int targetId, int comboTargetId)
         {
             int playerId = CurrentMatch.CurrentApostle.Id;
@@ -994,6 +996,7 @@ namespace SoulBind.Managers
                 Debug.Log($"MatchController: Apostle {playerId} played {CardCatalog.Get(card).Name}.");
         }
 
+        // Walks the local Apostle to a tile on its turn.
         public void TryMove(HexCoord destination)
         {
             if (!IsLocalTurn)
@@ -1073,6 +1076,7 @@ namespace SoulBind.Managers
                 SendWalkStep();
         }
 
+        // Stops the step-by-step walk.
         private void StopWalk()
         {
             _walkPath.Clear();
@@ -1206,6 +1210,7 @@ namespace SoulBind.Managers
                 AfterStateChange();
         }
 
+        // Ends the local Apostle's turn.
         public void EndTurn()
         {
             if (!IsLocalTurn)
@@ -1218,6 +1223,7 @@ namespace SoulBind.Managers
                 AfterStateChange();
         }
 
+        // Starts the next Phase in the chosen direction, for the Apostle whose pick it is.
         public void BeginNextPhase(TurnDirection direction)
         {
             if (!IsLocalPhaseChooser)
@@ -1261,19 +1267,18 @@ namespace SoulBind.Managers
         }
 #endif
 
-        // ---- Picking starting tiles ----
+        // ---------- Picking starting tiles ----------
 
         // Whoever picks now: a person clicks a highlighted edge tile; a bot picks a random one after a pause.
         private void UpdateSpawnDraft()
         {
-            
             int picker = _draft.CurrentPickerId;
             if (picker == 0)
                 return;
 
             if (botsPlayOthers && picker != localApostleId)
             {
-                // online, people pick for themselves: wait for them.
+                // Online, people pick for themselves: wait for them.
                 if (_online == OnlineRole.Client || IsRemoteSeat(picker))
                     return;
                 _botWait -= Time.deltaTime;
@@ -1328,6 +1333,7 @@ namespace SoulBind.Managers
             return (screenPoint - _tapStart).sqrMagnitude <= slop * slop;
         }
 
+        // Takes a spawn pick during the draft and moves on to the next picker.
         private void PickSpawn(HexCoord tile)
         {
             int picker = _draft.CurrentPickerId;
@@ -1350,7 +1356,7 @@ namespace SoulBind.Managers
             AfterDraftChange();
         }
 
-        // the disc appears on its tile straight away.
+        // The disc appears on its tile straight away.
         private void PlaceDisc(int picker, HexCoord tile)
         {
             int index = picker - 1;
@@ -1420,7 +1426,7 @@ namespace SoulBind.Managers
             AfterMatchChange();
         }
 
-        // ---- Bots ----
+        // ---------- Bots ----------
 
         // Lets the bot whose turn it is (or who chooses the next Phase's direction) take one action
         // every botActionDelay seconds. If the rules refuse an action, the bot's turn ends, so a bot
@@ -1508,7 +1514,7 @@ namespace SoulBind.Managers
         }
 #endif
 
-        // ---- Animation ----
+        // ---------- Animation ----------
 
         // A short sentence for the hint line, so you can follow what a bot just did.
         private static string Describe(BotAction action)
@@ -1682,6 +1688,7 @@ namespace SoulBind.Managers
                 _engagedAttackerId = CurrentMatch.CurrentApostle.Id;
         }
 
+        // Position of an Apostle in the battlefield list, or -1.
         private int IndexOfApostle(int id)
         {
             IReadOnlyList<ApostleState> apostles = CurrentMatch.Battlefield.Apostles;
@@ -1727,6 +1734,7 @@ namespace SoulBind.Managers
             _statsTaken = true;
         }
 
+        // Logs the winner once, so a finished match shows up in the Console.
         private void LogIfOver()
         {
             if (CurrentMatch.IsOver)
@@ -1757,6 +1765,7 @@ namespace SoulBind.Managers
             StateChanged?.Invoke();
         }
 
+        // The one-line hint under the HUD telling the player what to do next.
         private string BuildHint()
         {
             Match match = CurrentMatch;
@@ -1786,6 +1795,7 @@ namespace SoulBind.Managers
             return "Drag a card to the discard pile to play it, or onto a red-ringed enemy to attack.";
         }
 
+        // Copies the match state onto the pieces, panels and marks on screen.
         private void SyncViews()
         {
             _auraIndex = -1;
@@ -1844,6 +1854,7 @@ namespace SoulBind.Managers
                 boardView.SetMoveTarget(_moveTarget);
         }
 
+        // Redraws the red marks under Apostles the local player can attack.
         private void RefreshAttackMarks()
         {
             if (IsLocalTurn)

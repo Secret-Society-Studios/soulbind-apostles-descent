@@ -29,6 +29,7 @@ namespace SoulBind.UI
         public static ScreenPlane Pin(RectTransform canvasRoot, Camera cam, Vector2 offset, float size) =>
             Attach(canvasRoot, cam, false, offset, size);
 
+        // Puts the canvas on a plane in front of the camera, sized to fill the view.
         private static ScreenPlane Attach(RectTransform canvasRoot, Camera cam, bool fill, Vector2 offset, float size)
         {
             if (canvasRoot == null || cam == null)

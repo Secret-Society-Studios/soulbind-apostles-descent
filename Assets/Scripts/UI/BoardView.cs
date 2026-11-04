@@ -79,7 +79,7 @@ namespace SoulBind.UI
         [SerializeField, Range(30f, 60f)] private float matSideAngle = 45f;
         [Tooltip("Extra room above and below the board, in world units (added to both the top and the bottom). " + "The slanted sides move out with it, so the top and bottom sides keep their length.")]
         [SerializeField, Min(0f)] private float matExtraHeight = 1f;
-        
+
         [Header("Tapping tiles")]
         [Tooltip("A tap this close to a tile you can pick (a highlighted move, an Apostle you can attack) " + "picks it, even if the finger landed on a neighbouring tile. In centimetres on the screen. " + "Tiles far from the camera look small, so this makes them much easier to hit on a phone.")]
         [SerializeField, Range(0f, 2f)] private float tapRadiusCm = 0.8f;
@@ -151,7 +151,7 @@ namespace SoulBind.UI
             bool hit = TryGetTileAtScreen(screenPoint, out tile);
             if (pickable == null || pickable.Count == 0)
                 return hit;
-            
+
             // A tap right on a pickable tile always picks it.
             if (hit)
             {
@@ -185,10 +185,6 @@ namespace SoulBind.UI
             }
             return found || hit;
         }
-        
-
-
-
 
         /// <summary>Finds the board tile under a world point. Returns false if the point is off the board.</summary>
         public bool TryGetTileAt(Vector3 worldPoint, out HexCoord tile)
@@ -278,6 +274,7 @@ namespace SoulBind.UI
             RefreshGrid();
         }
 
+        // Puts every highlighted tile back to its normal look.
         public void ClearHighlights()
         {
             for (int i = 0; i < _highlighted.Count; i++)
@@ -305,6 +302,7 @@ namespace SoulBind.UI
             RefreshGrid();
         }
 
+        // Removes the move-reach marks.
         public void ClearReach()
         {
             for (int i = 0; i < _reach.Count; i++)
@@ -679,6 +677,7 @@ namespace SoulBind.UI
             return Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(0.5f, 0.5f), pixelsPerUnit);
         }
 
+        // Creates a flat sprite on the board, such as the island or a marker.
         private GameObject CreateFlat(string objectName, Sprite sprite, Color color, int sortingOrder, Vector3 scale)
         {
             var flat = new GameObject(objectName);
@@ -691,6 +690,7 @@ namespace SoulBind.UI
             return flat;
         }
 
+        // True when the tile is the current Ascension tile.
         private bool IsAscensionTile(HexCoord tile) => _hasAscensionTile && _ascensionTile == tile;
 
         // Puts a tile back to how it looks when nothing is highlighted or marked: its art (or the
@@ -741,6 +741,7 @@ namespace SoulBind.UI
             return tileScale * (2f * hexSize) / height;
         }
 
+        // The art for a special tile type.
         private Sprite SpecialArt(SpecialTileType type)
         {
             switch (type)
@@ -751,6 +752,7 @@ namespace SoulBind.UI
             }
         }
 
+        // The tint for a special tile type.
         private Color SpecialColor(SpecialTileType type)
         {
             switch (type)
@@ -761,6 +763,7 @@ namespace SoulBind.UI
             }
         }
 
+        // Builds every hex tile from the prefab, once.
         private void Build()
         {
             if (hexTilePrefab == null)
@@ -857,6 +860,7 @@ namespace SoulBind.UI
                 _icons[i].gameObject.SetActive(false);
         }
 
+        // Shows a floating icon over a special tile, reusing icons from the pool.
         private void ShowIcon(int index, HexCoord tile, SpecialTileType type)
         {
             if (index >= _icons.Count)

@@ -6,6 +6,7 @@ namespace SoulBind.Core
     /// </summary>
     public sealed class HighPriestessEffect : CardEffect
     {
+        // Draws one card.
         public override void OnPlayed(CardPlayContext context)
         {
             context.DrawCard();
