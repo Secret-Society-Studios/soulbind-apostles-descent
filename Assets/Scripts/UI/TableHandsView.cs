@@ -53,10 +53,17 @@ namespace SoulBind.UI
         [Tooltip("On: your hand lies along the bottom of the screen with the Capacity bar, and the others' " +
                  "card counts are on their name plates. Off: every hand lies on the table around the board.")]
         [SerializeField] private bool handsOnScreen = true;
-        [Tooltip("Your cards' size on the screen (1 = 252 pixels tall on a 1080-pixel-high screen).")]
-        [SerializeField, Range(0.3f, 1f)] private float screenCardScale = 0.55f;
-        [Tooltip("How wide your hand may get before cards overlap, in pixels of a 1080-pixel-high screen.")]
-        [SerializeField] private float screenHandWidth = 1000f;
+        [Tooltip("Your cards' size on a computer screen (1 = 252 pixels tall on a 1080-pixel-high screen).")]
+        [SerializeField, Range(0.3f, 1.2f)] private float pcCardScale = 0.8f;
+        [Tooltip("Your cards' size on a phone, where the screen is only a few inches tall. Tablets fall between.")]
+        [SerializeField, Range(0.3f, 1.2f)] private float phoneCardScale = 0.6f;
+        [Tooltip("Tick to see the phone hand size while testing in the Editor.")]
+        [SerializeField] private bool handPhoneInEditor;
+        [Tooltip("How wide your hand may get at the PC size, in pixels of a 1080-pixel-high screen. " +
+                 "It shrinks with the cards, and never runs under the draw pile or your profile.")]
+        [SerializeField] private float pcHandWidth = 1300f;
+        [Tooltip("Room kept free on the left (draw pile) and right (your profile), same pixels.")]
+        [SerializeField] private float screenLeftClear = 280f, screenRightClear = 360f;
         [Tooltip("Your hand's middle, left (-) or right (+) of the screen's middle, clear of your profile.")]
         [SerializeField] private float screenHandOffset = -120f;
         [SerializeField] private float screenBottomMargin = 12f;
@@ -477,6 +484,8 @@ namespace SoulBind.UI
                 edge.effectColor = ApostleColors.Get(apostle.Id);
                 edge.effectDistance = new Vector2(6f, -6f);
                 seat.Edge = edge;
+                if (seat.IsYours && handsOnScreen)
+                    HideTray(seat);
 
                 if (showNameTags && !handsOnScreen)
                 {
@@ -723,9 +732,10 @@ namespace SoulBind.UI
             float half = _rect.sizeDelta.y / 2f;
             if (seat.IsYours)
             {
-                seat.CardScale = screenCardScale;
-                float depth = CardHeight * screenCardScale + 2f * trayPadding + LabelHeight;
-                seat.Root.sizeDelta = new Vector2(screenHandWidth, depth);
+                float scale = YourScreenScale();
+                seat.CardScale = scale;
+                float depth = CardHeight * scale + 2f * trayPadding + LabelHeight;
+                seat.Root.sizeDelta = new Vector2(YourHandWidth(scale), depth);
                 float y = -half + screenBottomMargin + depth / 2f - LabelHeight / 2f;
                 seat.Root.anchoredPosition = new Vector2(screenHandOffset, y);
                 return;
@@ -739,6 +749,29 @@ namespace SoulBind.UI
             CanvasGroup hide = seat.Root.gameObject.AddComponent<CanvasGroup>();
             hide.alpha = 0f;
             hide.blocksRaycasts = false;
+        }
+
+        // Phones get smaller cards, computers bigger ones, by how tall the screen really is in inches:
+        // about 3 inches or less is a phone, 7 or more a laptop or monitor, tablets in between.
+        private float YourScreenScale()
+        {
+            if (Application.isEditor && handPhoneInEditor)
+                return phoneCardScale;
+            float inches = Screen.dpi > 0f ? Screen.height / Screen.dpi : 0f;
+            if (inches <= 0f)
+                return Application.isMobilePlatform ? phoneCardScale : pcCardScale;
+            float t = Mathf.InverseLerp(3f, 7f, inches);
+            return Mathf.Lerp(phoneCardScale, pcCardScale, t);
+        }
+
+        // As wide as the PC width allows at this card size, but clear of the draw pile and your profile.
+        private float YourHandWidth(float scale)
+        {
+            float wanted = pcHandWidth * scale / Mathf.Max(0.01f, pcCardScale);
+            float half = _rect.sizeDelta.x / 2f;
+            float right = 2f * (half - screenRightClear - screenHandOffset);
+            float left = 2f * (half - screenLeftClear + screenHandOffset);
+            return Mathf.Max(CardWidth * scale, Mathf.Min(wanted, Mathf.Min(left, right)));
         }
 
         // Cards standing up from the table only make sense on the table.
@@ -1540,6 +1573,19 @@ namespace SoulBind.UI
                     seat.DefenseGlow.color = color;
                 }
             }
+        }
+
+        // On the screen your cards float on their own, Balatro style: the tray keeps its size for the
+        // layout (the Capacity bar sits on it) but draws nothing, and the glows around it go.
+        private static void HideTray(Seat seat)
+        {
+            seat.Tray.GetComponent<Image>().enabled = false;
+            Destroy(seat.Edge);
+            seat.Edge = null;
+            Destroy(seat.TurnGlow.gameObject);
+            Destroy(seat.DefenseGlow.gameObject);
+            seat.TurnGlow = null;
+            seat.DefenseGlow = null;
         }
 
         // width: smaller makes a wider band (it scales the glow sprite's edge).
