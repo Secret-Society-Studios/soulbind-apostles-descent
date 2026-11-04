@@ -39,6 +39,25 @@ namespace SoulBind.UI
         [Tooltip("One sprite per emote slot (QuickChat.EmoteCount = 8). An empty slot shows a numbered placeholder.")]
         [SerializeField] private Sprite[] emotes = new Sprite[8];
 
+        [Header("Main menu design (Art/UI/MainMenu)")]
+        [Tooltip("Full-screen still background. An animated one goes in FxLibrary > Main Menu Background.")]
+        [SerializeField] private Sprite menuBackground;
+        [SerializeField] private Sprite menuLogo;
+        [Tooltip("Boxes and cards behind menu content. 9-slice it.")]
+        [SerializeField] private Sprite menuPanel;
+        [SerializeField] private Sprite menuButton;
+        [SerializeField] private Sprite menuButtonPressed;
+        [SerializeField] private Sprite menuBackButton;
+
+        [Header("In-game menu design (Art/UI/InGame)")]
+        [Tooltip("The Menu, Settings, Help and result boxes. 9-slice it.")]
+        [SerializeField] private Sprite gamePanel;
+        [SerializeField] private Sprite gameButton;
+        [SerializeField] private Sprite gameButtonPressed;
+        [SerializeField] private Sprite gameMenuIcon;
+        [SerializeField] private Sprite gameHelpIcon;
+        [SerializeField] private Sprite gameBanner;
+
         [Header("Colours")]
         [Tooltip("Off: fill sprites show their own colours. On: the game still tints them " +
                  "(Corruption turns red when Corrupted, for example). Draw fills white to tint them.")]
@@ -48,6 +67,18 @@ namespace SoulBind.UI
         public Sprite CapacityPipSpent => capacityPipSpent;
         public Sprite CapacityFrame => capacityFrame;
         public bool TintFills => tintFills;
+        public Sprite MenuBackground => menuBackground;
+        public Sprite MenuLogo => menuLogo;
+        public Sprite MenuPanel => menuPanel;
+        public Sprite MenuButton => menuButton;
+        public Sprite MenuButtonPressed => menuButtonPressed;
+        public Sprite MenuBackButton => menuBackButton;
+        public Sprite GamePanel => gamePanel;
+        public Sprite GameButton => gameButton;
+        public Sprite GameButtonPressed => gameButtonPressed;
+        public Sprite GameMenuIcon => gameMenuIcon;
+        public Sprite GameHelpIcon => gameHelpIcon;
+        public Sprite GameBanner => gameBanner;
 
         /// <summary>The art for emote slot index, or null to keep its placeholder.</summary>
         public Sprite GetEmote(int index) =>

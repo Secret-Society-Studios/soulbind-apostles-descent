@@ -324,6 +324,7 @@ namespace SoulBind.Managers
                 chooseSpawns = MatchSettings.ChooseSpawns;
             }
             bool online = MatchSettings.IsSet && MatchSettings.IsOnline;
+            GameAudio.PlayMusic(SoundLibrary.Current != null ? SoundLibrary.Current.MatchMusic : null);
 
             // The tutorial is for learning, so nobody is rushed there.
             if (useTurnTimer && !IsTutorial)

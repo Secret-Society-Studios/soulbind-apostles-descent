@@ -43,6 +43,7 @@ namespace SoulBind.UI
             _players = Mathf.Clamp(defaultPlayers, 2, 6);
             _root = (RectTransform)transform;
             Build();
+            GameAudio.PlayMusic(SoundLibrary.Current != null ? SoundLibrary.Current.MainMenuMusic : null);
 
             OnlineSession session = OnlineSession.Instance;
             if (session != null && session.InSession && session.MatchStarted)
