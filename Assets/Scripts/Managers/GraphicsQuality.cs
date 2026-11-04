@@ -43,6 +43,9 @@ namespace SoulBind.Managers
         /// <summary>A button label such as "Graphics: Auto (Medium)".</summary>
         public static string Label => IsAuto ? "Graphics: Auto (" + Current + ")" : "Graphics: " + Current;
 
+        /// <summary>Just the setting, such as "Auto (Medium)" or "Low", for a row that already says Graphics.</summary>
+        public static string ShortLabel => IsAuto ? "Auto (" + Current + ")" : Current.ToString();
+
         // ---------- Starting ----------
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]

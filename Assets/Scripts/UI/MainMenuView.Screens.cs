@@ -197,9 +197,8 @@ namespace SoulBind.UI
             Kit.At((RectTransform)_chatMuteLabel.transform.parent, 0f, 70f, 500f, 56f);
             ShowChatMute();
 
-            TMP_Text later = Kit.Label(column, "ComingSoon",
-                "Sound, music and graphics settings will go here.", 14f, Kit.Inter, Kit.Muted);
-            Kit.At(later.rectTransform, 0f, 146f, 500f, 22f);
+            // Graphics and Volume (the same rows as the in-game Menu's Settings).
+            SettingsPanel.Build(column, 0f, 150f, 500f);
         }
 
         private void ToggleChatMute()
