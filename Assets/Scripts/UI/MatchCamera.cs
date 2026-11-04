@@ -87,12 +87,20 @@ namespace SoulBind.UI
 
         // ---------- Following ----------
 
-        // Your avatar, or the middle of the board while it is not on the board yet.
+        // Your avatar. Once you are out (spectating), whoever's turn it is. Before anyone is placed,
+        // the middle of the board.
         private Vector3 GetTarget()
         {
             ApostleView piece = _controller.GetPieceView(_controller.ViewerId);
             if (piece != null && piece.gameObject.activeInHierarchy)
                 return piece.transform.position;
+            SoulBind.Core.Match match = _controller.CurrentMatch;
+            if (match != null && match.CurrentApostle != null)
+            {
+                ApostleView turn = _controller.GetPieceView(match.CurrentApostle.Id);
+                if (turn != null && turn.gameObject.activeInHierarchy)
+                    return turn.transform.position;
+            }
             return _boardCenter != null ? _boardCenter.position : Vector3.zero;
         }
 

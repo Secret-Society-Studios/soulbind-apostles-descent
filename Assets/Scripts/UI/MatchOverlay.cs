@@ -71,7 +71,7 @@ namespace SoulBind.UI
         private GameObject _quitButton;   // the Menu button
         private GameObject _helpButton;   // the round ? button left of Chat (How to Play)
         private GameObject _menu;         // Resume / Settings / Leave Match
-        private GameObject _outPanel;     // "You are out": Keep Watching / Leave Match
+        private GameObject _outPanel;     // "You are out": Spectate / Leave Match
         private GameObject _leaveButton;
         private GameObject _quitConfirm;
         private TMP_Text _quitText;
@@ -705,9 +705,9 @@ namespace SoulBind.UI
             title.color = GoldColor;
             TMP_Text text = CreateText("Text", box, 24f, FontStyles.Normal);
             Row(text.rectTransform, 90f, 80f);
-            text.text = "Watch the rest of the match, or leave now.";
+            text.text = "Spectate the rest of the match (the camera follows whoever's turn it is), or leave now.";
 
-            CreateButton("WatchButton", box, "Keep Watching", new Vector2(-125f, 0f), KeepWatching);
+            CreateButton("SpectateButton", box, "Spectate", new Vector2(-125f, 0f), KeepWatching);
             CreateButton("LeaveButton", box, "Leave Match", new Vector2(125f, 0f), MainMenu);
             _outPanel.SetActive(false);
         }
