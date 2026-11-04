@@ -385,6 +385,7 @@ namespace SoulBind.UI
                 return;
 
             _endShown = true;
+            GameAudio.PlayMusic(SoundLibrary.Current != null ? SoundLibrary.Current.ResultMusic : null);
             int viewer = _controller.ViewerId;
             int winner = match.WinnerId;
             bool youWon = winner != 0 && winner == viewer && _controller.BotsPlayOthers;
