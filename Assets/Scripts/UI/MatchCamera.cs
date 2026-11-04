@@ -31,6 +31,10 @@ namespace SoulBind.UI
         [Tooltip("How far you may pan from your avatar, in world units.")]
         [SerializeField, Min(0f)] private float maxPan = 6f;
         [SerializeField, Min(0f)] private float zoomPerScroll = 0.01f;
+        [Tooltip("Panning sideways goes the other way: swipe right and the camera moves right.")]
+        [SerializeField] private bool invertPanX = true;
+        [Tooltip("Turning goes the other way: swipe right and the view turns the other way round.")]
+        [SerializeField] private bool invertTurnX;
 
         private enum Drag { None, Pending, Pan, Turn }
 
@@ -83,12 +87,20 @@ namespace SoulBind.UI
 
         // ---------- Following ----------
 
-        // Your avatar, or the middle of the board while it is not on the board yet.
+        // Your avatar. Once you are out (spectating), whoever's turn it is. Before anyone is placed,
+        // the middle of the board.
         private Vector3 GetTarget()
         {
             ApostleView piece = _controller.GetPieceView(_controller.ViewerId);
             if (piece != null && piece.gameObject.activeInHierarchy)
                 return piece.transform.position;
+            SoulBind.Core.Match match = _controller.CurrentMatch;
+            if (match != null && match.CurrentApostle != null)
+            {
+                ApostleView turn = _controller.GetPieceView(match.CurrentApostle.Id);
+                if (turn != null && turn.gameObject.activeInHierarchy)
+                    return turn.transform.position;
+            }
             return _boardCenter != null ? _boardCenter.position : Vector3.zero;
         }
 
@@ -163,9 +175,13 @@ namespace SoulBind.UI
             Vector2 moved = point - _lastPointer;
             _lastPointer = point;
             if (_drag == Drag.Turn)
-                _yaw += moved.x * turnSpeed;
-            else
-                PanBy(moved);
+            {
+                _yaw += (invertTurnX ? -moved.x : moved.x) * turnSpeed;
+                return;
+            }
+            if (invertPanX)
+                moved.x = -moved.x;
+            PanBy(moved);
         }
 
         // The board slides with the finger: the point under it stays under it, roughly.

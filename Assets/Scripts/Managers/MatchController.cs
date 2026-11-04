@@ -72,10 +72,14 @@ namespace SoulBind.Managers
         [Tooltip("Rising numbers above Apostles for damage, healing, Souls and Corruption.")]
         [SerializeField] private bool showStatPopups = true;
         [SerializeField] private float popupFontSize = 5f;
+        [Tooltip("Moving takes two taps on the same tile: the first marks it, the second goes. Stops misclicks.")]
+        [SerializeField] private bool tapTwiceToMove = true;
 
         private readonly List<ApostleView> _views = new List<ApostleView>(GameConstants.MaxPlayers);
         private readonly List<HexCoord> _legalDestinations = new List<HexCoord>(6);
         private readonly List<HexCoord> _reachTiles = new List<HexCoord>(64); // every tile in walking range
+        private HexCoord _moveTarget;  // the tile a first tap marked
+        private bool _hasMoveTarget;
         private readonly List<ApostleState> _attackTargets = new List<ApostleState>(6);
         private readonly List<HexCoord> _pickTiles = new List<HexCoord>(64);
         private readonly List<HexCoord> _attackTiles = new List<HexCoord>(6);
@@ -734,7 +738,47 @@ namespace SoulBind.Managers
                 return;
             }
 
-            TryMove(tile);
+            TapTile(tile);
+        }
+
+        // The first tap on a tile in reach marks it; a second tap on the same tile moves there.
+        // A tap anywhere else picks that tile instead, or (out of reach) clears the mark.
+        private void TapTile(HexCoord tile)
+        {
+            bool inReach = _reachTiles.Contains(tile) || _legalDestinations.Contains(tile);
+            if (!inReach)
+            {
+                ClearMoveTarget();
+                return;
+            }
+            if (!tapTwiceToMove || (_hasMoveTarget && _moveTarget == tile))
+            {
+                ClearMoveTarget();
+                TryMove(tile);
+                return;
+            }
+
+            _moveTarget = tile;
+            _hasMoveTarget = true;
+            RedrawMoveMarks();
+            if (_numbers != null)
+                _numbers.Show(boardView.GetWorldPosition(tile) + Vector3.up * 0.3f, "Tap again to move", Color.white);
+        }
+
+        private void ClearMoveTarget()
+        {
+            if (!_hasMoveTarget)
+                return;
+            _hasMoveTarget = false;
+            RedrawMoveMarks();
+        }
+
+        // The same order as AfterStateChange, so no board layer paints over another.
+        private void RedrawMoveMarks()
+        {
+            boardView.ClearAttackMarks();
+            RefreshHighlights();
+            RefreshAttackMarks();
         }
 
         // ---- Playing cards from the hand (the real UI) ----
@@ -1792,6 +1836,12 @@ namespace SoulBind.Managers
             boardView.SetReach(_reachTiles);
             if (_legalDestinations.Count > 0)
                 boardView.SetHighlights(_legalDestinations);
+
+            // A marked tile that is no longer in reach (moved, or the turn ended) loses its mark.
+            if (_hasMoveTarget && !_reachTiles.Contains(_moveTarget) && !_legalDestinations.Contains(_moveTarget))
+                _hasMoveTarget = false;
+            if (_hasMoveTarget)
+                boardView.SetMoveTarget(_moveTarget);
         }
 
         private void RefreshAttackMarks()

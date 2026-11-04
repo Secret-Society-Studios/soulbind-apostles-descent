@@ -71,6 +71,7 @@ namespace SoulBind.UI
         private GameObject _quitButton;   // the Menu button
         private GameObject _helpButton;   // the round ? button left of Chat (How to Play)
         private GameObject _menu;         // Resume / Settings / Leave Match
+        private GameObject _outPanel;     // "You are out": Spectate / Leave Match
         private GameObject _leaveButton;
         private GameObject _quitConfirm;
         private TMP_Text _quitText;
@@ -78,6 +79,7 @@ namespace SoulBind.UI
 
         // What was last seen, to notice changes.
         private readonly bool[] _wasEliminated = new bool[GameConstants.MaxPlayers + 1];
+        private readonly HexCoord[] _lastPosition = new HexCoord[GameConstants.MaxPlayers + 1]; // by Apostle Id
         private int _lastAwakenedId;
         private int _lastDrawCount;
         private int _lastDiscardCount;
@@ -125,7 +127,10 @@ namespace SoulBind.UI
                 // A new match: remember its starting state without announcing anything.
                 _seenMatch = match;
                 for (int i = 0; i < apostles.Count; i++)
+                {
                     _wasEliminated[apostles[i].Id] = apostles[i].IsEliminated;
+                    _lastPosition[apostles[i].Id] = apostles[i].Position;
+                }
                 _lastAwakenedId = match.Ascension.AwakenedId;
                 _lastDrawCount = match.Deck.DrawCount;
                 _lastDiscardCount = match.Deck.DiscardCount;
@@ -135,6 +140,7 @@ namespace SoulBind.UI
                 _endScreenTimer = -1f;
                 _endScreen.SetActive(false);
                 _showResultButton.SetActive(false);
+                _outPanel.SetActive(false);
                 RefreshQuit(match);
                 return;
             }
@@ -143,8 +149,13 @@ namespace SoulBind.UI
             {
                 ApostleState apostle = apostles[i];
                 if (apostle.IsEliminated && !_wasEliminated[apostle.Id])
+                {
                     QueueBanner(apostle.Id == viewer ? "You have been eliminated" : $"{Name(apostle.Id)} has been eliminated");
+                    if (apostle.Id == viewer && !match.IsOver)
+                        ShowOutPanel();
+                }
                 _wasEliminated[apostle.Id] = apostle.IsEliminated;
+                CheckSoulTile(match, apostle, viewer);
             }
 
             int awakened = match.Ascension.AwakenedId;
@@ -187,6 +198,29 @@ namespace SoulBind.UI
             RefreshQuit(match);
         }
 
+
+        // Stepping onto a Soul tile that gives nothing (the tile stays) needs saying, or it looks broken.
+        private void CheckSoulTile(Match match, ApostleState apostle, int viewer)
+        {
+            HexCoord position = apostle.Position;
+            if (position == _lastPosition[apostle.Id])
+                return;
+            _lastPosition[apostle.Id] = position;
+            if (apostle.IsEliminated || match.IsOver)
+                return;
+            if (!match.Battlefield.Specials.Active.TryGetValue(position, out SpecialTileType type))
+                return;
+            if (type != SpecialTileType.Soul)
+                return;
+
+            bool you = apostle.Id == viewer;
+            if (apostle.IsSoullocked)
+                QueueBanner(you
+                    ? $"Soullocked! No Souls until your Corruption is below {GameConstants.CorruptionThreshold}"
+                    : $"{Name(apostle.Id)} is Soullocked and can't take the Soul tile");
+            else if (apostle.HasMaxSouls)
+                QueueBanner(you ? "Your Souls are full: the Soul tile stays" : $"{Name(apostle.Id)}'s Souls are full");
+        }
 
         // ---- Quit ----
 
@@ -231,6 +265,16 @@ namespace SoulBind.UI
         {
             _quitConfirm.SetActive(false);
         }
+
+        // Out of the match: watch the rest, or leave now (online, the others play on).
+        private void ShowOutPanel()
+        {
+            _menu.SetActive(false);
+            _outPanel.transform.SetAsLastSibling();
+            _outPanel.SetActive(true);
+        }
+
+        private void KeepWatching() => _outPanel.SetActive(false);
 
         private void Update()
         {
@@ -325,6 +369,7 @@ namespace SoulBind.UI
 
         private void ShowEndScreen()
         {
+            _outPanel.SetActive(false);
             Match match = _controller.CurrentMatch;
             if (match == null || !match.IsOver)
                 return;
@@ -631,6 +676,40 @@ namespace SoulBind.UI
             CreateButton("StayButton", box, "Stay", new Vector2(-125f, 0f), CancelQuit);
             CreateButton("LeaveButton", box, "Leave", new Vector2(125f, 0f), MainMenu);
             _quitConfirm.SetActive(false);
+
+            BuildOutPanel(root);
+        }
+
+        // "You are out": shown once when this screen's Apostle is eliminated. Tapping outside means watch.
+        private void BuildOutPanel(RectTransform root)
+        {
+            RectTransform panel = CreateRect("OutPanel", root);
+            Stretch(panel);
+            AddImage(panel, DimColor, true);
+            Button outside = panel.gameObject.AddComponent<Button>();
+            outside.transition = Selectable.Transition.None;
+            outside.onClick.AddListener(KeepWatching);
+            _outPanel = panel.gameObject;
+
+            RectTransform box = CreateRect("Box", panel);
+            box.anchorMin = box.anchorMax = new Vector2(0.5f, 0.5f);
+            box.sizeDelta = new Vector2(640f, 300f);
+            AddImage(box, PanelColor, true);
+            Outline edge = box.gameObject.AddComponent<Outline>();
+            edge.effectColor = GoldColor;
+            edge.effectDistance = new Vector2(3f, -3f);
+
+            TMP_Text title = CreateText("Title", box, 40f, FontStyles.Bold);
+            Row(title.rectTransform, 24f, 56f);
+            title.text = "You are out";
+            title.color = GoldColor;
+            TMP_Text text = CreateText("Text", box, 24f, FontStyles.Normal);
+            Row(text.rectTransform, 90f, 80f);
+            text.text = "Spectate the rest of the match (the camera follows whoever's turn it is), or leave now.";
+
+            CreateButton("SpectateButton", box, "Spectate", new Vector2(-125f, 0f), KeepWatching);
+            CreateButton("LeaveButton", box, "Leave Match", new Vector2(125f, 0f), MainMenu);
+            _outPanel.SetActive(false);
         }
 
         // The Menu: dims everything; tapping outside the box means Resume.
