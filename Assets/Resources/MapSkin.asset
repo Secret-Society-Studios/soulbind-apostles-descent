@@ -23,7 +23,7 @@ MonoBehaviour:
   seaSize: 140
   seaTileSize: 6
   seaScroll: {x: 0.25, y: 0.12}
-  island: {fileID: 21300000, guid: 6e3cddf365fa4d8794fa4b6196f053b2, type: 3}
+  island: {fileID: -6058928264790137376, guid: 781524bd8e7d39a4893c50d968a6a5c6, type: 3}
   islandSize: {x: 1.35, y: 2.15}
   islandTopShift: 0
   lavaGlow: {fileID: 0}

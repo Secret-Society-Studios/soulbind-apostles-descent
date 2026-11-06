@@ -561,6 +561,7 @@ MonoBehaviour:
   mobilePortraitScale: 1.25
   previewMobileInEditor: 0
   mobileEdgeInset: 50
+  phoneHudMargin: {x: 60, y: 24}
 --- !u!1 &331999870
 GameObject:
   m_ObjectHideFlags: 0
@@ -1485,8 +1486,12 @@ MonoBehaviour:
   previewMobileInEditor: 0
   previewRaise: 40
   handsOnScreen: 1
-  screenCardScale: 0.55
-  screenHandWidth: 1000
+  pcCardScale: 0.8
+  phoneCardScale: 0.6
+  handPhoneInEditor: 0
+  pcHandWidth: 1300
+  screenLeftClear: 280
+  screenRightClear: 360
   screenHandOffset: -120
   screenBottomMargin: 12
   cardWorldHeight: 1.4
@@ -1506,6 +1511,11 @@ MonoBehaviour:
   hoverScale: 1.1
   selectedLift: 45
   moveSpeed: 14
+  fanYourHand: 1
+  fanAngle: 10
+  fanDrop: 34
+  fanOverlap: 0.72
+  idleBob: 4
   playFlightTime: 0.4
   drawFlightTime: 0.5
   arcHeight: 60
@@ -1960,14 +1970,15 @@ MonoBehaviour:
   ascensionHighlightColor: {r: 1, g: 0.95, b: 0.6, a: 1}
   attackTargetColor: {r: 0.45, g: 0.08, b: 0.1, a: 1}
   reachColor: {r: 0.55, g: 0.8, b: 0.6, a: 0.43137255}
+  moveTargetColor: {r: 1, g: 0.85, b: 0.35, a: 1}
   reachStrength: 0.45
   plainTileSprite: {fileID: 0}
   edgeTileSprite: {fileID: 0}
-  healTileSprite: {fileID: 21300000, guid: cf13af120a0b89249be6e6b5521e7e54, type: 3}
-  purifyTileSprite: {fileID: 21300000, guid: 99138121ea46a7845ac19f27daccca2c, type: 3}
-  soulTileSprite: {fileID: 21300000, guid: 060bb6d97d0b5d84ab2115fa475fa836, type: 3}
+  healTileSprite: {fileID: 7706390822701730368, guid: 9bf50e95f16ca9845a76a7fd9070e9cf, type: 3}
+  purifyTileSprite: {fileID: 2356005373734846401, guid: 52732c5989a8edc44b1d87fb415ffdd1, type: 3}
+  soulTileSprite: {fileID: -3066682036366246359, guid: 1a05cd061024371448813769e49953dd, type: 3}
   fitCameraToBoard: 1
-  followCamera: 1
+  followCamera: 0
   showMat: 0
   gridOnlyWhenActing: 0
   floatSpecialTiles: 1
@@ -2408,6 +2419,7 @@ MonoBehaviour:
   lungeTime: 0.3
   showStatPopups: 1
   popupFontSize: 5
+  tapTwiceToMove: 1
 --- !u!4 &1066798568
 Transform:
   m_ObjectHideFlags: 0
