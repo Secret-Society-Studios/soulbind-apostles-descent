@@ -1978,7 +1978,7 @@ MonoBehaviour:
   purifyTileSprite: {fileID: 2356005373734846401, guid: 52732c5989a8edc44b1d87fb415ffdd1, type: 3}
   soulTileSprite: {fileID: -3066682036366246359, guid: 1a05cd061024371448813769e49953dd, type: 3}
   fitCameraToBoard: 1
-  followCamera: 0
+  followCamera: 1
   showMat: 0
   gridOnlyWhenActing: 0
   floatSpecialTiles: 1
