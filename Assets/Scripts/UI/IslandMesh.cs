@@ -66,8 +66,11 @@ namespace SoulBind.UI
                 uvs.Add(top.center + new Vector2(cos * art * top.width * 0.5f, sin * art * top.height * 0.5f));
                 colors.Add(Color.white);
             }
+            // The top goes in its own list and is drawn last: depth is off, so whatever is drawn later
+            // wins, and the top must cover any chipped cliff that pokes past the rim.
+            var topTriangles = new List<int>(n * 3);
             for (int i = 0; i < n; i++)
-                AddTriangle(vertices, triangles, 0, 1 + i, 2 + i, Vector3.back);
+                AddTriangle(vertices, topTriangles, 0, 1 + i, 2 + i, Vector3.back);
 
             // ---------- Rock ----------
             int ringStart = vertices.Count;
@@ -118,6 +121,7 @@ namespace SoulBind.UI
             for (int i = 0; i < n; i++)
                 AddTriangle(vertices, triangles, last + i, tip, last + i + 1, Outward(vertices[last + i]));
 
+            triangles.AddRange(topTriangles);
             return Finish("Island", vertices, uvs, colors, triangles);
         }
 
