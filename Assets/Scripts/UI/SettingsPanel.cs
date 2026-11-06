@@ -7,7 +7,7 @@ using Kit = SoulBind.UI.UiKit;
 namespace SoulBind.UI
 {
     /// <summary>
-    /// The settings rows: Graphics (Auto, Low, Medium, High) and Volume. The main menu's Settings screen
+    /// The settings rows: Graphics (Auto, Low, Medium, High), Music and Sounds. The main menu's Settings screen
     /// shows them in place; during a match, SettingsPopup shows them over the game.
     /// </summary>
     public sealed class SettingsPanel : MonoBehaviour
@@ -17,18 +17,17 @@ namespace SoulBind.UI
         private const float LabelWidth = 160f;
 
         private TMP_Text _graphics;
-        private TMP_Text _percent;
 
         /// <summary>Builds the rows at x, y (design pixels from the parent's top-left), width wide.</summary>
         public static SettingsPanel Build(RectTransform parent, float x, float y, float width)
         {
-            RectTransform root = Kit.At(Kit.CreateRect("Settings", parent), x, y, width, RowGap + RowHeight);
+            RectTransform root = Kit.At(Kit.CreateRect("Settings", parent), x, y, width, 2f * RowGap + RowHeight);
             SettingsPanel panel = root.gameObject.AddComponent<SettingsPanel>();
             panel.BuildRows(root, width);
             return panel;
         }
 
-        // Builds the Graphics and Volume rows.
+        // Builds the Graphics, Music and Sounds rows.
         private void BuildRows(RectTransform root, float width)
         {
             float control = width - LabelWidth - 20f;
@@ -40,13 +39,27 @@ namespace SoulBind.UI
             Kit.At((RectTransform)_graphics.transform.parent, LabelWidth + 20f, 0f, control, RowHeight);
 
             // ---------- Volume ----------
-            RowLabel(root, "VolumeLabel", "Volume", RowGap);
-            Slider slider = BuildSlider(root, LabelWidth + 20f, RowGap + RowHeight / 2f - 8f, control - 70f);
-            _percent = Kit.Label(root, "Percent", "", 18f, Kit.InterSemiBold, Kit.Text, TextAlignmentOptions.Right);
-            Kit.At(_percent.rectTransform, width - 64f, RowGap, 64f, RowHeight);
-            slider.SetValueWithoutNotify(GameAudio.Volume);
-            slider.onValueChanged.AddListener(SetVolume);
-            ShowPercent(GameAudio.Volume);
+            VolumeRow(root, "Music", RowGap, width, GameAudio.MusicVolume, v => GameAudio.MusicVolume = v);
+            VolumeRow(root, "Sounds", 2f * RowGap, width, GameAudio.SoundVolume, v => GameAudio.SoundVolume = v);
+        }
+
+        // One volume row: a label, a slider and its percentage. set stores the new volume.
+        private static void VolumeRow(RectTransform root, string name, float y, float width, float value,
+            System.Action<float> set)
+        {
+            float control = width - LabelWidth - 20f;
+            RowLabel(root, name + "Label", name, y);
+            Slider slider = BuildSlider(root, name + "Slider", LabelWidth + 20f, y + RowHeight / 2f - 8f, control - 70f);
+            TMP_Text percent = Kit.Label(root, name + "Percent", "", 18f, Kit.InterSemiBold, Kit.Text,
+                TextAlignmentOptions.Right);
+            Kit.At(percent.rectTransform, width - 64f, y, 64f, RowHeight);
+            slider.SetValueWithoutNotify(value);
+            ShowPercent(percent, value);
+            slider.onValueChanged.AddListener(volume =>
+            {
+                set(volume);
+                ShowPercent(percent, volume);
+            });
         }
 
         private void OnEnable()
@@ -56,7 +69,7 @@ namespace SoulBind.UI
                 _graphics.text = GraphicsQuality.ShortLabel;
         }
 
-        // Volume is saved to disk when the rows close, not on every slider step.
+        // The volumes are saved to disk when the rows close, not on every slider step.
         private void OnDisable() => GameAudio.Save();
 
         // Moves to the next graphics level and shows it.
@@ -66,15 +79,9 @@ namespace SoulBind.UI
             _graphics.text = GraphicsQuality.ShortLabel;
         }
 
-        // Sets the master volume from the slider.
-        private void SetVolume(float volume)
-        {
-            GameAudio.Volume = volume;
-            ShowPercent(volume);
-        }
-
         // Shows the volume as a percentage, without allocating a string.
-        private void ShowPercent(float volume) => _percent.SetText("{0}%", Mathf.RoundToInt(volume * 100f));
+        private static void ShowPercent(TMP_Text percent, float volume) =>
+            percent.SetText("{0}%", Mathf.RoundToInt(volume * 100f));
 
         // Builds a row label on the left.
         private static void RowLabel(RectTransform root, string name, string text, float y)
@@ -84,9 +91,9 @@ namespace SoulBind.UI
         }
 
         // A gold bar with a round handle, 0 to 1.
-        private static Slider BuildSlider(RectTransform root, float x, float y, float width)
+        private static Slider BuildSlider(RectTransform root, string name, float x, float y, float width)
         {
-            RectTransform track = Kit.At(Kit.Box(root, "VolumeSlider", Kit.Inset, Kit.Line, 8f), x, y, width, 16f);
+            RectTransform track = Kit.At(Kit.Box(root, name, Kit.Inset, Kit.Line, 8f), x, y, width, 16f);
             Slider slider = track.gameObject.AddComponent<Slider>();
 
             RectTransform fillArea = Kit.Stretch(Kit.CreateRect("Fill Area", track));
@@ -139,7 +146,7 @@ namespace SoulBind.UI
 
             RectTransform box = Kit.Box(dim, "Box", Kit.Panel, Kit.GoldLine, 14f, 2f);
             box.anchorMin = box.anchorMax = box.pivot = new Vector2(0.5f, 0.5f);
-            box.sizeDelta = new Vector2(600f, 330f);
+            box.sizeDelta = new Vector2(600f, 394f);
 
             TMP_Text title = Kit.Label(box, "Title", "Settings", 32f, Kit.Display, Kit.Title);
             Kit.At(title.rectTransform, 0f, 22f, 600f, 44f);
@@ -147,7 +154,7 @@ namespace SoulBind.UI
             SettingsPanel.Build(box, 40f, 92f, 520f);
 
             TMP_Text close = Kit.Button(box, "Close", "Close", Kit.ButtonStyle.Primary, popup.Close, 20f);
-            Kit.At((RectTransform)close.transform.parent, 200f, 254f, 200f, 52f);
+            Kit.At((RectTransform)close.transform.parent, 200f, 318f, 200f, 52f);
             return dim.gameObject;
         }
 

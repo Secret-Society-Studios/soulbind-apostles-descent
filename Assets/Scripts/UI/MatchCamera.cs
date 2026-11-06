@@ -9,7 +9,8 @@ namespace SoulBind.UI
     /// <summary>
     /// The match camera, like an auto-battler's: tilted down at the board, close in, following your avatar.
     /// Swipe on the top half of the screen to pan, on the bottom half to turn around the board.
-    /// The mouse wheel zooms. Panning snaps back once your avatar moves, so it stays in view.
+    /// The mouse wheel or a two-finger pinch zooms. Panning snaps back once your avatar moves, so it
+    /// stays in view. Each match opens with the camera sweeping in around the board; a tap hurries it.
     /// Values can be tuned on the Main Camera during Play.
     /// </summary>
     [DefaultExecutionOrder(100)] // after MatchController moved the pieces this frame
@@ -25,14 +26,25 @@ namespace SoulBind.UI
         [Tooltip("How fast the camera catches up with your avatar (higher = snappier).")]
         [SerializeField, Min(0.5f)] private float followSharpness = 6f;
 
+        [Header("Opening sweep")]
+        [Tooltip("Seconds the camera takes to sweep in when a match starts. 0 = no sweep.")]
+        [SerializeField, Min(0f)] private float introSeconds = 3.5f;
+        [Tooltip("Degrees around the board the sweep starts from.")]
+        [SerializeField] private float introTurn = -100f;
+        [Tooltip("Degrees closer to straight down the sweep starts from. Looking lower would show past the sea.")]
+        [SerializeField, Range(0f, 25f)] private float introTilt = 14f;
+        [Tooltip("How many times faster the sweep finishes after a tap.")]
+        [SerializeField, Min(1f)] private float introSkipSpeed = 5f;
+
         [Header("Swipes")]
         [Tooltip("Degrees turned per screen pixel swiped on the bottom half.")]
         [SerializeField, Min(0f)] private float turnSpeed = 0.25f;
         [Tooltip("How far you may pan from your avatar, in world units.")]
         [SerializeField, Min(0f)] private float maxPan = 6f;
-        [SerializeField, Min(0f)] private float zoomPerScroll = 0.01f;
+        [Tooltip("World units moved per notch of the mouse wheel.")]
+        [SerializeField, Min(0f)] private float zoomPerScroll = 1f;
         [Tooltip("Panning sideways goes the other way: swipe right and the camera moves right.")]
-        [SerializeField] private bool invertPanX = true;
+        [SerializeField] private bool invertPanX;
         [Tooltip("Turning goes the other way: swipe right and the view turns the other way round.")]
         [SerializeField] private bool invertTurnX;
 
@@ -49,9 +61,24 @@ namespace SoulBind.UI
         private bool _dragOnTop;      // the swipe started on the top half
         private Vector2 _pressStart;
         private Vector2 _lastPointer;
+        private float _introShare = 1f; // how far through the opening sweep, 0 to 1
+        private bool _introHurried;   // a tap asked it to finish
+        private bool _pinching;       // stays on until every finger has lifted
+        private float _pinchSpan;     // pixels between the two fingers last frame
 
         /// <summary>True while a finger or the mouse is panning or turning (so a release is not a tap).</summary>
         public static bool IsDragging { get; private set; }
+
+        /// <summary>True during the opening sweep: the match waits for it, and taps only hurry it.</summary>
+        public static bool IsIntroPlaying { get; private set; }
+
+        // Off on every Play, even with domain reload turned off.
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetOnPlay()
+        {
+            IsDragging = false;
+            IsIntroPlaying = false;
+        }
 
         /// <summary>Puts the camera on the Main Camera and starts following. Returns null with no camera.</summary>
         public static MatchCamera Create(MatchController controller)
@@ -67,6 +94,7 @@ namespace SoulBind.UI
             rig._boardCenter = controller.BoardView != null ? controller.BoardView.transform : null;
             rig._focus = rig.GetTarget();
             rig._lastTarget = rig._focus;
+            rig.StartIntro();
             rig.Apply();
             return rig;
         }
@@ -74,15 +102,42 @@ namespace SoulBind.UI
         private void OnDisable()
         {
             IsDragging = false;
+            IsIntroPlaying = false;
         }
 
         private void Update()
         {
             if (_camera == null || _controller == null)
                 return;
-            ReadSwipes();
+            if (IsIntroPlaying)
+                PlayIntro();
+            else
+                ReadSwipes();
             Follow(Time.deltaTime);
             Apply();
+        }
+
+        // ---------- Opening sweep ----------
+
+        // Starts the sweep, unless it is turned off.
+        private void StartIntro()
+        {
+            _introHurried = false;
+            IsIntroPlaying = introSeconds > 0f;
+            _introShare = IsIntroPlaying ? 0f : 1f;
+        }
+
+        // Moves the sweep on. Real time, capped, so the long first frame of the scene skips nothing.
+        private void PlayIntro()
+        {
+            Pointer pointer = Pointer.current;
+            if (pointer != null && pointer.press.wasPressedThisFrame)
+                _introHurried = true;
+            float seconds = MotionStyle.Seconds(introSeconds);
+            float step = Mathf.Min(Time.unscaledDeltaTime, 0.05f) / Mathf.Max(0.01f, seconds);
+            _introShare = Mathf.Clamp01(_introShare + step * (_introHurried ? introSkipSpeed : 1f));
+            if (_introShare >= 1f)
+                IsIntroPlaying = false;
         }
 
         // ---------- Following ----------
@@ -120,13 +175,17 @@ namespace SoulBind.UI
         // The board lies in the XY plane facing -Z. Yaw turns around Z; tilt looks down from the player's side.
         private void Apply()
         {
-            Quaternion rotation = Quaternion.AngleAxis(_yaw, Vector3.forward) * Quaternion.Euler(-tilt, 0f, 0f);
+            // 1 at the start of the sweep, down to 0 at the normal view.
+            float sweep = 1f - MotionStyle.InOut(_introShare);
+            float away = Mathf.Lerp(distance, Mathf.Max(distance, distanceRange.y), sweep);
+            Quaternion rotation = Quaternion.AngleAxis(_yaw + introTurn * sweep, Vector3.forward)
+                                  * Quaternion.Euler(-(tilt + introTilt * sweep), 0f, 0f);
             _camera.orthographic = false;
             _camera.fieldOfView = fieldOfView;
             _camera.nearClipPlane = 0.1f;
             _camera.farClipPlane = 1000f;
             _camera.transform.rotation = rotation;
-            _camera.transform.position = _focus - rotation * Vector3.forward * distance;
+            _camera.transform.position = _focus - rotation * Vector3.forward * away;
         }
 
         // ---------- Swipes ----------
@@ -139,8 +198,11 @@ namespace SoulBind.UI
             {
                 float scroll = mouse.scroll.ReadValue().y;
                 if (scroll != 0f && !IsOverUi())
-                    distance = Mathf.Clamp(distance - scroll * zoomPerScroll, distanceRange.x, distanceRange.y);
+                    Zoom(-Mathf.Sign(scroll) * zoomPerScroll);
             }
+
+            if (ReadPinch())
+                return;
 
             Pointer pointer = Pointer.current;
             if (pointer == null)
@@ -185,6 +247,52 @@ namespace SoulBind.UI
                 moved.x = -moved.x;
             PanBy(moved);
         }
+
+        // Two fingers zoom: apart moves in, together moves out. A pinch starts like a swipe, so never on
+        // cards or buttons. True while it lasts, so the fingers do not pan or turn as well.
+        private bool ReadPinch()
+        {
+            Touchscreen screen = Touchscreen.current;
+            if (screen == null)
+                return false;
+
+            int fingers = 0;
+            Vector2 first = Vector2.zero, second = Vector2.zero;
+            for (int i = 0; i < screen.touches.Count; i++)
+            {
+                if (!screen.touches[i].press.isPressed)
+                    continue;
+                if (fingers == 0)
+                    first = screen.touches[i].position.ReadValue();
+                else if (fingers == 1)
+                    second = screen.touches[i].position.ReadValue();
+                fingers++;
+            }
+
+            if (fingers >= 2 && (_pinching || _drag != Drag.None))
+            {
+                float span = Mathf.Max(1f, Vector2.Distance(first, second));
+                if (_pinching)
+                    Zoom(distance * (_pinchSpan / span - 1f));
+                _pinchSpan = span;
+                _pinching = true;
+                _drag = Drag.None;
+                IsDragging = true;
+                return true;
+            }
+            if (!_pinching)
+                return false;
+            if (fingers == 0)
+            {
+                _pinching = false;
+                IsDragging = false;
+            }
+            return true;
+        }
+
+        // Moves the camera nearer (negative) or further away, within the allowed range.
+        private void Zoom(float change) =>
+            distance = Mathf.Clamp(distance + change, distanceRange.x, distanceRange.y);
 
         // The board slides with the finger: the point under it stays under it, roughly.
         private void PanBy(Vector2 moved)

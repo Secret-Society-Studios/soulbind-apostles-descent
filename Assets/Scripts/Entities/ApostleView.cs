@@ -54,28 +54,51 @@ namespace SoulBind.Entities
                 SpawnPiece(apostleId);
         }
 
-        /// <summary>The avatar swings at a target: towards the right if directionX is 0 or more.</summary>
-        public void PlayAttack(float directionX)
+        /// <summary>The avatar swings towards a world direction.</summary>
+        public void PlayAttack(Vector3 direction)
         {
             if (_avatar != null)
-                _avatar.PlayAttack(directionX);
+                _avatar.PlayAttack(direction);
         }
 
-        /// <summary>The avatar flinches, facing the side the hit came from.</summary>
-        public void PlayDamaged(bool fromRight)
+        /// <summary>The avatar flinches, facing the world direction the hit came from.</summary>
+        public void PlayDamaged(Vector3 towardAttacker)
         {
             if (_avatar != null)
-                _avatar.PlayDamaged(fromRight);
+                _avatar.PlayDamaged(towardAttacker);
+        }
+
+        /// <summary>Holds the avatar still, for The World's stopped time.</summary>
+        public void SetFrozen(bool frozen)
+        {
+            if (_avatar != null)
+                _avatar.SetFrozen(frozen);
+        }
+
+        /// <summary>Shows the avatar's Corrupted look, or back to normal.</summary>
+        public void SetCorrupted(bool corrupted)
+        {
+            if (_avatar != null)
+                _avatar.SetCorrupted(corrupted);
+        }
+
+        /// <summary>While it is this Apostle's turn, the avatar keeps facing the way it walked.</summary>
+        public void SetHoldsPosture(bool holds)
+        {
+            if (_avatar != null)
+                _avatar.SetHoldsPosture(holds);
         }
 
         /// <summary>
-        /// The top of the piece in world space: the point nearest the camera, since the board faces -Z
-        /// and pieces stand toward it. Name plates float just above this.
+        /// The top of the piece in world space: the avatar's head, or for a 3D piece the point nearest
+        /// the camera, since the board faces -Z and pieces stand toward it. Name plates float above this.
         /// </summary>
         public Vector3 TopPoint
         {
             get
             {
+                if (_avatar != null)
+                    return _avatar.TopPoint;
                 Vector3 position = transform.position;
                 float top = position.z + pieceLift;
                 if (_pieceRenderers != null)
@@ -119,7 +142,6 @@ namespace SoulBind.Entities
             if (_avatar == null)
                 return false;
             _avatar.transform.localPosition = new Vector3(0f, 0f, pieceLift);
-            _pieceRenderers = new[] { _avatar.Renderer };
             return true;
         }
 

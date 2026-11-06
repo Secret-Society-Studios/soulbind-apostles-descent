@@ -45,6 +45,8 @@ namespace SoulBind.UI
         private GameObject _startButton;
         private readonly SeatCard[] _seatCards = new SeatCard[GameConstants.MaxPlayers];
         private readonly List<OnlineSession.RoomPlayer> _roomPlayers = new List<OnlineSession.RoomPlayer>(6);
+        private readonly int[] _wantedColors = new int[SeatColors.Count];
+        private readonly int[] _seatColors = new int[SeatColors.Count];
         private readonly StringBuilder _lobbyKey = new StringBuilder(128);
         private string _shownLobby = string.Empty;
         private float _nextLobbyRead;
@@ -117,7 +119,7 @@ namespace SoulBind.UI
             _lobbyKey.Clear();
             _lobbyKey.Append(session.Code).Append('|').Append(seats).Append('|').Append(joined);
             for (int i = 0; i < _roomPlayers.Count; i++)
-                _lobbyKey.Append('|').Append(_roomPlayers[i].Name).Append(_roomPlayers[i].IsHost ? '*' : '-');
+                _lobbyKey.Append('|').Append(_roomPlayers[i].Name).Append(_roomPlayers[i].IsHost ? '*' : '-').Append(_roomPlayers[i].Color);
             if (!force && _lobbyKey.Length == _shownLobby.Length && KeyMatches())
                 return;
             _shownLobby = _lobbyKey.ToString();
@@ -148,6 +150,11 @@ namespace SoulBind.UI
                 ? "Open seats are played by bots when the match starts"
                 : "Waiting for the host to start the match";
 
+            // The same sharing out the host does when the match starts.
+            for (int i = 0; i < _wantedColors.Length; i++)
+                _wantedColors[i] = i < _roomPlayers.Count ? _roomPlayers[i].Color : SeatColors.None;
+            SeatColors.Resolve(_wantedColors, _seatColors);
+
             for (int i = 0; i < _seatCards.Length; i++)
                 ShowSeat(_seatCards[i], i, seats);
 
@@ -163,7 +170,7 @@ namespace SoulBind.UI
             _lobbyHost.text = HostName();
             _startButton.SetActive(host);
             _lobbyHint.text = host
-                ? "Share the code. Players who join take the next open seat, in the colour shown."
+                ? "Share the code. Players who join take the next open seat, in their own colour if it is free."
                 : "The host picks the number of Apostles and starts the match.";
         }
 
@@ -175,7 +182,7 @@ namespace SoulBind.UI
             if (!shown)
                 return;
 
-            Color colour = ApostleColors.Get(index + 1);
+            Color colour = ApostleColors.Palette(_seatColors[index]);
             bool open = index >= _roomPlayers.Count;
             card.Fill.color = open ? Color.clear : Kit.Panel;
             card.Border.color = open ? Kit.Line : Kit.BronzeLine;

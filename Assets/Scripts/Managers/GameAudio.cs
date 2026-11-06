@@ -3,27 +3,46 @@ using UnityEngine;
 namespace SoulBind.Managers
 {
     /// <summary>
-    /// The player's master volume, saved between launches. It turns the whole game up or down
-    /// (AudioListener.volume), so every sound and music track added later follows it with no extra code.
+    /// The player's Music and Sounds volumes, saved between launches. Each one turns its own
+    /// AudioSource up or down, so every clip played through PlayMusic or PlaySfx follows it.
     /// </summary>
     public static class GameAudio
     {
-        private const string PrefKey = "masterVolume"; // 0 to 1
+        private const string MusicKey = "musicVolume"; // 0 to 1
+        private const string SoundKey = "soundVolume"; // 0 to 1
+        private const string OldMasterKey = "masterVolume"; // from before the split: the starting value of both
 
-        /// <summary>0 = silent, 1 = full. Saved at once.</summary>
-        public static float Volume
+        /// <summary>The music's volume: 0 = silent, 1 = full.</summary>
+        public static float MusicVolume
         {
-            get => PlayerPrefs.GetFloat(PrefKey, 1f);
+            get => Saved(MusicKey);
             set
             {
                 float volume = Mathf.Clamp01(value);
-                PlayerPrefs.SetFloat(PrefKey, volume);
-                AudioListener.volume = volume;
+                PlayerPrefs.SetFloat(MusicKey, volume);
+                if (_music != null)
+                    _music.volume = volume;
             }
         }
 
-        /// <summary>Writes the volume to disk (call when the player lets go of the slider).</summary>
+        /// <summary>The sound effects' volume: 0 = silent, 1 = full.</summary>
+        public static float SoundVolume
+        {
+            get => Saved(SoundKey);
+            set
+            {
+                float volume = Mathf.Clamp01(value);
+                PlayerPrefs.SetFloat(SoundKey, volume);
+                if (_sfx != null)
+                    _sfx.volume = volume;
+            }
+        }
+
+        /// <summary>Writes the volumes to disk (call when the player lets go of the slider).</summary>
         public static void Save() => PlayerPrefs.Save();
+
+        // A saved volume, or the old master volume for a player who has not moved this slider yet.
+        private static float Saved(string key) => PlayerPrefs.GetFloat(key, PlayerPrefs.GetFloat(OldMasterKey, 1f));
 
         // ---------- Playing ----------
 
@@ -65,8 +84,10 @@ namespace SoulBind.Managers
             _music = go.AddComponent<AudioSource>();
             _music.loop = true;
             _music.playOnAwake = false;
+            _music.volume = MusicVolume;
             _sfx = go.AddComponent<AudioSource>();
             _sfx.playOnAwake = false;
+            _sfx.volume = SoundVolume;
         }
 
         // Forgets the sources on every Play, even with domain reload turned off.
@@ -75,13 +96,6 @@ namespace SoulBind.Managers
         {
             _music = null;
             _sfx = null;
-        }
-
-        // The saved volume applies from the first scene.
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-        private static void ApplySaved()
-        {
-            AudioListener.volume = Volume;
         }
     }
 }

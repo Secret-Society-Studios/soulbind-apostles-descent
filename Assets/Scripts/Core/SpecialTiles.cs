@@ -158,7 +158,11 @@ namespace SoulBind.Core
             }
 
             _active.Remove(apostle.Position);
+            Triggered?.Invoke(apostle, type);
             return true;
         }
+
+        /// <summary>Raised when an Apostle uses a tile up.</summary>
+        public event Action<ApostleState, SpecialTileType> Triggered;
     }
 }

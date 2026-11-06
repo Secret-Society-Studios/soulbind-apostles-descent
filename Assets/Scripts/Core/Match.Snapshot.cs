@@ -70,6 +70,13 @@ namespace SoulBind.Core
             s.StrengthAwaitingPartner = _strengthAwaitingPartner;
             s.EmperorArmed = _emperorArmed;
             s.SkipRestOfRound = _skipRestOfRound;
+            s.PhaseOpenerId = _phaseOpenerId;
+            s.TimeStopOwnerId = TimeStopOwnerId;
+            s.LegendaryPlayCount = LegendaryPlayCount;
+            s.LastLegendaryCard = LastLegendaryCard;
+            s.LastLegendaryPlayerId = LastLegendaryPlayerId;
+            s.EffectCount = EffectCount;
+            s.RecentEffects.AddRange(_recentEffects);
             Array.Copy(_elementsPlayedThisTurn, s.ElementsPlayedThisTurn, _elementsPlayedThisTurn.Length);
             s.AttackCards.AddRange(_queuedCards);
             s.LastStrikeHits.AddRange(_lastStrikeHits);
@@ -151,6 +158,14 @@ namespace SoulBind.Core
             _strengthAwaitingPartner = snapshot.StrengthAwaitingPartner;
             _emperorArmed = snapshot.EmperorArmed;
             _skipRestOfRound = snapshot.SkipRestOfRound;
+            _phaseOpenerId = snapshot.PhaseOpenerId;
+            TimeStopOwnerId = snapshot.TimeStopOwnerId;
+            LegendaryPlayCount = snapshot.LegendaryPlayCount;
+            LastLegendaryCard = snapshot.LastLegendaryCard;
+            LastLegendaryPlayerId = snapshot.LastLegendaryPlayerId;
+            EffectCount = snapshot.EffectCount;
+            _recentEffects.Clear();
+            _recentEffects.AddRange(snapshot.RecentEffects);
             _endTurnRequested = false;
             _nocturneVictimId = 0;
             Array.Copy(snapshot.ElementsPlayedThisTurn, _elementsPlayedThisTurn, _elementsPlayedThisTurn.Length);

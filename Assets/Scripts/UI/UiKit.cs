@@ -197,9 +197,20 @@ namespace SoulBind.UI
             image.pixelsPerUnitMultiplier = 2f;
             image.color = fill;
             image.raycastTarget = fill.a > 0f;
+            if (fill == Panel)
+                UseMenuArt(image, UiSkin.Current != null ? UiSkin.Current.MenuPanel : null);
             if (border.a > 0f && borderWidth > 0f)
                 AddBorder(rect, border, radius, borderWidth);
             return rect;
+        }
+
+        // UiSkin's art, tinted by the box's colour. Null keeps the drawn rounded box.
+        private static void UseMenuArt(Image image, Sprite art)
+        {
+            if (art == null)
+                return;
+            image.sprite = art;
+            image.pixelsPerUnitMultiplier = 1f;
         }
 
         /// <summary>A thin rounded border over rect (a child named Border), returned so it can be recoloured.</summary>
@@ -268,6 +279,7 @@ namespace SoulBind.UI
             RectTransform rect = Box(parent, name, fill, border, radius, borderWidth);
             Image image = rect.GetComponent<Image>();
             image.raycastTarget = true; // a ghost button is clear but still clickable
+            UseMenuArt(image, UiSkin.Current != null ? UiSkin.Current.MenuButton : null);
             UnityEngine.UI.Button button = rect.gameObject.AddComponent<UnityEngine.UI.Button>();
             button.targetGraphic = image;
             ColorBlock colors = button.colors;

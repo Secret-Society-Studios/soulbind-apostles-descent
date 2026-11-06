@@ -44,7 +44,7 @@ namespace SoulBind.Tests.EditMode
         [TestCase(ArcanaId.Temperance, Element.Celeste, 0, 5, 4, 2)]
         [TestCase(ArcanaId.Devil, Element.Nocturne, 8, 3, 6, 2)]
         [TestCase(ArcanaId.Tower, Element.Crimson, 3, 3, 6, 3)]
-        [TestCase(ArcanaId.Star, Element.Radiance, 0, 6, 4, 2)]
+        [TestCase(ArcanaId.Star, Element.Crimson, 0, 6, 4, 2)]
         [TestCase(ArcanaId.Moon, Element.Nocturne, 4, 10, 6, 1)]
         [TestCase(ArcanaId.Sun, Element.Radiance, 10, 4, 6, 1)]
         [TestCase(ArcanaId.Judgement, Element.Radiance, 2, 4, 3, 3)]

@@ -115,17 +115,18 @@ namespace SoulBind.Core
         }
 
         /// <summary>
-        /// Starts the next Phase. The living Apostle with the lowest Vessel goes first,
-        /// and the chosen direction decides how turns travel around the seats.
+        /// Starts the next Phase. The living Apostle with the lowest Vessel goes first, unless firstApostleId
+        /// names a living Apostle (The World). The chosen direction decides how turns travel around the seats.
         /// </summary>
-        public void BeginNextPhase(IReadOnlyList<ApostleState> apostles, TurnDirection direction)
+        public void BeginNextPhase(IReadOnlyList<ApostleState> apostles, TurnDirection direction, int firstApostleId = 0)
         {
             if (apostles == null)
                 throw new ArgumentNullException(nameof(apostles));
             if (!IsAwaitingPhaseStart)
                 throw new InvalidOperationException("The current phase has not ended.");
 
-            _startSeat = SeatOf(GetLowestVesselApostleId(apostles));
+            bool hasFirst = firstApostleId != 0 && IsAlive(apostles, firstApostleId);
+            _startSeat = SeatOf(hasFirst ? firstApostleId : GetLowestVesselApostleId(apostles));
             Direction = direction;
             RoundNumber++;
             IsAwaitingPhaseStart = false;

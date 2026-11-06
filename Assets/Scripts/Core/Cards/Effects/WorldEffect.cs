@@ -1,17 +1,20 @@
 namespace SoulBind.Core
 {
     /// <summary>
-    /// The World: "Every other Apostle loses their turn."
-    /// The player's own turn carries on as normal. When it ends, every other Apostle's turn is passed
-    /// over (no start-of-turn effects, no draw) until it is the player's turn again, in the next round.
-    /// If the Phase ends on the way (The World played in a Phase's last round), the Phase ends as normal.
+    /// The World: "Stop all opponents' turns; go to the next round."
+    /// Playing it ends the turn at once, exactly like End Turn (an attack in progress resolves first, and
+    /// the player still draws). Every other Apostle's turn is passed over (no start-of-turn effects, no
+    /// draw) and the player goes again in the next round, with a fresh Capacity.
+    /// If that crosses into a new Phase, the Phase ends as normal and the direction is chosen as normal,
+    /// but the player still goes first in it.
     /// </summary>
     public sealed class WorldEffect : CardEffect
     {
-        // Skips everyone else's turns for the rest of the round.
+        // Ends the turn now and passes over everyone else's.
         public override void OnPlayed(CardPlayContext context)
         {
             context.SkipRestOfRound();
+            context.EndTurnAfterThisCard();
         }
     }
 }

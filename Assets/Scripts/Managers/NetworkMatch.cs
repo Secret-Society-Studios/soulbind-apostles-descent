@@ -33,6 +33,7 @@ namespace SoulBind.Online
         private readonly Dictionary<ulong, int> _seatByClient = new Dictionary<ulong, int>(GameConstants.MaxPlayers);
         private readonly HashSet<ulong> _ready = new HashSet<ulong>();
         private readonly Dictionary<ulong, string> _nameByClient = new Dictionary<ulong, string>(GameConstants.MaxPlayers);
+        private readonly Dictionary<ulong, int> _colorByClient = new Dictionary<ulong, int>(GameConstants.MaxPlayers);
         private readonly List<int> _remoteSeats = new List<int>(GameConstants.MaxPlayers);
         private readonly byte[] _commandBytes = new byte[MatchCommand.EncodedSize];
         private readonly Dictionary<ulong, Budget> _budgets = new Dictionary<ulong, Budget>(GameConstants.MaxPlayers);
@@ -60,6 +61,9 @@ namespace SoulBind.Online
                 controller.CommandSubmitted += SendCommand;
                 controller.SpawnSubmitted += SendSpawn;
                 controller.ChatSubmitted += SendChat;
+                // A separate message, so ClientReadyRpc stays the same between versions: it carries the
+                // protocol check, and a changed signature would never reach a host on another version.
+                ClientColorRpc(ApostleColors.LocalChoice);
                 ClientReadyRpc(PlayerNames.LocalName, BuildInfo.ProtocolVersion);
             }
         }
@@ -126,11 +130,33 @@ namespace SoulBind.Online
             }
             NamesRpc(PlayerNames.Pack());
 
+            // Colours likewise: the views are built from them when the match starts.
+            int[] colors = ResolveColors();
+            ApostleColors.SetSeats(colors);
+            ColorsRpc(colors);
+
             // Seats first, so each player knows who they are before the first snapshot arrives.
             foreach (KeyValuePair<ulong, int> pair in _seatByClient)
                 AssignSeatRpc(pair.Value, seats, RpcTarget.Single(pair.Key, RpcTargetUse.Temp));
 
             controller.StartOnlineHost(seats, _remoteSeats); // its first MatchChanged sends the snapshots
+        }
+
+        // Everyone's colour wishes, in seat order: earlier seats win a clash, bots take what is left.
+        private int[] ResolveColors()
+        {
+            var wanted = new int[SeatColors.Count];
+            for (int i = 0; i < wanted.Length; i++)
+                wanted[i] = SeatColors.None;
+            wanted[0] = ApostleColors.LocalChoice;
+            foreach (KeyValuePair<ulong, int> seat in _seatByClient)
+            {
+                if (_colorByClient.TryGetValue(seat.Key, out int color))
+                    wanted[seat.Value - 1] = color;
+            }
+            var colors = new int[SeatColors.Count];
+            SeatColors.Resolve(wanted, colors);
+            return colors;
         }
 
         // ---------- Host to players ----------
@@ -186,6 +212,15 @@ namespace SoulBind.Online
 
         // ---------- Players to host ----------
 
+        // Client to host: the colour I picked. SeatColors ignores anything outside the palette.
+        [Rpc(SendTo.Server)]
+        private void ClientColorRpc(int color, RpcParams rpcParams = default)
+        {
+            ulong sender = rpcParams.Receive.SenderClientId;
+            if (Allow(sender))
+                _colorByClient[sender] = color;
+        }
+
         // Client to host: I am ready, with my name and protocol version.
         [Rpc(SendTo.Server)]
         private void ClientReadyRpc(string playerName, int protocol, RpcParams rpcParams = default)
@@ -212,6 +247,13 @@ namespace SoulBind.Online
         private void NamesRpc(string packed)
         {
             PlayerNames.Unpack(packed);
+        }
+
+        // Host to everyone: every seat's colour.
+        [Rpc(SendTo.NotServer)]
+        private void ColorsRpc(int[] colors)
+        {
+            ApostleColors.SetSeats(colors);
         }
 
         // Packs a command into the reused buffer and sends it to the host.

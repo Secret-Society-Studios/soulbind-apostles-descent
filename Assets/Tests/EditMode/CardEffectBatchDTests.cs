@@ -175,13 +175,12 @@ namespace SoulBind.Tests.EditMode
         // ---- The World ----
 
         [Test]
-        public void World_SkipsTheRestOfTheRound()
+        public void World_GoesToTheNextRoundAtOnce()
         {
             Match match = MatchWithHand(3, ArcanaId.World, ArcanaId.Fool, ArcanaId.Fool, ArcanaId.Fool, ArcanaId.Fool);
             ApostleState player = match.CurrentApostle;
-            Play(match, ArcanaId.World);
 
-            match.EndTurn();
+            Play(match, ArcanaId.World);
 
             Assert.AreEqual(2, match.Turns.RoundNumber);
             Assert.AreSame(player, match.CurrentApostle, "The player was first in the round, so goes first again");
@@ -193,12 +192,109 @@ namespace SoulBind.Tests.EditMode
         }
 
         [Test]
+        public void World_StopsTimeUntilTheTurnThatFollowsEnds()
+        {
+            Match match = MatchWithHand(3, ArcanaId.World, ArcanaId.Fool, ArcanaId.Fool, ArcanaId.Fool, ArcanaId.Fool);
+            ApostleState player = match.CurrentApostle;
+            Assert.AreEqual(0, match.TimeStopOwnerId);
+
+            Play(match, ArcanaId.World);
+            Assert.AreEqual(player.Id, match.TimeStopOwnerId);
+
+            match.EndTurn();
+            Assert.AreEqual(0, match.TimeStopOwnerId);
+        }
+
+        private static bool HasEffect(Match match, MatchEffectKind kind, int apostleId)
+        {
+            foreach (MatchEffect effect in match.RecentEffects)
+            {
+                if (effect.Kind == kind && effect.ApostleId == apostleId)
+                    return true;
+            }
+            return false;
+        }
+
+        private static ApostleState Opponent(Match match, ApostleState player) =>
+            match.Battlefield.Apostles[0] == player ? match.Battlefield.Apostles[1] : match.Battlefield.Apostles[0];
+
+        [Test]
+        public void Effects_BuffCardShowsOnItsPlayer()
+        {
+            Match match = MatchWithHand(2, ArcanaId.Hermit, ArcanaId.Fool, ArcanaId.Fool, ArcanaId.Fool, ArcanaId.Fool);
+            ApostleState player = match.CurrentApostle;
+
+            Play(match, ArcanaId.Hermit);
+
+            Assert.IsTrue(HasEffect(match, MatchEffectKind.Buff, player.Id));
+        }
+
+        [Test]
+        public void Effects_TheTowerDebuffsOpponents_NotThePlayer()
+        {
+            Match match = MatchWithHand(2, ArcanaId.Tower, ArcanaId.Fool, ArcanaId.Fool, ArcanaId.Fool, ArcanaId.Fool);
+            ApostleState player = match.CurrentApostle;
+
+            Play(match, ArcanaId.Tower);
+
+            Assert.IsTrue(HasEffect(match, MatchEffectKind.Debuff, Opponent(match, player).Id));
+            Assert.IsFalse(HasEffect(match, MatchEffectKind.Debuff, player.Id));
+        }
+
+        [Test]
+        public void Effects_JusticeCorruptsOpponents_NotThePlayer()
+        {
+            Match match = MatchWithHand(2, ArcanaId.Justice, ArcanaId.Fool, ArcanaId.Fool, ArcanaId.Fool, ArcanaId.Fool);
+            ApostleState player = match.CurrentApostle;
+
+            Play(match, ArcanaId.Justice);
+
+            Assert.IsTrue(HasEffect(match, MatchEffectKind.Corrupt, Opponent(match, player).Id));
+            Assert.IsFalse(HasEffect(match, MatchEffectKind.Corrupt, player.Id));
+        }
+
+        [Test]
+        public void Effects_AnOrdinaryCardShowsNothing()
+        {
+            Match match = MatchWithHand(2, ArcanaId.Magician, ArcanaId.Fool, ArcanaId.Fool, ArcanaId.Fool, ArcanaId.Fool);
+
+            Play(match, ArcanaId.Magician);
+
+            Assert.AreEqual(0, match.EffectCount);
+        }
+
+        [Test]
+        public void LegendaryCards_AreRecordedForTheScreen()
+        {
+            Match match = MatchWithHand(3, ArcanaId.World, ArcanaId.Fool, ArcanaId.Fool, ArcanaId.Fool, ArcanaId.Fool);
+            ApostleState player = match.CurrentApostle;
+            Assert.AreEqual(0, match.LegendaryPlayCount);
+
+            Play(match, ArcanaId.Fool);
+            Assert.AreEqual(0, match.LegendaryPlayCount, "An ordinary card is not recorded");
+
+            Play(match, ArcanaId.World);
+            Assert.AreEqual(1, match.LegendaryPlayCount);
+            Assert.AreEqual(ArcanaId.World, match.LastLegendaryCard);
+            Assert.AreEqual(player.Id, match.LastLegendaryPlayerId);
+        }
+
+        [Test]
+        public void World_RefreshesThePlayersCapacity()
+        {
+            Match match = MatchWithHand(3, ArcanaId.World, ArcanaId.Fool, ArcanaId.Fool, ArcanaId.Fool, ArcanaId.Fool);
+
+            Play(match, ArcanaId.World);
+
+            Assert.AreEqual(match.CurrentCapacity.Maximum, match.CurrentCapacity.Remaining);
+        }
+
+        [Test]
         public void World_OnlyAffectsTheTurnItWasPlayed()
         {
             Match match = MatchWithHand(3, ArcanaId.World, ArcanaId.Fool, ArcanaId.Fool, ArcanaId.Fool, ArcanaId.Fool);
             ApostleState player = match.CurrentApostle;
-            Play(match, ArcanaId.World);
-            match.EndTurn(); // round 2, the player again
+            Play(match, ArcanaId.World); // round 2, the player again
 
             match.EndTurn();
 
@@ -207,7 +303,7 @@ namespace SoulBind.Tests.EditMode
         }
 
         [Test]
-        public void World_InThePhasesLastRound_EndsThePhase()
+        public void World_InThePhasesLastRound_EndsThePhaseAndThePlayerGoesFirstInTheNext()
         {
             Match match = MatchWithHand(2, ArcanaId.World, ArcanaId.Fool, ArcanaId.Fool, ArcanaId.Fool, ArcanaId.Fool);
             ApostleState player = match.CurrentApostle;
@@ -216,11 +312,41 @@ namespace SoulBind.Tests.EditMode
             Assert.AreEqual(3, match.Turns.RoundNumber);
             Assert.AreSame(player, match.CurrentApostle);
 
-            Play(match, ArcanaId.World);
-            TurnEvent turnEvent = match.EndTurn();
+            ApostleState other = match.Battlefield.Apostles[0] == player
+                ? match.Battlefield.Apostles[1]
+                : match.Battlefield.Apostles[0];
+            other.TakeDamage(5); // normally the lowest Vessel would go first
 
-            Assert.AreEqual(TurnEvent.PhaseEnded, turnEvent);
+            Play(match, ArcanaId.World);
+
             Assert.IsTrue(match.IsAwaitingPhaseStart);
+            Assert.AreEqual(other.Id, match.GetNextPhaseChooserId(), "The direction is still chosen as normal");
+
+            match.BeginNextPhase(TurnDirection.Forward);
+
+            Assert.AreSame(player, match.CurrentApostle);
+            Assert.AreEqual(match.CurrentCapacity.Maximum, match.CurrentCapacity.Remaining);
+        }
+
+        [Test]
+        public void World_GoingFirstLastsOnePhaseOnly()
+        {
+            Match match = MatchWithHand(2, ArcanaId.World, ArcanaId.Fool, ArcanaId.Fool, ArcanaId.Fool, ArcanaId.Fool);
+            ApostleState player = match.CurrentApostle;
+            for (int i = 0; i < 4; i++)
+                match.EndTurn();
+            ApostleState other = match.Battlefield.Apostles[0] == player
+                ? match.Battlefield.Apostles[1]
+                : match.Battlefield.Apostles[0];
+            other.TakeDamage(5);
+            Play(match, ArcanaId.World);
+            match.BeginNextPhase(TurnDirection.Forward);
+
+            for (int i = 0; i < GameConstants.RoundsPerPhase * 2; i++)
+                match.EndTurn();
+            match.BeginNextPhase(TurnDirection.Forward);
+
+            Assert.AreSame(other, match.CurrentApostle, "The lowest Vessel goes first again");
         }
     }
 }

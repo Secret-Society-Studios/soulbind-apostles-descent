@@ -45,7 +45,7 @@ namespace SoulBind.Core
                 "Opponent gains +3 Corruption; you gain +1."),
             new CardDefinition(ArcanaId.Tower, "The Tower", Element.Crimson, 3, 3, 6, 3,
                 "Decrease each opponent's Capacity by 2 for 1 round."),
-            new CardDefinition(ArcanaId.Star, "The Star", Element.Radiance, 0, 6, 4, 2,
+            new CardDefinition(ArcanaId.Star, "The Star", Element.Crimson, 0, 6, 4, 2,
                 "Heal 2 Vessel and increase DEF by 4 for 2 rounds."),
             new CardDefinition(ArcanaId.Moon, "The Moon", Element.Nocturne, 4, 10, 6, 1,
                 "If an opponent fails to break your DEF, they gain +2 Corruption."),

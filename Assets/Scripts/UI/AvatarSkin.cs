@@ -22,6 +22,16 @@ namespace SoulBind.UI
         [SerializeField] private Sprite[] damagedLeft = new Sprite[0];
         [SerializeField] private Sprite[] damagedRight = new Sprite[0];
 
+        [Header("Corrupted frames (5+ Corruption; an empty list uses the normal frames)")]
+        [SerializeField] private Sprite[] corruptedIdleLeft = new Sprite[0];
+        [SerializeField] private Sprite[] corruptedIdleRight = new Sprite[0];
+        [SerializeField] private Sprite[] corruptedWalkUp = new Sprite[0];
+        [SerializeField] private Sprite[] corruptedWalkDown = new Sprite[0];
+        [SerializeField] private Sprite[] corruptedWalkLeft = new Sprite[0];
+        [SerializeField] private Sprite[] corruptedWalkRight = new Sprite[0];
+        [SerializeField] private Sprite[] corruptedDamagedLeft = new Sprite[0];
+        [SerializeField] private Sprite[] corruptedDamagedRight = new Sprite[0];
+
         [Header("Speed (frames per second)")]
         [SerializeField, Min(1f)] private float idleFps = 10f;
         [SerializeField, Min(1f)] private float walkFps = 10f;
@@ -44,12 +54,23 @@ namespace SoulBind.UI
         public Sprite[] AttackRight => attackRight;
         public Sprite[] DamagedLeft => damagedLeft;
         public Sprite[] DamagedRight => damagedRight;
+        public Sprite[] CorruptedIdleLeft => corruptedIdleLeft;
+        public Sprite[] CorruptedIdleRight => corruptedIdleRight;
+        public Sprite[] CorruptedWalkUp => corruptedWalkUp;
+        public Sprite[] CorruptedWalkDown => corruptedWalkDown;
+        public Sprite[] CorruptedWalkLeft => corruptedWalkLeft;
+        public Sprite[] CorruptedWalkRight => corruptedWalkRight;
+        public Sprite[] CorruptedDamagedLeft => corruptedDamagedLeft;
+        public Sprite[] CorruptedDamagedRight => corruptedDamagedRight;
         public float IdleFps => idleFps;
         public float WalkFps => walkFps;
         public float AttackFps => attackFps;
         public float DamagedFps => damagedFps;
         public float Height => height;
         public float Tint => tint;
+
+        /// <summary>The sprite colour that tints the grey frames with this Apostle colour.</summary>
+        public Color Tinted(Color color) => Color.Lerp(Color.white, color, tint);
 
         private static AvatarSkin _current;
         private static bool _looked;

@@ -9,6 +9,7 @@ namespace SoulBind.UI
     /// It lives at Assets/Resources/UiSkin.asset. Drag a sprite into a slot and that part of the bar
     /// uses it; an empty slot keeps the code-drawn placeholder, so the art can arrive one piece at a time.
     /// Frames and backs should be 9-sliced in the Sprite Editor; fills are drawn as Filled, Horizontal.
+    /// Panels, buttons and the game frame are tinted by the game, so draw them in white and greys.
     /// </summary>
     [CreateAssetMenu(menuName = "SoulBind/UI Skin", fileName = "UiSkin")]
     public sealed class UiSkin : ScriptableObject
@@ -55,6 +56,8 @@ namespace SoulBind.UI
         [SerializeField] private Sprite gamePanel;
         [SerializeField] private Sprite gameButton;
         [SerializeField] private Sprite gameButtonPressed;
+        [Tooltip("The border laid over panels and buttons. 9-slice it, with a clear middle. Draw it white: the game tints it gold.")]
+        [SerializeField] private Sprite gameFrame;
         [SerializeField] private Sprite gameMenuIcon;
         [SerializeField] private Sprite gameHelpIcon;
         [SerializeField] private Sprite gameBanner;
@@ -90,6 +93,7 @@ namespace SoulBind.UI
         public Sprite GamePanel => gamePanel;
         public Sprite GameButton => gameButton;
         public Sprite GameButtonPressed => gameButtonPressed;
+        public Sprite GameFrame => gameFrame;
         public Sprite GameMenuIcon => gameMenuIcon;
         public Sprite GameHelpIcon => gameHelpIcon;
         public Sprite GameBanner => gameBanner;

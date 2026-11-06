@@ -32,6 +32,18 @@ namespace SoulBind.UI
             Kit.At((RectTransform)label.transform.parent, 0f, y, 420f, MenuButtonHeight);
         }
 
+        // Two half-width buttons side by side in one row of the main column.
+        private static void AddMenuPair(RectTransform column, int row, string left, UnityEngine.Events.UnityAction onLeft,
+            string right, UnityEngine.Events.UnityAction onRight)
+        {
+            float y = row * (MenuButtonHeight + MenuButtonGap);
+            float width = (420f - MenuButtonGap) / 2f;
+            TMP_Text a = Kit.Button(column, left, left, Kit.ButtonStyle.Secondary, onLeft, 18f);
+            Kit.At((RectTransform)a.transform.parent, 0f, y, width, MenuButtonHeight);
+            TMP_Text b = Kit.Button(column, right, right, Kit.ButtonStyle.Secondary, onRight, 18f);
+            Kit.At((RectTransform)b.transform.parent, width + MenuButtonGap, y, width, MenuButtonHeight);
+        }
+
         // A sub-screen: frame lines, the back button and a title. Starts hidden.
         private RectTransform BuildSubScreen(string name, string title)
         {
@@ -83,12 +95,11 @@ namespace SoulBind.UI
         private const float TileWidth = 84f, TileHeight = 118f, TileGap = 8f; // about the art's 5:7
         private const float PreviewLeft = 820f, PreviewWidth = 300f, PreviewHeight = 420f;
 
-        private Image _previewArt;
+        private CardViewer360 _previewCard;
         private TMP_Text _previewName;
         private TMP_Text _previewStats;
         private TMP_Text _previewEffect;
         private TMP_Text _previewMissing;
-        private RectTransform _collectionsFrame;
         private readonly List<RectTransform> _galleryTiles = new List<RectTransform>(22);
         private readonly List<CardDefinition> _galleryCards = new List<CardDefinition>(22);
         private readonly List<Image> _filterButtons = new List<Image>(5);
@@ -96,12 +107,11 @@ namespace SoulBind.UI
         private int _filter = -1; // -1 = all cards, else the SoulBind.Core.Element shown
 
         // The card gallery: every card's art in a grid, with element filters on top. Tapping a card shows
-        // it on the right and opens the 360 view.
+        // it in the 360 view on the right.
         private void BuildCollections()
         {
             RectTransform frame = BuildSubScreen("CollectionsScreen", "Collections");
             _collectionsScreen = frame.gameObject;
-            _collectionsFrame = frame;
 
             BuildFilters(frame);
             CardArtLibrary art = CardArtLibrary.Current;
@@ -161,18 +171,11 @@ namespace SoulBind.UI
             }
         }
 
-        // Tapping a card: it shows on the right, and the 360 view opens.
-        private void OpenCard(ArcanaId id)
-        {
-            ShowCard(id);
-            CardViewer360.Open(_collectionsFrame, CardCatalog.Get(id));
-        }
-
         // One card: its art, or its name on a plain tile while it has none. Placed by SetFilter.
         private RectTransform BuildGalleryTile(RectTransform frame, CardDefinition card, CardArtLibrary art)
         {
             ArcanaId id = card.Id;
-            TMP_Text label = Kit.Button(frame, card.Name, "", Kit.ButtonStyle.Ghost, () => OpenCard(id), 12f, 8f);
+            TMP_Text label = Kit.Button(frame, card.Name, "", Kit.ButtonStyle.Ghost, () => ShowCard(id), 12f, 8f);
             var tile = (RectTransform)label.transform.parent;
 
             Sprite front = art != null ? art.GetFront(id) : null;
@@ -192,7 +195,7 @@ namespace SoulBind.UI
         {
             RectTransform box = Kit.Box(frame, "Preview", Kit.Inset, Kit.GoldLine, 12f);
             Kit.At(box, PreviewLeft, FilterTop, PreviewWidth, PreviewHeight);
-            _previewArt = AddArt(box, null, 6f);
+            _previewCard = CardViewer360.Create(box, 6f, new Vector2(PreviewWidth, PreviewHeight));
             _previewMissing = Kit.Label(box, "NoArt", "No art yet", 18f, Kit.Inter, Kit.Muted);
             Kit.Stretch(_previewMissing.rectTransform);
 
@@ -207,7 +210,7 @@ namespace SoulBind.UI
                 PreviewWidth + 80f, 40f);
 
             // The left side's bottom line, under the grid.
-            TMP_Text note = Kit.Label(frame, "Note", "Tap a card to spin it in 360°.", 14f, Kit.Inter, Kit.Muted);
+            TMP_Text note = Kit.Label(frame, "Note", "Tap a card to see it. Drag it on the right to spin it in 360°.", 14f, Kit.Inter, Kit.Muted);
             float gridBottom = GalleryTop + 3f * (TileHeight + TileGap);
             Kit.At(note.rectTransform, GalleryLeft, gridBottom + 6f,
                 GalleryColumns * (TileWidth + TileGap) - TileGap, 22f);
@@ -219,8 +222,7 @@ namespace SoulBind.UI
             CardDefinition card = CardCatalog.Get(id);
             CardArtLibrary art = CardArtLibrary.Current;
             Sprite front = art != null ? art.GetFront(id) : null;
-            _previewArt.sprite = front;
-            _previewArt.enabled = front != null;
+            _previewCard.Show(card);
             _previewMissing.gameObject.SetActive(front == null);
             _previewName.text = card.Name;
             _previewStats.text = $"{card.Element.ToString().ToUpperInvariant()}   ATK {card.Attack}   " +
@@ -242,7 +244,7 @@ namespace SoulBind.UI
 
         // ---------- Settings ----------
 
-        // Builds the Settings screen: graphics, volume and chat.
+        // Builds the Settings screen: graphics, music and sound volume, and chat.
         private void BuildSettings()
         {
             RectTransform frame = BuildSubScreen("SettingsScreen", "Settings");
@@ -259,7 +261,7 @@ namespace SoulBind.UI
             Kit.At((RectTransform)_chatMuteLabel.transform.parent, 0f, 70f, 500f, 56f);
             ShowChatMute();
 
-            // Graphics and Volume (the same rows as the in-game Menu's Settings).
+            // Graphics, Music and Sounds (the same rows as the in-game Menu's Settings).
             SettingsPanel.Build(column, 0f, 150f, 500f);
         }
 

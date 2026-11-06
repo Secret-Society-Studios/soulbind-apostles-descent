@@ -79,12 +79,12 @@ namespace SoulBind.Tests.EditMode
         [Test]
         public void Radiance_ThirdCard_DoesNotTriggerAgain()
         {
-            Match match = MatchWithHand(2, ArcanaId.Magician, ArcanaId.Empress, ArcanaId.Star, ArcanaId.Fool, ArcanaId.Fool);
+            Match match = MatchWithHand(2, ArcanaId.Magician, ArcanaId.Empress, ArcanaId.Judgement, ArcanaId.Fool, ArcanaId.Fool);
             ApostleState player = match.CurrentApostle;
 
             Play(match, ArcanaId.Magician); // 1
             Play(match, ArcanaId.Empress);  // 3 + 2
-            Play(match, ArcanaId.Star);     // 6, no second combo
+            Play(match, ArcanaId.Judgement); // 4 + 2 from its effect, no second combo
 
             Assert.AreEqual(12, player.Shield);
         }

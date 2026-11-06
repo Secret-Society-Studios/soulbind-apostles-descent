@@ -60,7 +60,7 @@ namespace SoulBind.Core
         /// <summary>Temperance only: ends the player's turn as soon as the card has been played.</summary>
         public void EndTurnAfterThisCard() => _match.RequestEndTurn();
 
-        /// <summary>The World only: when the player's turn ends, the rest of the current round is skipped.</summary>
+        /// <summary>The World only: when the player's turn ends, everyone else's turns are passed over.</summary>
         public void SkipRestOfRound() => _match.SkipRestOfRound();
 
         /// <summary>

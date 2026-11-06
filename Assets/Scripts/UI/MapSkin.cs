@@ -59,13 +59,24 @@ namespace SoulBind.UI
         [SerializeField, Range(0f, 1f)] private float cliffShade = 0.45f;
 
         [Header("Edge rocks (big rocks standing on the 3D island's rim)")]
-        [Tooltip("Your rock art, picked in turn. Each stands on the rim and faces the camera, like the " + "avatars. Empty = 3D placeholder rocks cut from the cliff art.")]
-        [SerializeField] private Sprite[] edgeRocks = new Sprite[0];
-        [SerializeField, Range(0, 40)] private int edgeRockCount = 14;
-        [Tooltip("The smallest and largest rock height, in world units.")]
+        [Tooltip("On: an unbroken ring of solid 3D rocks around the whole island, built from the sprites below (plain stone if there are none). Off: the sprites stand flat, facing the camera.")]
+        [SerializeField] private bool edgeRocks3D = true;
+        [Tooltip("Plain stone rocks only: world units from one rock to the next. Smaller = a denser ring, and more rocks.")]
+        [SerializeField, Min(0.2f)] private float edgeRockSpacing = 0.7f;
+        [Tooltip("With sprites: y is the height of the tallest one, and the others keep their size next to it, " + "so the pixels stay one size. Plain stone rocks pick a height from x to y. In world units.")]
         [SerializeField] private Vector2 edgeRockHeight = new Vector2(0.7f, 1.6f);
         [Tooltip("How far in from the rim the rocks stand, as a share of the island's radius.")]
         [SerializeField, Range(0f, 0.3f)] private float edgeRockInset = 0.05f;
+
+        [Header("Edge rock art")]
+        [Tooltip("Your rock art: the tallest stand in the middle of a formation, the rest at its sides.")]
+        [SerializeField] private Sprite[] edgeRocks = new Sprite[0];
+        [Tooltip("How many rocks when they stand flat. The 3D ring uses as many as it takes to close.")]
+        [SerializeField, Range(0, 40)] private int edgeRockCount = 14;
+        [Tooltip("How many rocks stand together in each formation. 1 = spaced out singly around the rim.")]
+        [SerializeField, Range(1, 8)] private int edgeRockFormationSize = 3;
+        [Tooltip("Multiplied over your rock art, to match it to the island. White = the art as drawn.")]
+        [SerializeField] private Color edgeRockTint = new Color(1f, 0.9f, 0.85f);
 
         [Header("Lava glow (over the island's edge, pulses)")]
         [SerializeField] private Sprite lavaGlow;
@@ -110,7 +121,12 @@ namespace SoulBind.UI
         public Rect IslandCliffArea => islandCliffArea;
         public float CliffShade => cliffShade;
         public bool HasEdgeRockArt => edgeRocks != null && edgeRocks.Length > 0;
+        public bool EdgeRocks3D => edgeRocks3D;
+        public float EdgeRockSpacing => edgeRockSpacing;
+        public int EdgeRockArtCount => edgeRocks != null ? edgeRocks.Length : 0;
         public int EdgeRockCount => edgeRockCount;
+        public int EdgeRockFormationSize => edgeRockFormationSize;
+        public Color EdgeRockTint => edgeRockTint;
         public Vector2 EdgeRockHeight => edgeRockHeight;
         public float EdgeRockInset => edgeRockInset;
         public Sprite LavaGlow => lavaGlow;

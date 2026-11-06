@@ -47,8 +47,39 @@ namespace SoulBind.Core
         // Set by Temperance: the turn ends as soon as the card has been played.
         private bool _endTurnRequested;
 
-        // Set by The World: when this turn ends, the rest of the round is skipped.
+        // Set by The World: when this turn ends, everyone else's turns are passed over.
         private bool _skipRestOfRound;
+
+        // Set when The World runs into the end of a Phase: this Apostle goes first in the next one.
+        private int _phaseOpenerId;
+
+        /// <summary>
+        /// The Apostle who stopped time with The World, for the screen: 0 when time runs normally.
+        /// It lasts until the turn that follows The World ends.
+        /// </summary>
+        public int TimeStopOwnerId { get; private set; }
+
+        /// <summary>
+        /// How many legendary cards have resolved this match, for the screen: when it goes up,
+        /// LastLegendaryCard was played by LastLegendaryPlayerId.
+        /// </summary>
+        public int LegendaryPlayCount { get; private set; }
+        public ArcanaId LastLegendaryCard { get; private set; }
+        public int LastLegendaryPlayerId { get; private set; }
+
+        /// <summary>
+        /// The latest things that happened to Apostles, for the screen, oldest first. EffectCount counts
+        /// every one so far, so anything added since the last look is at the end of this list.
+        /// </summary>
+        public IReadOnlyList<MatchEffect> RecentEffects => _recentEffects;
+        public int EffectCount { get; private set; }
+        private const int MaxRecentEffects = 16;
+        private readonly List<MatchEffect> _recentEffects = new List<MatchEffect>(MaxRecentEffects);
+
+        // Each Apostle as a card started to resolve, to see what it changed.
+        private readonly int[] _corruptionBefore = new int[GameConstants.MaxPlayers];
+        private readonly int[] _timedBefore = new int[GameConstants.MaxPlayers];
+        private readonly int[] _vesselBefore = new int[GameConstants.MaxPlayers];
 
         // Element combos: cards of each element played this turn (indexed by Element).
         private readonly int[] _elementsPlayedThisTurn = new int[ElementCombo.ElementCount];
@@ -102,6 +133,7 @@ namespace SoulBind.Core
         private Match(Battlefield battlefield, TurnTracker turns, Deck deck, Random random)
         {
             Battlefield = battlefield;
+            Battlefield.Specials.Triggered += OnSpecialTileUsed;
             Turns = turns;
             Deck = deck;
             _random = random;
@@ -351,6 +383,14 @@ namespace SoulBind.Core
         // playing a card that both a direct play and the queue need.
         private void RunEffectAndCombo(ArcanaId card, CardDefinition definition)
         {
+            if (definition.Rarity == CardRarity.Legendary)
+            {
+                LegendaryPlayCount++;
+                LastLegendaryCard = card;
+                LastLegendaryPlayerId = CurrentApostle.Id;
+            }
+            NoteApostlesBeforeCard();
+
             // Then the card's own effect, if it has one.
             CardEffect effect = CardEffects.Get(card);
             if (effect != null)
@@ -390,6 +430,57 @@ namespace SoulBind.Core
                 ApplyCombo(definition.Element);
                 UpdateGameOver();
             }
+            RecordCardEffects();
+        }
+
+        private void NoteApostlesBeforeCard()
+        {
+            IReadOnlyList<ApostleState> apostles = Battlefield.Apostles;
+            for (int i = 0; i < apostles.Count; i++)
+            {
+                _corruptionBefore[i] = apostles[i].Corruption;
+                _timedBefore[i] = apostles[i].TimedEffects.Count;
+                _vesselBefore[i] = apostles[i].Vessel;
+            }
+        }
+
+        // What the card did, for the screen: strengthened its player, or hurt an opponent's standing.
+        private void RecordCardEffects()
+        {
+            IReadOnlyList<ApostleState> apostles = Battlefield.Apostles;
+            for (int i = 0; i < apostles.Count; i++)
+            {
+                ApostleState apostle = apostles[i];
+                if (apostle.IsEliminated)
+                    continue;
+                bool gainedTimed = apostle.TimedEffects.Count > _timedBefore[i];
+                if (apostle == CurrentApostle)
+                {
+                    if (gainedTimed || apostle.Vessel > _vesselBefore[i])
+                        RecordEffect(MatchEffectKind.Buff, apostle.Id);
+                    continue;
+                }
+                if (gainedTimed)
+                    RecordEffect(MatchEffectKind.Debuff, apostle.Id);
+                if (apostle.Corruption > _corruptionBefore[i])
+                    RecordEffect(MatchEffectKind.Corrupt, apostle.Id);
+            }
+        }
+
+        private void OnSpecialTileUsed(ApostleState apostle, SpecialTileType type)
+        {
+            if (type == SpecialTileType.Heal)
+                RecordEffect(MatchEffectKind.HealTile, apostle.Id);
+            else if (type == SpecialTileType.Soul)
+                RecordEffect(MatchEffectKind.SoulTile, apostle.Id);
+        }
+
+        private void RecordEffect(MatchEffectKind kind, int apostleId)
+        {
+            if (_recentEffects.Count == MaxRecentEffects)
+                _recentEffects.RemoveAt(0);
+            _recentEffects.Add(new MatchEffect(kind, apostleId));
+            EffectCount++;
         }
 
         // Starts or joins an attack with this card. Cards already waiting outside an attack
@@ -880,19 +971,22 @@ namespace SoulBind.Core
             }
 
             int endingId = CurrentApostle.Id;
+            TimeStopOwnerId = _skipRestOfRound ? endingId : 0;
             FinishTurn(CurrentApostle);
 
             TurnEvent turnEvent = Turns.EndTurn(Battlefield.Apostles);
 
             // The World: every other Apostle loses their turn (no start-of-turn effects, no draw), so the
             // player who played it goes again straight away, in the next round. If the Phase ends on the
-            // way, it ends as normal.
+            // way, it ends as normal, and they go first in the next one.
             if (_skipRestOfRound)
             {
                 _skipRestOfRound = false;
                 int guard = 4 * GameConstants.MaxPlayers;
                 while (turnEvent != TurnEvent.PhaseEnded && Turns.CurrentApostleId != endingId && guard-- > 0)
                     turnEvent = Turns.EndTurn(Battlefield.Apostles);
+                if (turnEvent == TurnEvent.PhaseEnded)
+                    _phaseOpenerId = endingId;
             }
 
             if (turnEvent == TurnEvent.PhaseEnded)
@@ -927,7 +1021,8 @@ namespace SoulBind.Core
             if (!Turns.IsAwaitingPhaseStart)
                 throw new InvalidOperationException("The current phase has not ended.");
 
-            Turns.BeginNextPhase(Battlefield.Apostles, direction);
+            Turns.BeginNextPhase(Battlefield.Apostles, direction, _phaseOpenerId);
+            _phaseOpenerId = 0;
             // Every Phase starts with all the special tiles back: the used ones on random free tiles.
             Battlefield.Specials.Replenish(Battlefield.Board, _random, IsBlockedForSpecialTile);
             StartTurn();
@@ -995,6 +1090,10 @@ namespace SoulBind.Core
 
                 if (UpdateGameOver())
                     return;
+
+                // Whoever stopped time did not survive to use it.
+                if (TimeStopOwnerId == apostle.Id)
+                    TimeStopOwnerId = 0;
 
                 if (Turns.EndTurn(Battlefield.Apostles) == TurnEvent.PhaseEnded)
                 {

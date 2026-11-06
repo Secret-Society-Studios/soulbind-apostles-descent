@@ -669,6 +669,7 @@ namespace SoulBind.UI
             outside.transition = Selectable.Transition.None;
             outside.onClick.AddListener(CancelQuit);
             _quitConfirm = confirm.gameObject;
+            UiKit.OnTop(_quitConfirm);
 
             RectTransform box = CreateRect("Box", confirm);
             box.anchorMin = box.anchorMax = new Vector2(0.5f, 0.5f);
@@ -711,6 +712,7 @@ namespace SoulBind.UI
             outside.transition = Selectable.Transition.None;
             outside.onClick.AddListener(KeepWatching);
             _outPanel = panel.gameObject;
+            UiKit.OnTop(_outPanel);
 
             RectTransform box = CreateRect("Box", panel);
             box.anchorMin = box.anchorMax = new Vector2(0.5f, 0.5f);
@@ -743,6 +745,7 @@ namespace SoulBind.UI
             outside.transition = Selectable.Transition.None;
             outside.onClick.AddListener(CloseMenu);
             _menu = menu.gameObject;
+            UiKit.OnTop(_menu); // over the hand, the piles and a card being played, which have their own layers
 
             RectTransform box = CreateRect("Box", menu);
             box.anchorMin = box.anchorMax = new Vector2(0.5f, 0.5f);
@@ -763,7 +766,7 @@ namespace SoulBind.UI
             _menu.SetActive(false);
         }
 
-        // Graphics and Volume, over the match.
+        // Graphics, Music and Sounds, over the match.
         private void OpenSettings()
         {
             _menu.SetActive(false);

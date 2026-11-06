@@ -1,5 +1,5 @@
+using System.Collections.Generic;
 using SoulBind.Core;
-using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -8,58 +8,61 @@ using Kit = SoulBind.UI.UiKit;
 namespace SoulBind.UI
 {
     /// <summary>
-    /// The Collections' 360 view: one card, large, turning slowly. Drag anywhere to spin it (it keeps
-    /// spinning, then settles back to a slow turn) and up or down to tip it. Its back shows when it faces
-    /// away. Tap outside the card, or Close, to go back. Built once under the screen's frame and reused.
+    /// The Collections' preview: one card as a real 3D object, with thickness, turning slowly above its
+    /// reflection on the floor. A glossy sheen slides over it as it turns. Drag to spin it (it keeps
+    /// spinning, then settles back to a slow turn) and up or down to tip it.
+    /// The card has its own small scene, far from everything, and a camera that draws it into a texture
+    /// only while this preview is on screen.
     /// </summary>
-    public sealed class CardViewer360 : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler,
-        IPointerClickHandler
+    public sealed class CardViewer360 : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
     {
-        private const float CardWidth = 300f, CardHeight = 420f; // design pixels, about the art's 5:7
         private const float AutoSpin = 25f;      // degrees per second while nobody drags
         private const float DragSpin = 0.45f;    // degrees per pixel dragged sideways
         private const float DragTip = 0.25f;     // degrees per pixel dragged up or down
         private const float MaxTip = 25f;        // the most it tips forward or back
         private const float Settle = 2.5f;       // how fast a flick slows back to the slow turn
 
-        private RectTransform _card;
-        private Image _front;
-        private Image _back;
-        private TMP_Text _missing;
-        private GameObject _plain; // a plain card shape (with its border), for a side that has no art
-        private TMP_Text _name;
-        private TMP_Text _stats;
-        private TMP_Text _effect;
+        // The card's size in its scene (about the art's 5:7), and how the camera frames it.
+        private const float CardWidth = 1f, CardHeight = 1.4f, CardThickness = 0.02f, CornerRadius = 0.06f;
+        private const int CornerSteps = 6;
+        private const float FloorBelow = 0.8f;   // from the card's middle down to the floor
+        private const float CameraDistance = 4.2f, CameraDrop = 0.3f, CameraFieldOfView = 28f;
+        private const int TextureScale = 2;      // texture pixels per design pixel
+        private const int RigLayer = 31;         // nothing else uses it, so no other camera draws the card
+        private static readonly Vector3 RigPosition = new Vector3(0f, 2000f, 0f);
+        private static readonly int MirrorId = Shader.PropertyToID("_Mirror");
+        private static readonly int FloorId = Shader.PropertyToID("_FloorY");
+
+        private GameObject _rig;
+        private Camera _camera;
+        private RenderTexture _texture;
+        private Mesh _mesh;
+        private Transform _card;
+        private Transform _reflection;
+        private Material _front;
+        private Material _back;
+        private Material _edge;
         private float _yaw;      // degrees around the card's upright axis; 0 = front facing you
         private float _tip;      // degrees forward or back
         private float _spin;     // degrees per second
         private bool _dragging;
 
-        /// <summary>Shows this card in the viewer over frame (made the first time).</summary>
-        public static void Open(RectTransform frame, CardDefinition card)
+        /// <summary>Fills box (width x height in design pixels) with the preview.</summary>
+        public static CardViewer360 Create(RectTransform box, float inset, Vector2 size)
         {
-            if (frame == null || card == null)
-                return;
-            Transform existing = frame.Find("CardViewer360");
-            CardViewer360 viewer = existing != null ? existing.GetComponent<CardViewer360>() : Create(frame);
-            viewer.Show(card);
-            viewer.gameObject.SetActive(true);
-            viewer.transform.SetAsLastSibling();
+            RectTransform rect = Kit.Stretch(Kit.CreateRect("CardViewer360", box), inset);
+            RawImage image = rect.gameObject.AddComponent<RawImage>();
+            CardViewer360 viewer = rect.gameObject.AddComponent<CardViewer360>();
+            viewer.Build(image, size - 2f * inset * Vector2.one);
+            return viewer;
         }
 
-        // Puts a card's front and back art on the viewer and resets the spin.
-        private void Show(CardDefinition card)
+        /// <summary>Puts a card's front and back art on the card, and resets the spin.</summary>
+        public void Show(CardDefinition card)
         {
             CardArtLibrary art = CardArtLibrary.Current;
-            Sprite front = art != null ? art.GetFront(card.Id) : null;
-            Sprite back = art != null ? art.Back : null;
-            _front.sprite = front;
-            _back.sprite = back;
-            _missing.text = front == null ? card.Name : "";
-            _name.text = card.Name;
-            _stats.text = $"{card.Element.ToString().ToUpperInvariant()}   ATK {card.Attack}   " +
-                          $"DEF {card.Defense}   CAP {card.Cap}";
-            _effect.text = card.Effect;
+            SetArt(_front, art != null ? art.GetFront(card.Id) : null);
+            SetArt(_back, art != null ? art.Back : null);
 
             // Every card starts face on, with a little spin so it is clearly turnable.
             _yaw = 0f;
@@ -69,7 +72,50 @@ namespace SoulBind.UI
             Apply();
         }
 
+        // A sprite's part of its texture, or a plain card colour for a side with no art.
+        private static void SetArt(Material material, Sprite sprite)
+        {
+            if (sprite == null)
+            {
+                material.mainTexture = Texture2D.whiteTexture;
+                material.mainTextureScale = Vector2.one;
+                material.mainTextureOffset = Vector2.zero;
+                material.color = Kit.Panel;
+                return;
+            }
+            Texture2D texture = sprite.texture;
+            Rect area = sprite.rect;
+            material.mainTexture = texture;
+            material.mainTextureScale = new Vector2(area.width / texture.width, area.height / texture.height);
+            material.mainTextureOffset = new Vector2(area.x / texture.width, area.y / texture.height);
+            material.color = Color.white;
+        }
+
         // ---------- Spinning ----------
+
+        private void OnEnable()
+        {
+            if (_rig != null)
+                _rig.SetActive(true);
+        }
+
+        private void OnDisable()
+        {
+            if (_rig != null)
+                _rig.SetActive(false);
+        }
+
+        private void OnDestroy()
+        {
+            Destroy(_rig);
+            Destroy(_mesh);
+            Destroy(_front);
+            Destroy(_back);
+            Destroy(_edge);
+            if (_texture != null)
+                _texture.Release();
+            Destroy(_texture);
+        }
 
         private void Update()
         {
@@ -84,21 +130,13 @@ namespace SoulBind.UI
             Apply();
         }
 
-        // Turns the card and shows whichever face points at the camera.
+        // Turns the card and its reflection.
         private void Apply()
         {
             _yaw = Mathf.Repeat(_yaw, 360f);
-            _card.localRotation = Quaternion.Euler(_tip, _yaw, 0f);
-            // UI images draw both sides, so show whichever side faces you.
-            bool facing = Mathf.Cos(_yaw * Mathf.Deg2Rad) >= 0f;
-            if (_front.enabled != (facing && _front.sprite != null))
-                _front.enabled = facing && _front.sprite != null;
-            if (_back.enabled != !facing)
-                _back.enabled = !facing;
-            _missing.enabled = facing;
-            bool plain = facing ? _front.sprite == null : _back.sprite == null;
-            if (_plain.activeSelf != plain)
-                _plain.SetActive(plain);
+            Quaternion turn = Quaternion.Euler(_tip, _yaw, 0f);
+            _card.localRotation = turn;
+            _reflection.localRotation = turn;
         }
 
         // Stops the free spin while the player drags.
@@ -125,79 +163,166 @@ namespace SoulBind.UI
             _spin = Mathf.Clamp(_spin, -900f, 900f);
         }
 
-        // A tap (not the end of a drag) outside the card closes the viewer.
-        public void OnPointerClick(PointerEventData eventData)
-        {
-            if (eventData.dragging)
-                return;
-            if (RectTransformUtility.RectangleContainsScreenPoint(_card, eventData.position, eventData.pressEventCamera))
-                return;
-            Close();
-        }
-
-        // Hides the viewer.
-        private void Close() => gameObject.SetActive(false);
-
         // ---------- Building ----------
 
-        // Builds the viewer once: a dim layer, the card with two faces, and a hint.
-        private static CardViewer360 Create(RectTransform frame)
+        // Builds the card, its reflection, and the camera that draws them into image.
+        private void Build(RawImage image, Vector2 size)
         {
-            // A dim layer over the whole screen: it catches drags anywhere, so spinning is easy on a phone.
-            RectTransform root = Kit.Stretch(Kit.CreateRect("CardViewer360", frame));
-            root.offsetMin = new Vector2(-2000f, -2000f); // past the design frame's edges, to the screen's
-            root.offsetMax = new Vector2(2000f, 2000f);
-            Image dim = root.gameObject.AddComponent<Image>();
-            dim.color = new Color(0f, 0f, 0f, 0.82f);
-            CardViewer360 viewer = root.gameObject.AddComponent<CardViewer360>();
+            _rig = new GameObject("CardViewerRig");
+            _rig.transform.position = RigPosition;
+            _mesh = BuildCardMesh();
 
-            // A holder at the design frame's size, so the parts can be placed with the design's numbers.
-            RectTransform area = Kit.CreateRect("Area", root);
-            area.anchorMin = area.anchorMax = area.pivot = new Vector2(0.5f, 0.5f);
-            area.sizeDelta = frame.sizeDelta;
+            Shader shader = Resources.Load<Shader>("CardGloss");
+            _front = new Material(shader);
+            _back = new Material(shader);
+            _edge = new Material(shader) { color = Kit.Gold };
+            var materials = new[] { _front, _back, _edge };
 
-            TMP_Text hint = Kit.Label(area, "Hint", "Drag to spin the card", 15f, Kit.Inter, Kit.Muted);
-            Kit.At(hint.rectTransform, 0f, 70f, frame.sizeDelta.x, 22f);
+            _card = AddCard("Card", _rig.transform, materials);
 
-            viewer._card = Kit.CreateRect("Card", area);
-            viewer._card.anchorMin = viewer._card.anchorMax = new Vector2(0.5f, 1f);
-            viewer._card.pivot = new Vector2(0.5f, 0.5f);
-            viewer._card.anchoredPosition = new Vector2(0f, -110f - CardHeight / 2f);
-            viewer._card.sizeDelta = new Vector2(CardWidth, CardHeight);
+            // A mirror image under the floor: flipped upside down around it, and fading away from it.
+            float floor = RigPosition.y - FloorBelow;
+            var mirror = new GameObject("Mirror").transform;
+            mirror.SetParent(_rig.transform, false);
+            mirror.localPosition = new Vector3(0f, -FloorBelow, 0f);
+            mirror.localScale = new Vector3(1f, -1f, 1f);
+            _reflection = AddCard("Reflection", mirror, materials);
+            _reflection.localPosition = new Vector3(0f, FloorBelow, 0f);
+            var block = new MaterialPropertyBlock();
+            block.SetFloat(MirrorId, 1f);
+            block.SetFloat(FloorId, floor);
+            MeshRenderer reflection = _reflection.GetComponent<MeshRenderer>();
+            for (int i = 0; i < materials.Length; i++)
+                reflection.SetPropertyBlock(block, i);
 
-            // The back sits behind the front, turned around so it reads the right way when it shows.
-            viewer._back = AddFace(viewer._card, "Back");
-            viewer._back.rectTransform.localRotation = Quaternion.Euler(0f, 180f, 0f);
-            RectTransform plain = Kit.Stretch(Kit.Box(viewer._card, "Plain", Kit.Panel, Kit.GoldLine, 14f, 2f));
-            plain.GetComponent<Image>().raycastTarget = false;
-            plain.SetAsFirstSibling();
-            viewer._plain = plain.gameObject;
-            viewer._front = AddFace(viewer._card, "Front");
-            viewer._missing = Kit.Label(viewer._card, "Name", "", 24f, Kit.Display, Kit.Title);
-            Kit.Stretch(viewer._missing.rectTransform, 20f);
+            _texture = new RenderTexture(Mathf.RoundToInt(size.x) * TextureScale, Mathf.RoundToInt(size.y) * TextureScale,
+                16, RenderTextureFormat.ARGB32) { antiAliasing = 4 };
+            image.texture = _texture;
 
-            float y = 110f + CardHeight + 18f;
-            float width = frame.sizeDelta.x;
-            viewer._name = Kit.Label(area, "CardName", "", 26f, Kit.Display, Kit.Title);
-            Kit.At(viewer._name.rectTransform, 0f, y, width, 34f);
-            viewer._stats = Kit.Label(area, "CardStats", "", 15f, Kit.InterSemiBold, Kit.Soft);
-            Kit.At(viewer._stats.rectTransform, 0f, y + 38f, width, 22f);
-            viewer._effect = Kit.Label(area, "CardEffect", "", 14f, Kit.Inter, Kit.Muted);
-            Kit.At(viewer._effect.rectTransform, width / 2f - 300f, y + 64f, 600f, 44f);
+            var eye = new GameObject("Camera", typeof(Camera));
+            eye.layer = RigLayer;
+            eye.transform.SetParent(_rig.transform, false);
+            eye.transform.localPosition = new Vector3(0f, -CameraDrop, -CameraDistance);
+            _camera = eye.GetComponent<Camera>();
+            _camera.clearFlags = CameraClearFlags.SolidColor;
+            _camera.backgroundColor = Kit.Inset; // the preview box's own colour, so the edge never shows
+            _camera.fieldOfView = CameraFieldOfView;
+            _camera.nearClipPlane = 0.1f;
+            _camera.farClipPlane = 20f;
+            _camera.cullingMask = 1 << RigLayer;
+            _camera.allowHDR = false;
+            _camera.targetTexture = _texture;
 
-            TMP_Text close = Kit.Button(area, "Close", "Close", Kit.ButtonStyle.Secondary, viewer.Close, 18f);
-            Kit.At((RectTransform)close.transform.parent, width - 170f, 40f, 130f, 48f);
-            return viewer;
+            _rig.SetActive(isActiveAndEnabled);
         }
 
-        // Adds one face of the card as a stretched image.
-        private static Image AddFace(RectTransform card, string name)
+        // One copy of the card mesh.
+        private Transform AddCard(string name, Transform parent, Material[] materials)
         {
-            RectTransform rect = Kit.Stretch(Kit.CreateRect(name, card));
-            var image = (Image)rect.gameObject.AddComponent(typeof(Image));
-            image.preserveAspect = true;
-            image.raycastTarget = false;
-            return image;
+            var go = new GameObject(name, typeof(MeshFilter), typeof(MeshRenderer));
+            go.layer = RigLayer;
+            go.transform.SetParent(parent, false);
+            go.GetComponent<MeshFilter>().sharedMesh = _mesh;
+            var meshRenderer = go.GetComponent<MeshRenderer>();
+            meshRenderer.sharedMaterials = materials;
+            meshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            meshRenderer.receiveShadows = false;
+            return go.transform;
+        }
+
+        // A rounded card with thickness, in three parts: front, back and edge.
+        private static Mesh BuildCardMesh()
+        {
+            float halfX = CardWidth / 2f, halfY = CardHeight / 2f, halfZ = CardThickness / 2f;
+            float cornerX = halfX - CornerRadius, cornerY = halfY - CornerRadius;
+
+            // The outline, counter-clockwise from the right side of the top-right corner.
+            int count = 4 * (CornerSteps + 1);
+            var outline = new Vector2[count];
+            var outward = new Vector3[count];
+            for (int corner = 0, n = 0; corner < 4; corner++)
+            {
+                var centre = new Vector2(corner == 0 || corner == 3 ? cornerX : -cornerX,
+                    corner < 2 ? cornerY : -cornerY);
+                for (int step = 0; step <= CornerSteps; step++, n++)
+                {
+                    float angle = (corner + (float)step / CornerSteps) * 90f * Mathf.Deg2Rad;
+                    var direction = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
+                    outline[n] = centre + direction * CornerRadius;
+                    outward[n] = direction;
+                }
+            }
+
+            var vertices = new List<Vector3>(4 * count + 2);
+            var normals = new List<Vector3>(4 * count + 2);
+            var uvs = new List<Vector2>(4 * count + 2);
+
+            // Each face: the centre, then the outline. The back's art is flipped to read right from behind.
+            void AddFace(float z, Vector3 normal, bool flip)
+            {
+                vertices.Add(new Vector3(0f, 0f, z));
+                normals.Add(normal);
+                uvs.Add(new Vector2(0.5f, 0.5f));
+                foreach (Vector2 point in outline)
+                {
+                    float u = (point.x + halfX) / CardWidth;
+                    vertices.Add(new Vector3(point.x, point.y, z));
+                    normals.Add(normal);
+                    uvs.Add(new Vector2(flip ? 1f - u : u, (point.y + halfY) / CardHeight));
+                }
+            }
+
+            AddFace(-halfZ, Vector3.back, false);
+            var front = new List<int>(3 * count);
+            for (int i = 0; i < count; i++)
+            {
+                front.Add(0);
+                front.Add(1 + (i + 1) % count);
+                front.Add(1 + i);
+            }
+
+            int backStart = vertices.Count;
+            AddFace(halfZ, Vector3.forward, true);
+            var back = new List<int>(3 * count);
+            for (int i = 0; i < count; i++)
+            {
+                back.Add(backStart);
+                back.Add(backStart + 1 + i);
+                back.Add(backStart + 1 + (i + 1) % count);
+            }
+
+            int edgeStart = vertices.Count;
+            for (int i = 0; i < count; i++)
+            {
+                vertices.Add(new Vector3(outline[i].x, outline[i].y, -halfZ));
+                vertices.Add(new Vector3(outline[i].x, outline[i].y, halfZ));
+                normals.Add(outward[i]);
+                normals.Add(outward[i]);
+                uvs.Add(Vector2.zero);
+                uvs.Add(Vector2.zero);
+            }
+            var edge = new List<int>(6 * count);
+            for (int i = 0; i < count; i++)
+            {
+                int a = edgeStart + 2 * i, b = a + 1;
+                int c = edgeStart + 2 * ((i + 1) % count), d = c + 1;
+                edge.Add(a);
+                edge.Add(c);
+                edge.Add(b);
+                edge.Add(c);
+                edge.Add(d);
+                edge.Add(b);
+            }
+
+            var mesh = new Mesh { name = "Card" };
+            mesh.SetVertices(vertices);
+            mesh.SetNormals(normals);
+            mesh.SetUVs(0, uvs);
+            mesh.subMeshCount = 3;
+            mesh.SetTriangles(front, 0);
+            mesh.SetTriangles(back, 1);
+            mesh.SetTriangles(edge, 2);
+            return mesh;
         }
     }
 }

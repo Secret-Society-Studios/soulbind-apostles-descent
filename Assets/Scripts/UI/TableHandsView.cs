@@ -54,7 +54,7 @@ namespace SoulBind.UI
         [Tooltip("Your cards' size on a computer screen (1 = 252 pixels tall on a 1080-pixel-high screen).")]
         [SerializeField, Range(0.3f, 1.2f)] private float pcCardScale = 0.8f;
         [Tooltip("Your cards' size on a phone, where the screen is only a few inches tall. Tablets fall between.")]
-        [SerializeField, Range(0.3f, 1.2f)] private float phoneCardScale = 0.6f;
+        [SerializeField, Range(0.3f, 1.2f)] private float phoneCardScale = 0.75f;
         [Tooltip("Tick to see the phone hand size while testing in the Editor.")]
         [SerializeField] private bool handPhoneInEditor;
         [Tooltip("How wide your hand may get at the PC size, in pixels of a 1080-pixel-high screen. " +
@@ -172,6 +172,8 @@ namespace SoulBind.UI
         private readonly List<Seat> _seats = new List<Seat>(GameConstants.MaxPlayers);
         private readonly int[] _cardCounts = new int[ArcanaSlots];
         private readonly int[] _newDiscards = new int[ArcanaSlots];
+        private readonly Queue<ArcanaId> _playOrder = new Queue<ArcanaId>(8); // queued cards still to be shown
+        private bool _playingCard;
         private readonly Vector3[] _corners = new Vector3[4];
         private RectTransform _rect;
         private Camera _camera;
@@ -189,6 +191,7 @@ namespace SoulBind.UI
         // The card whose preview stays up after a tap, until the preview itself is tapped.
         private bool _hasPinned;
         private ArcanaId _pinned;
+        private CardView _pinnedFace; // the copy that was tapped: another copy of the card stays down
         private CanvasGroup _previewGroup;
         private Camera _previewCamera;
         // Your Capacity, like an XP bar just above your hand: one pip per point, lit while unspent.
@@ -634,8 +637,24 @@ namespace SoulBind.UI
                     FlyToSeat(seat, match, Mathf.Clamp(slots - flying + j, 0, Mathf.Max(0, slots - 1)), hand.Count - flying + j);
             }
 
+            // What no hand claimed came out of the play queue: those play one at a time, in order.
+            int queued = _playOrder.Count;
+            if (_flights != null && discardPile != null)
+            {
+                for (int i = Mathf.Max(0, discards.Count - discardGrowth); i < discards.Count; i++)
+                {
+                    if (_newDiscards[(int)discards[i]] <= 0)
+                        continue;
+                    _newDiscards[(int)discards[i]]--;
+                    _playOrder.Enqueue(discards[i]);
+                }
+            }
+            toPile += _playOrder.Count - queued;
+
             if (toPile > 0 && discardPile != null)
                 discardPile.HoldTop(toPile);
+            if (!_playingCard)
+                PlayNextCard();
             // A new wheel of fortune swap (its Number went up): show which two cards changed hands.
             CardSwap swap = match.LastSwap;
             if (swap.Number != _lastSwapNumber)
@@ -1053,14 +1072,17 @@ namespace SoulBind.UI
             // The gentle float is skipped on Low graphics: a still hand is not redrawn every frame.
             bool bob = IsFanned(seat) && idleBob > 0f && _dragged == null && GraphicsQuality.AnimateUi;
             float time = Time.unscaledTime;
+            bool selectionShown = false; // with two copies in hand, only the first one rises
             for (int k = 0; k < seat.Faces.Count && k < total; k++)
             {
                 CardView face = seat.Faces[k];
                 if (face == _dragged || !face.gameObject.activeSelf)
                     continue;
 
-                bool hovered = face == _hovered || (_hasPinned && face.CardId == _pinned);
-                bool selected = matchController.HasSelectedCard && matchController.SelectedCard == face.CardId;
+                bool hovered = face == _hovered || (_hasPinned && face == _pinnedFace && face.CardId == _pinned);
+                bool selected = !selectionShown && matchController.HasSelectedCard
+                                && matchController.SelectedCard == face.CardId;
+                selectionShown |= selected;
                 Vector2 target = SlotPosition(seat, k, total);
                 float angle = FanAngle(seat, k, total);
                 if (hovered)
@@ -1123,10 +1145,13 @@ namespace SoulBind.UI
         private PointerEventData _hoverEvent;
         private EventSystem _hoverEventSystem; // the one _hoverEvent was made for
         private Vector2 _lastHoverPoint = new Vector2(-1f, -1f); // -1 = no point yet
+        private bool _touchDown;
+        private bool _touchMoved;  // this press went past a tap's wobble
+        private Vector2 _touchStart;
+
 
         // Picks the card under the pointer by where the cards rest. The hovered card keeps its whole
-        // lifted, grown area, so lifting it never moves it out from under the pointer. On a phone a
-        // card is only hovered while the finger is down, as before.
+        // lifted, grown area, so lifting it never moves it out from under the pointer.
         private void UpdateHover(Seat seat, int total)
         {
             if (_dragged != null)
@@ -1134,11 +1159,9 @@ namespace SoulBind.UI
             Pointer pointer = Pointer.current;
             if (pointer == null)
                 return;
-            if (pointer is Touchscreen && !pointer.press.isPressed)
+            if (pointer is Touchscreen || Application.isMobilePlatform)
             {
-                _lastHoverPoint = new Vector2(-1f, -1f);
-                if (_hovered != null)
-                    EndHover();
+                UpdateTouch(seat, total, pointer);
                 return;
             }
 
@@ -1156,6 +1179,43 @@ namespace SoulBind.UI
                 EndHover();
             if (found != null)
                 OnHoverStarted(found);
+        }
+
+        // A finger has no hover: the card it lands on stays the lifted one until it lets go, however the
+        // finger wobbles or the card rises out from under it. Letting go without moving is a tap. It is
+        // read here because the lifted card may have left the finger, and then uGUI sends no click.
+        private void UpdateTouch(Seat seat, int total, Pointer pointer)
+        {
+            bool down = pointer.press.isPressed;
+            Vector2 point = pointer.position.ReadValue();
+            if (down == _touchDown)
+            {
+                if (down && (point - _touchStart).magnitude > MatchCamera.TapSlop())
+                    _touchMoved = true;
+                return;
+            }
+
+            _touchDown = down;
+            if (down)
+            {
+                _touchStart = point;
+                _touchMoved = false;
+                CardView found = FindRestingCard(seat, total, point);
+                if (found != null && IsCoveredByOtherUi(seat, point))
+                    found = null;
+                if (_hovered != null && found != _hovered)
+                    EndHover();
+                if (found != null && found != _hovered)
+                    OnHoverStarted(found);
+                return;
+            }
+
+            CardView held = _hovered;
+            if (held == null)
+                return;
+            if (!_touchMoved)
+                OnClicked(held);
+            EndHover();
         }
 
         // The card whose resting slot is under the point, so a lifted card does not flicker.
@@ -1257,6 +1317,8 @@ namespace SoulBind.UI
                 return;
             if (Time.frameCount == _pinnedFrame)
                 return; // the tap that pinned it
+            if (_touchDown && _hovered != null)
+                return; // a finger lifting off a card: UpdateTouch pins that card instead
             Pointer pointer = Pointer.current;
             if (pointer == null || !pointer.press.wasReleasedThisFrame)
                 return;
@@ -1303,6 +1365,7 @@ namespace SoulBind.UI
         {
             _hasPinned = true;
             _pinned = card.CardId;
+            _pinnedFace = card;
             ShowPreview(_pinned);
             // While pinned, the preview catches taps, so a tap on it never reaches the board underneath.
             if (_previewGroup != null)
@@ -1387,6 +1450,40 @@ namespace SoulBind.UI
         }
 
         // ---------- Flying cards ----------
+
+        /// <summary>True while cards from the play queue are still being shown.</summary>
+        public bool IsPlayingCards => _playingCard;
+
+        /// <summary>About how long until the last queued card has landed.</summary>
+        public float PlaySecondsLeft =>
+            (_playOrder.Count + (_playingCard ? 1 : 0)) * MotionStyle.Seconds(playFlightTime * 1.9f);
+
+        // Shows the next queued card: it rises large in the middle of the screen, then drops on the pile.
+        private void PlayNextCard()
+        {
+            while (_playOrder.Count > 0)
+            {
+                ArcanaId card = _playOrder.Dequeue();
+                if (discardPile.TryGetScreenSpot(out Vector2 to, out float toPixels))
+                {
+                    _playingCard = true;
+                    var from = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+                    _flights.Fly(card, from, 0f, _flights.ScaleForPixels(Screen.height * 0.1f), to, 0f,
+                        _flights.ScaleForPixels(toPixels), false, false, playFlightTime, OnCardPlayed, true,
+                        _flights.ScaleForPixels(Screen.height * 0.45f));
+                    return;
+                }
+                discardPile.ReleaseOne();
+            }
+            _playingCard = false;
+        }
+
+        // A queued card reached the pile: on to the next one.
+        private void OnCardPlayed()
+        {
+            discardPile.ReleaseOne();
+            PlayNextCard();
+        }
 
         // A new discard no hand has claimed yet, or -1.
         private int TakeAnyNewDiscard()

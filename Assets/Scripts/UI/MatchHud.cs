@@ -97,6 +97,8 @@ namespace SoulBind.UI
                 // A plate above every piece: name, Souls, Vessel, Corruption and DEF.
                 // They take over from the opponents' portrait row, which is hidden.
                 NamePlates.Create((RectTransform)transform, matchController);
+                // A red pulse around the screen while your Vessel is low.
+                LowHealthIndicator.Create(_canvas.rootCanvas, matchController);
                 // The turn timer, top-left above the play queue (hidden while it is off or nobody is acting).
                 TurnTimerView.Create((RectTransform)transform, matchController);
                 // Quick chat: the Chat button left of Menu, and bubbles above each speaker's cards.

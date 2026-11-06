@@ -47,12 +47,14 @@ namespace SoulBind.Online
         public readonly struct RoomPlayer
         {
             public readonly string Name;
+            public readonly int Color; // the palette colour they picked, or SeatColors.None
             public readonly bool IsHost;
             public readonly bool IsYou;
 
-            public RoomPlayer(string name, bool isHost, bool isYou)
+            public RoomPlayer(string name, int color, bool isHost, bool isYou)
             {
                 Name = name;
+                Color = color;
                 IsHost = isHost;
                 IsYou = isYou;
             }
@@ -61,14 +63,18 @@ namespace SoulBind.Online
         // Names
         // The session player property that holds the typed name.
         private const string NameKey = "name";
+        // The session player property that holds the picked colour.
+        private const string ColorKey = "color";
 
         // This device's name, packed as a property for the room.
         private static Dictionary<string, PlayerProperty> NameProperty()
         {
             var name = new PlayerProperty(PlayerNames.LocalName, VisibilityPropertyOptions.Member);
+            var color = new PlayerProperty(ApostleColors.LocalChoice.ToString(), VisibilityPropertyOptions.Member);
             return new Dictionary<string, PlayerProperty>
             {
                 { NameKey, name},
+                { ColorKey, color},
             };
         }
 
@@ -245,8 +251,14 @@ namespace SoulBind.Online
                     && player.Properties.TryGetValue(NameKey, out PlayerProperty property)
                     && property != null)
                     name = property.Value ?? string.Empty;
+                int color = SeatColors.None;
+                if (player.Properties != null
+                    && player.Properties.TryGetValue(ColorKey, out PlayerProperty picked)
+                    && picked != null
+                    && int.TryParse(picked.Value, out int parsed))
+                    color = parsed;
                 bool isHost = player.Id == _session.Host;
-                players.Add(new RoomPlayer(name, isHost, player.Id == me));
+                players.Add(new RoomPlayer(name, color, isHost, player.Id == me));
             }
         }
 

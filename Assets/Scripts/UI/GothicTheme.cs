@@ -199,7 +199,7 @@ namespace SoulBind.UI
             if (image == null)
                 return;
             bool strike = image.color.r > image.color.g + 0.25f; // the red Strike button stays red
-            image.sprite = PanelSprite;
+            image.sprite = ButtonSprite;
             image.type = Image.Type.Sliced;
             image.color = strike ? StrikeButtonColor : ButtonColor;
 
@@ -356,7 +356,17 @@ namespace SoulBind.UI
         // ---------- Sprites, drawn once ----------
 
         // White, with a gentle top-to-bottom shading and rounded corners: tinted by the image's colour.
-        private static Sprite PanelSprite => _panel != null ? _panel : (_panel = MakeSliced(64, 16, (x, y, s) =>
+        // UiSkin's art when it is there, otherwise the drawn look below.
+        private static Sprite PanelSprite =>
+            UiSkin.Current != null && UiSkin.Current.GamePanel != null ? UiSkin.Current.GamePanel : DrawnPanel;
+
+        private static Sprite ButtonSprite =>
+            UiSkin.Current != null && UiSkin.Current.GameButton != null ? UiSkin.Current.GameButton : PanelSprite;
+
+        private static Sprite FrameSprite =>
+            UiSkin.Current != null && UiSkin.Current.GameFrame != null ? UiSkin.Current.GameFrame : DrawnFrame;
+
+        private static Sprite DrawnPanel => _panel != null ? _panel : (_panel = MakeSliced(64, 16, (x, y, s) =>
         {
             float alpha = RoundedAlpha(x, y, s, 6f);
             float shade = Mathf.Lerp(0.78f, 1f, y / (s - 1f)); // lighter at the top
@@ -366,7 +376,7 @@ namespace SoulBind.UI
         }));
 
         // A thin outer line and a fainter inner line, with small square studs in the corners.
-        private static Sprite FrameSprite => _frame != null ? _frame : (_frame = MakeSliced(64, 16, (x, y, s) =>
+        private static Sprite DrawnFrame => _frame != null ? _frame : (_frame = MakeSliced(64, 16, (x, y, s) =>
         {
             float d = EdgeDistance(x, y, s);
             float a = 0f;

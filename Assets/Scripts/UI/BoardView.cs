@@ -1,7 +1,10 @@
 using System.Collections.Generic;
 using SoulBind.Core;
 using SoulBind.Utility;
+using SoulBind.Managers;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 
 namespace SoulBind.UI
 {
@@ -48,8 +51,12 @@ namespace SoulBind.UI
         [SerializeField] private bool followCamera = true;
         [Tooltip("Show the dark hexagonal mat under the board. Off lets the island art show through.")]
         [SerializeField] private bool showMat = false;
-        [Tooltip("Hide the hex grid except while you are moving or attacking.")]
-        [SerializeField] private bool gridOnlyWhenActing = true;
+        [Tooltip("How long the whole hex grid stays up after a tap on the map, in seconds.")]
+        [SerializeField, Min(0f)] private float gridLingerSeconds = 2f;
+        [Tooltip("Scales how see-through the grid and the walking-range tint are: 1 = their colours as set, 0 = invisible.")]
+        [SerializeField, Range(0f, 1f)] private float gridOpacity = 0.7f;
+        [Tooltip("How long the grid takes to fade away, in seconds. 0 = it vanishes at once.")]
+        [SerializeField, Min(0f)] private float gridFadeSeconds = 0.6f;
 
         [Header("Floating special tiles")]
         [Tooltip("Special tiles float above their tile and face the camera, like the Apostles.")]
@@ -61,7 +68,7 @@ namespace SoulBind.UI
         [Tooltip("Bobs per second.")]
         [SerializeField, Min(0f)] private float specialBobSpeed = 0.8f;
         [Tooltip("The icon's size, in tile heights.")]
-        [SerializeField, Range(0.3f, 1.5f)] private float specialIconSize = 0.8f;
+        [SerializeField, Range(0.3f, 1.5f)] private float specialIconSize = 0.55f;
         [SerializeField] private float cameraMargin = 0.2f;
 
         [Header("Table view")]
@@ -110,6 +117,16 @@ namespace SoulBind.UI
         private Sprite _solidHexSprite; // floating icons without art stay a filled hex
         private bool _hasAscensionTile;
         private HexCoord _ascensionTile;
+        private bool _gridTapArmed;  // pressed on the map, not on the HUD, and has not swiped since
+        private Vector2 _gridTapStart;
+        private bool _gridRevealed;  // the whole grid is showing
+        private float _gridHideTime; // when the whole grid goes away again
+        private bool _gridFading;
+        private float _gridFadeStart;
+        private HexCoord _gridRippleFrom; // the fade spreads out from the tapped tile
+        private int _gridRippleReach;     // tiles to the farthest one; 0 = all fade together
+        private const float GridFadeSpread = 0.5f; // share of the fade the ripple takes to cross the board
+        private const float GridFadeShrink = 0.85f; // a fading tile's size at the end of its fade
         private float _centerX;
         private float _centerY;
         private float _boardWidth;
@@ -296,7 +313,9 @@ namespace SoulBind.UI
                 if (!_tiles.TryGetValue(tiles[i], out SpriteRenderer spriteRenderer))
                     continue;
                 ApplyBase(tiles[i]);
-                spriteRenderer.color = Color.Lerp(spriteRenderer.color, reachColor, reachStrength);
+                Color tint = Color.Lerp(spriteRenderer.color, reachColor, reachStrength);
+                tint.a *= gridOpacity;
+                spriteRenderer.color = tint;
                 _reach.Add(tiles[i]);
             }
             RefreshGrid();
@@ -707,14 +726,19 @@ namespace SoulBind.UI
                 spriteRenderer.transform.localScale = Vector3.one * ScaleFor(sprite);
             }
 
+            spriteRenderer.color = RestColor(tile);
+        }
+
+        // A tile's colour when nothing is highlighted or marked.
+        private Color RestColor(HexCoord tile)
+        {
             if (IsAscensionTile(tile))
-                spriteRenderer.color = ascensionTileColor;
-            else if (art != null)
-                spriteRenderer.color = Color.white; // show the art as drawn
-            else if (_specialTypes.TryGetValue(tile, out SpecialTileType type))
-                spriteRenderer.color = SpecialColor(type);
-            else
-                spriteRenderer.color = Board.IsEdge(tile) ? edgeTileColor : tileColor;
+                return ascensionTileColor;
+            if (ArtFor(tile) != null)
+                return Color.white; // show the art as drawn
+            if (_specialTypes.TryGetValue(tile, out SpecialTileType type))
+                return SpecialColor(type);
+            return Board.IsEdge(tile) ? edgeTileColor : tileColor;
         }
 
         // The team's art for this tile, or null to use the placeholder.
@@ -831,19 +855,106 @@ namespace SoulBind.UI
 
         // ---------- Grid and floating icons ----------
 
-        // Shows the hex grid only while you are choosing a move or a target, so the island art reads
-        // as the ground. The Ascension tile (and special tiles, if they do not float) always show.
-        // Only runs when the board changes, never per frame.
+        // A tap on the map shows the whole grid for a moment, so the island art reads as the ground the
+        // rest of the time. It waits for the finger to lift: only then is a press known not to be a swipe.
+        // Swiping or pinching never shows the grid, and takes it away if it is up.
+        private void Update()
+        {
+            Pointer pointer = Pointer.current;
+            if (pointer != null)
+            {
+                if (pointer.press.wasPressedThisFrame)
+                {
+                    _gridTapStart = pointer.position.ReadValue();
+                    _gridTapArmed = !MatchCamera.IsIntroPlaying && !IsPointerOverUi();
+                }
+
+                if (MatchCamera.IsDragging)
+                {
+                    _gridTapArmed = false;
+                    _gridHideTime = 0f;
+                }
+                else if (_gridTapArmed && pointer.press.wasReleasedThisFrame)
+                {
+                    _gridTapArmed = false;
+                    float slop = MatchCamera.TapSlop();
+                    if ((pointer.position.ReadValue() - _gridTapStart).sqrMagnitude <= slop * slop)
+                    {
+                        _gridHideTime = Time.unscaledTime + gridLingerSeconds;
+                        AimGridRipple(_gridTapStart);
+                    }
+                }
+            }
+
+            bool reveal = Time.unscaledTime < _gridHideTime;
+            if (reveal != _gridRevealed)
+            {
+                _gridRevealed = reveal;
+                _gridFading = !reveal && gridFadeSeconds > 0f && GraphicsQuality.AnimateUi;
+                _gridFadeStart = Time.unscaledTime;
+                RefreshGrid();
+            }
+            else if (_gridFading)
+            {
+                _gridFading = Time.unscaledTime - _gridFadeStart < gridFadeSeconds;
+                RefreshGrid();
+            }
+        }
+
+        // The next fade spreads out from the tile under this point, or runs evenly when it is off the board.
+        private void AimGridRipple(Vector2 screenPoint)
+        {
+            _gridRippleReach = 0;
+            if (!TryGetTileAtScreen(screenPoint, out _gridRippleFrom))
+                return;
+            foreach (HexCoord tile in _tiles.Keys)
+                _gridRippleReach = Mathf.Max(_gridRippleReach, HexCoord.Distance(_gridRippleFrom, tile));
+        }
+
+        // How much of the grid shows on this tile: 1 while revealed, falling to 0 as its fade passes.
+        private float GridVisibility(HexCoord tile)
+        {
+            if (_gridRevealed)
+                return 1f;
+            if (!_gridFading)
+                return 0f;
+
+            float start = _gridRippleReach > 0
+                ? GridFadeSpread * HexCoord.Distance(_gridRippleFrom, tile) / _gridRippleReach
+                : 0f;
+            float progress = (Time.unscaledTime - _gridFadeStart) / gridFadeSeconds;
+            return 1f - Mathf.SmoothStep(0f, 1f, (progress - start) / (1f - GridFadeSpread));
+        }
+
+        private static bool IsPointerOverUi() =>
+            EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+
+        // Tiles stay hidden until a tap on the map. Tiles that matter right now always show:
+        // moves, reach, attack targets, the Ascension tile (and special tiles, if they do not float).
+        // Only runs when the board changes or while the grid fades, never otherwise per frame.
         private void RefreshGrid()
         {
-            bool acting = !gridOnlyWhenActing
-                || _highlighted.Count > 0 || _reach.Count > 0 || _attackMarks.Count > 0;
             foreach (KeyValuePair<HexCoord, SpriteRenderer> pair in _tiles)
             {
-                bool show = acting || IsAscensionTile(pair.Key)
-                    || (!floatSpecialTiles && _specialTypes.ContainsKey(pair.Key));
-                if (pair.Value.enabled != show)
-                    pair.Value.enabled = show;
+                HexCoord tile = pair.Key;
+                SpriteRenderer spriteRenderer = pair.Value;
+                bool marked = IsAscensionTile(tile)
+                    || _highlighted.Contains(tile) || _reach.Contains(tile) || _attackMarks.Contains(tile)
+                    || (!floatSpecialTiles && _specialTypes.ContainsKey(tile));
+                float visibility = marked ? 1f : GridVisibility(tile);
+                bool show = visibility > 0f;
+                if (spriteRenderer.enabled != show)
+                    spriteRenderer.enabled = show;
+                if (!show)
+                    continue;
+
+                float size = ScaleFor(spriteRenderer.sprite) * Mathf.Lerp(GridFadeShrink, 1f, visibility);
+                spriteRenderer.transform.localScale = Vector3.one * size;
+                if (marked)
+                    continue;
+                Color color = RestColor(tile);
+                color.a *= gridOpacity * visibility;
+                spriteRenderer.color = color;
             }
         }
 

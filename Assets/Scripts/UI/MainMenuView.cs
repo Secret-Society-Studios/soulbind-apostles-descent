@@ -21,7 +21,7 @@ namespace SoulBind.UI
         [SerializeField] private string gameSceneName = "SampleScene";
         [SerializeField, Range(2, 6)] private int defaultPlayers = 4;
 
-        private enum Screen { Main, Singleplayer, Online, Lobby, Collections, Settings }
+        private enum Screen { Main, Singleplayer, Online, Lobby, Collections, Avatar, Settings }
 
         private Screen _screen;
         private int _players;
@@ -37,6 +37,9 @@ namespace SoulBind.UI
         private GameObject _profilePopup;
         private TMP_Text _profileName;
         private TMP_Text _profileInitial;
+        private Image _profileAvatar;
+
+        private GameObject _quitPopup;
 
         private void Start()
         {
@@ -75,7 +78,9 @@ namespace SoulBind.UI
                 ShowScreen(Screen.Online);
             }
 
-            if (_screen == Screen.Lobby)
+            if (_screen == Screen.Avatar)
+                AnimateAvatarPreview();
+            else if (_screen == Screen.Lobby)
                 ShowLobby(session, false);
             else if (_screen == Screen.Online)
                 UpdateRoomList();
@@ -88,6 +93,7 @@ namespace SoulBind.UI
             _mainScreen.SetActive(screen == Screen.Main);
             _singleScreen.SetActive(screen == Screen.Singleplayer);
             _collectionsScreen.SetActive(screen == Screen.Collections);
+            _avatarScreen.SetActive(screen == Screen.Avatar);
             _settingsScreen.SetActive(screen == Screen.Settings);
             _onlineScreen.SetActive(screen == Screen.Online);
             _lobbyScreen.SetActive(screen == Screen.Lobby);
@@ -139,6 +145,16 @@ namespace SoulBind.UI
             SceneManager.LoadScene(gameSceneName);
         }
 
+        // Asks "Quit the game?" before closing anything.
+        private void AskToQuit()
+        {
+            _quitPopup.transform.SetAsLastSibling();
+            _quitPopup.SetActive(true);
+        }
+
+        // Closes the quit box without quitting.
+        private void CancelQuit() => _quitPopup.SetActive(false);
+
         // Quits the game, or stops Play mode in the editor.
         private void Quit()
         {
@@ -161,10 +177,12 @@ namespace SoulBind.UI
             BuildMain();
             BuildSingleplayer();
             BuildCollections();
+            BuildAvatar();
             BuildSettings();
             BuildOnline();
             BuildLobby();
             BuildProfilePopup();
+            BuildQuitPopup();
         }
 
         // The two thin frame lines just inside the edge of every screen.
@@ -205,9 +223,10 @@ namespace SoulBind.UI
             AddMenuButton(column, 1, "Multiplayer", Kit.ButtonStyle.Outline, () => ShowScreen(Screen.Online));
             // A practice match against one bot, with a coach, before playing for real.
             AddMenuButton(column, 2, "Tutorial", Kit.ButtonStyle.Secondary, PlayTutorial);
-            AddMenuButton(column, 3, "Collections", Kit.ButtonStyle.Secondary, () => ShowScreen(Screen.Collections));
+            AddMenuPair(column, 3, "Collections", () => ShowScreen(Screen.Collections),
+                "Avatar", () => ShowScreen(Screen.Avatar));
             AddMenuButton(column, 4, "Settings", Kit.ButtonStyle.Secondary, () => ShowScreen(Screen.Settings));
-            AddMenuButton(column, 5, "Quit", Kit.ButtonStyle.Ghost, Quit);
+            AddMenuButton(column, 5, "Quit", Kit.ButtonStyle.Ghost, AskToQuit);
 
             _mainStatus = Kit.Label(frame, "Status", "", 14f, Kit.Inter, Kit.Gold);
             Kit.At(_mainStatus.rectTransform, 330f, 630f, 620f, 24f);
@@ -251,6 +270,7 @@ namespace SoulBind.UI
             RectTransform avatar = Kit.Circle(card, "Avatar", 52f, Kit.Gold, Kit.GoldBright, 2f);
             Kit.At(avatar, 10f, 10f, 52f, 52f);
             avatar.GetComponent<Image>().raycastTarget = false;
+            _profileAvatar = avatar.GetComponent<Image>();
             _profileInitial = Kit.Label(avatar, "Initial", "?", 24f, Kit.Display, Kit.Background);
             Kit.Stretch(_profileInitial.rectTransform);
 
@@ -333,8 +353,41 @@ namespace SoulBind.UI
             bool named = typed.Length > 0;
             _profileName.text = named ? typed : "Set your name";
             _profileInitial.text = named ? typed.Substring(0, 1).ToUpperInvariant() : "?";
+            _profileAvatar.color = ApostleColors.Palette(ApostleColors.LocalChoice);
             if (_playingAs != null)
                 _playingAs.text = $"Playing as <color=#F5EBD8><b>{(named ? typed : "Apostle")}</b></color>";
+        }
+
+        // ---------- Quit ----------
+
+        // "Quit the game?": dims the menu. Tapping outside the box means Stay.
+        private void BuildQuitPopup()
+        {
+            RectTransform cover = Kit.Stretch(Kit.CreateRect("QuitPopup", _root));
+            Image dim = cover.gameObject.AddComponent<Image>();
+            dim.color = new Color(0f, 0f, 0f, 0.7f);
+            Button outside = cover.gameObject.AddComponent<Button>();
+            outside.transition = Selectable.Transition.None;
+            outside.onClick.AddListener(CancelQuit);
+            _quitPopup = cover.gameObject;
+
+            RectTransform frame = Kit.CreateFrame(cover, "Frame");
+            RectTransform panel = Kit.Box(frame, "Panel", Kit.Panel, Kit.GoldLine, 14f);
+            Kit.At(panel, 370f, 240f, 540f, 240f);
+            // Takes its own clicks, so a click on the box does not count as outside it.
+            panel.gameObject.AddComponent<Button>().transition = Selectable.Transition.None;
+
+            TMP_Text title = Kit.Label(panel, "Title", "Quit the game?", 30f, Kit.Display, Kit.Title);
+            Kit.At(title.rectTransform, 0f, 28f, 540f, 40f);
+            TMP_Text text = Kit.Label(panel, "Text", "SoulBind will close.", 16f, Kit.Inter, Kit.Soft);
+            Kit.At(text.rectTransform, 40f, 84f, 460f, 40f);
+
+            TMP_Text stay = Kit.Button(panel, "Stay", "Stay", Kit.ButtonStyle.Ghost, CancelQuit, 16f);
+            Kit.At((RectTransform)stay.transform.parent, 40f, 152f, 220f, 56f);
+            TMP_Text quit = Kit.Button(panel, "Quit", "Quit", Kit.ButtonStyle.Primary, Quit, 20f);
+            Kit.At((RectTransform)quit.transform.parent, 280f, 152f, 220f, 56f);
+
+            _quitPopup.SetActive(false);
         }
 
         // ---------- Shared pieces ----------

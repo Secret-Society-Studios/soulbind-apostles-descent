@@ -44,6 +44,8 @@ namespace SoulBind.UI
         [Header("Apostles (Animations/Spawn, Animations/Death)")]
         [Tooltip("The Apostle falling onto its spawn tile.")]
         [SerializeField] private FrameClip spawnFall = new FrameClip { Fps = 12f };
+        [Tooltip("How tall a frame of the spawn animation is, in world units (the avatar is about 1.1).")]
+        [SerializeField, Min(0.1f)] private float spawnFallHeight = 3.5f;
         [Tooltip("The Apostle dying when its Vessel hits 0.")]
         [SerializeField] private FrameClip death = new FrameClip { Fps = 12f };
 
@@ -53,6 +55,12 @@ namespace SoulBind.UI
         [SerializeField] private FrameClip purifyAura = new FrameClip { Fps = 12f };
         [SerializeField] private FrameClip shieldAura = new FrameClip { Fps = 10f, Loop = true };
         [SerializeField] private FrameClip awakenedAura = new FrameClip { Fps = 10f, Loop = true };
+        [Tooltip("A buff card is played.")]
+        [SerializeField] private FrameClip buffEffect = new FrameClip { Fps = 12f };
+        [Tooltip("An Apostle is debuffed, by another player or by its own card.")]
+        [SerializeField] private FrameClip debuffEffect = new FrameClip { Fps = 12f };
+        [Tooltip("A Soul tile is picked up.")]
+        [SerializeField] private FrameClip soulPick = new FrameClip { Fps = 12f };
 
         // ---------- Cards ----------
 
@@ -61,6 +69,25 @@ namespace SoulBind.UI
         [SerializeField] private FrameClip[] cardElements = new FrameClip[ElementCount];
 
         private const int ElementCount = 4; // Radiance, Celeste, Crimson, Nocturne
+
+        [Header("Legendary card sounds")]
+        [SerializeField] private AudioClip sunSound;
+        [SerializeField] private AudioClip moonSound;
+        [SerializeField] private AudioClip emperorSound;
+
+        [Header("The World's time stop (Animations/World)")]
+        [Tooltip("The clock, played once on the Apostle as the wave starts.")]
+        [SerializeField] private FrameClip worldClock = new FrameClip { Fps = 12f };
+        [Tooltip("How tall a frame of the clock is, in world units (the avatar is about 1.1).")]
+        [SerializeField, Min(0.1f)] private float worldClockHeight = 3f;
+        [Tooltip("The tint of the map's negative while time is stopped.")]
+        [SerializeField] private Color timeStopColor = new Color(0.95f, 0.85f, 0.3f);
+        [Tooltip("Added over the negative, to colour its dark parts.")]
+        [SerializeField] private Color timeStopShadows = new Color(0.2f, 0.04f, 0.32f);
+        [Tooltip("Plays as time stops.")]
+        [SerializeField] private AudioClip timeStopSound;
+        [Tooltip("Plays as time starts again.")]
+        [SerializeField] private AudioClip timeResumeSound;
 
         // ---------- Menus and UI ----------
 
@@ -74,12 +101,25 @@ namespace SoulBind.UI
 
         public FrameClip Lava => lava;
         public FrameClip SpawnFall => spawnFall;
+        public float SpawnFallHeight => spawnFallHeight;
         public FrameClip Death => death;
         public FrameClip CorruptionAura => corruptionAura;
         public FrameClip HealAura => healAura;
         public FrameClip PurifyAura => purifyAura;
         public FrameClip ShieldAura => shieldAura;
         public FrameClip AwakenedAura => awakenedAura;
+        public FrameClip BuffEffect => buffEffect;
+        public FrameClip DebuffEffect => debuffEffect;
+        public FrameClip SoulPick => soulPick;
+        public FrameClip WorldClock => worldClock;
+        public float WorldClockHeight => worldClockHeight;
+        public Color TimeStopColor => timeStopColor;
+        public Color TimeStopShadows => timeStopShadows;
+        public AudioClip TimeStopSound => timeStopSound;
+        public AudioClip TimeResumeSound => timeResumeSound;
+        public AudioClip SunSound => sunSound;
+        public AudioClip MoonSound => moonSound;
+        public AudioClip EmperorSound => emperorSound;
         public FrameClip MainMenuBackground => mainMenuBackground;
         public FrameClip ButtonPress => buttonPress;
         public FrameClip PopupOpen => popupOpen;

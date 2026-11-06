@@ -11,7 +11,8 @@ namespace SoulBind.UI
 {
     /// <summary>
     /// A name plate floating above every Apostle's hand of cards, like a MOBA health bar: a Souls badge,
-    /// the name, the Vessel bar, a thin Corruption bar and DEF. They replace the opponents' portrait
+    /// the name, the Vessel bar, a thin Corruption bar and DEF, with any buffs in force or starting next
+    /// round above it. They replace the opponents' portrait
     /// row at the top. While a combo target is being picked, a plate can be tapped to pick that Apostle.
     /// MatchHud creates it at runtime, so it needs no setup. Bars use UiSkin art when it is there.
     /// </summary>
@@ -23,9 +24,11 @@ namespace SoulBind.UI
         private const float BadgeSize = 40f;
         private const float BarLeft = 54f;
         private const float BarWidth = 138f;
-        private const float GapAbovePiece = 10f;  // between the top of the piece and the plate
+        private const float GapAbovePiece = 28f;  // between the top of the piece and the plate
         private const float PhoneScale = 1.2f;
         private const int CorruptionBarMax = 15;  // the bar is full here (Corruption has no cap)
+        private const float BuffLineHeight = 22f;
+        private const float TagGap = 2f;          // between the plate, or the buff line, and the tag
 
         private static readonly Color VesselColor = new Color(0.80f, 0.20f, 0.25f);
         private static readonly Color CorruptionColor = new Color(0.55f, 0.30f, 0.70f);
@@ -43,6 +46,7 @@ namespace SoulBind.UI
             public TMP_Text Name;
             public TMP_Text Souls;
             public TMP_Text Tag;
+            public TMP_Text Buffs;
             public TMP_Text Vessel;
             public TMP_Text Defense;
             public RectTransform VesselFill;
@@ -50,6 +54,7 @@ namespace SoulBind.UI
             public RectTransform CorruptionFill;
             public Image CorruptionFillImage;
             public ApostleView Piece;
+            public float BuffRoom;  // height of the buff line above the plate, 0 when it is empty
         }
 
         private readonly List<Plate> _plates = new List<Plate>(GameConstants.MaxPlayers);
@@ -135,7 +140,7 @@ namespace SoulBind.UI
                 float scale = plate.Rect.localScale.y;
                 Vector2 spot = local + new Vector2(0f, GapAbovePiece);
                 spot.x = Mathf.Clamp(spot.x, area.xMin + Width * scale / 2f, area.xMax - Width * scale / 2f);
-                spot.y = Mathf.Min(spot.y, area.yMax - Height * scale);
+                spot.y = Mathf.Min(spot.y, area.yMax - (Height + plate.BuffRoom) * scale);
                 // Only when it really moved: an unchanged plate does not redraw the HUD.
                 if ((plate.Rect.anchoredPosition - spot).sqrMagnitude > 0.25f)
                     plate.Rect.anchoredPosition = spot;
@@ -192,6 +197,11 @@ namespace SoulBind.UI
                     : isAwakened ? "AWAKENED"
                     : apostle.IsSoullocked ? "SOULLOCKED"
                     : string.Empty;
+
+                // The buff line sits just above the plate; the tag moves up over it.
+                plate.Buffs.text = BuffText.Format(apostle, "  ");
+                plate.BuffRoom = plate.Buffs.text.Length > 0 ? BuffLineHeight : 0f;
+                plate.Tag.rectTransform.anchoredPosition = new Vector2(0f, TagGap + plate.BuffRoom);
 
                 plate.Background.color = isPickable ? PickableColor : GothicTheme.PanelColor;
                 plate.Frame.color = isCurrent ? GothicTheme.GoldBright : GothicTheme.GoldDim;
@@ -328,6 +338,16 @@ namespace SoulBind.UI
             plate.Tag.rectTransform.sizeDelta = new Vector2(0f, 18f);
             plate.Tag.alignment = TextAlignmentOptions.Center;
             plate.Tag.color = GothicTheme.GoldBright;
+
+            // Buffs in force or starting next round, on one line above the plate.
+            plate.Buffs = NewText("Buffs", plate.Rect, "", 16f, FontStyles.Normal);
+            plate.Buffs.rectTransform.anchorMin = new Vector2(0f, 1f);
+            plate.Buffs.rectTransform.anchorMax = new Vector2(1f, 1f);
+            plate.Buffs.rectTransform.pivot = new Vector2(0.5f, 0f);
+            plate.Buffs.rectTransform.anchoredPosition = new Vector2(0f, TagGap);
+            plate.Buffs.rectTransform.sizeDelta = new Vector2(0f, BuffLineHeight);
+            plate.Buffs.alignment = TextAlignmentOptions.Center;
+            plate.Buffs.textWrappingMode = TextWrappingModes.NoWrap;
 
             plate.Frame.transform.SetAsLastSibling(); // the gold edge over everything inside
             return plate;

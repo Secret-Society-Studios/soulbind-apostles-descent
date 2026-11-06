@@ -19,6 +19,12 @@ namespace SoulBind.UI
         private const int IslandOrder = -30;
         private const int GlowOrder = -29;
         private const int EdgeRockOrder = -28;
+        private const int EdgeRockShapes = 10;        // different 3D rock meshes around the ring
+        private const int MaxSolidEdgeRocks = 200;    // stops the ring running away if the art is tiny
+        private const float EdgeRockTwist = 12f;      // degrees a solid rock may turn away from the rim line
+        private const float EdgeRockRowDepth = 0.04f; // how far inward a 3D rock may stray from the ring, as a share
+        private const float EdgeRockSmallest = 0.85f; // rocks vary from this share of their full size up to all of it
+        private const float EdgeRockOverlap = 0.35f;  // share of its width a side rock tucks behind its neighbour
         private const int RimSegments = 72; // corners around the 3D island's rim
 
         // Placeholder texture sizes, in pixels. Small on purpose: they read as pixel art.
@@ -32,6 +38,7 @@ namespace SoulBind.UI
         private BoardView _board;
         private SpriteRenderer _sky;
         private SpriteRenderer _sea;
+        private float _mapTime;    // stops with The World, so nothing jumps when time runs again
         private SpriteRenderer _island;
         private SpriteRenderer _glow;
         private SpriteRenderer[] _rocks;
@@ -148,47 +155,180 @@ namespace SoulBind.UI
             return true;
         }
 
-        // Big rocks spaced around the rim: your art standing up like the avatars, or 3D placeholder rocks.
+        // Big rocks on the rim: your art as an unbroken ring of 3D rocks, or standing up flat like the
+        // avatars. With no art, a ring of plain stone rocks.
         private void BuildEdgeRocks(MapSkin skin, float[] rim, Material material, Rect cliff)
         {
-            int count = skin.EdgeRockCount;
-            bool painted = skin.HasEdgeRockArt;
-            _edgeRockSprites = painted ? new SpriteRenderer[count] : null;
-            _edgeRockBase = painted ? new Vector3[count] : null;
-            _edgeRockLift = painted ? new float[count] : null;
+            if (skin.HasEdgeRockArt)
+            {
+                if (skin.EdgeRocks3D)
+                    BuildSolidEdgeRocks(skin, rim, material);
+                else
+                    BuildPaintedEdgeRocks(skin, rim);
+                return;
+            }
+
+            // Enough rocks to close the ring, whatever the island's size. They share a few shapes.
+            float rimLength = Mathf.PI * (_islandRadiusX + _islandRadiusY);
+            int count = Mathf.CeilToInt(rimLength / skin.EdgeRockSpacing);
+            var shapes = new Mesh[Mathf.Min(EdgeRockShapes, count)];
             var random = new System.Random(13); // same layout every match
 
             for (int i = 0; i < count; i++)
             {
-                float turn = (i + (float)random.NextDouble() * 0.7f) / count;
-                int segment = Mathf.Clamp((int)(turn * RimSegments), 0, RimSegments - 1);
-                float angle = turn * Mathf.PI * 2f;
-                float reach = rim[segment] * (1f - skin.EdgeRockInset);
-                var spot = new Vector3(Mathf.Cos(angle) * _islandRadiusX * reach,
-                    Mathf.Sin(angle) * _islandRadiusY * reach, 0f);
+                // A little off the even spacing and the rim line, so the ring looks natural; never enough to open a gap.
+                float turn = Mathf.Repeat((i + (float)random.NextDouble() * 0.5f) / count, 1f);
+                Vector3 spot = RimSpot(skin, rim, turn) * (1f - (float)random.NextDouble() * EdgeRockRowDepth);
                 float height = Mathf.Lerp(skin.EdgeRockHeight.x, skin.EdgeRockHeight.y, (float)random.NextDouble());
 
-                if (painted)
+                int shape = i % shapes.Length;
+                if (shapes[shape] == null)
+                    shapes[shape] = IslandMesh.BuildRock(100 + shape, FullTexture, skin.CliffShade);
+
+                // Plain stone, not the island's painted pattern.
+                Transform rock = CreateMesh("EdgeRock", shapes[shape], StoneMaterial(material), EdgeRockOrder, spot);
+                float width = height * (0.7f + (float)random.NextDouble() * 0.5f);
+                rock.localScale = new Vector3(width, width, height);
+                rock.localRotation = Quaternion.AngleAxis((float)random.NextDouble() * 360f, Vector3.forward);
+            }
+        }
+
+        // Your rock art made solid, side by side along the whole rim with each rock's length along it:
+        // every formation is a tall rock and smaller ones, and the rocks are measured so the ring closes.
+        private void BuildSolidEdgeRocks(MapSkin skin, float[] rim, Material island)
+        {
+            Sprite[] art = EdgeRockArtTallestFirst(skin);
+            var random = new System.Random(13); // same layout every match
+            float pixelScale = skin.EdgeRockHeight.y / Mathf.Max(0.0001f, art[0].bounds.size.y);
+            float rimLength = Mathf.PI * (_islandRadiusX + _islandRadiusY);
+            int large = Mathf.Max(1, art.Length / 3);
+            int small = art.Length - large;
+
+            // Pick rocks until they reach right around.
+            var picks = new System.Collections.Generic.List<int>(64);
+            var scales = new System.Collections.Generic.List<float>(64);
+            var lengths = new System.Collections.Generic.List<float>(64);
+            float total = 0f;
+            int flankers = 0;
+            while (total < rimLength && picks.Count < MaxSolidEdgeRocks)
+            {
+                int place = picks.Count % skin.EdgeRockFormationSize;
+                int formation = picks.Count / skin.EdgeRockFormationSize;
+                int pick = place == 0 || small == 0 ? formation % large : large + flankers++ % small;
+                float scale = pixelScale * Mathf.Lerp(EdgeRockSmallest, 1f, (float)random.NextDouble());
+                float length = art[pick].bounds.size.x * scale * (1f - EdgeRockOverlap);
+                picks.Add(pick);
+                scales.Add(scale);
+                lengths.Add(length);
+                total += length;
+            }
+
+            var meshes = new Mesh[art.Length];
+            Material stone = null;
+            float along = 0f;
+            for (int i = 0; i < picks.Count; i++)
+            {
+                int pick = picks[i];
+                if (meshes[pick] == null)
+                    meshes[pick] = SpriteRockMesh.Build(art[pick], skin.CliffShade);
+                if (stone == null || stone.mainTexture != art[pick].texture)
+                    stone = new Material(island) { mainTexture = art[pick].texture, color = skin.EdgeRockTint };
+
+                float turn = (along + lengths[i] / 2f) / total;
+                along += lengths[i];
+                float facing = turn * 360f + 90f + Mathf.Lerp(-EdgeRockTwist, EdgeRockTwist, (float)random.NextDouble());
+                if (random.Next(2) == 0)
+                    facing += 180f; // the other way round, as a mirrored sprite would be
+
+                Transform rock = CreateMesh("EdgeRock", meshes[pick], stone, EdgeRockOrder, RimSpot(skin, rim, turn));
+                rock.localScale = Vector3.one * scales[i];
+                rock.localRotation = Quaternion.AngleAxis(facing, Vector3.forward);
+            }
+        }
+
+        // The skin's rock art, tallest first.
+        private Sprite[] EdgeRockArtTallestFirst(MapSkin skin)
+        {
+            var art = new Sprite[skin.EdgeRockArtCount];
+            for (int i = 0; i < art.Length; i++)
+                art[i] = Pick(skin.GetEdgeRock(i), PlaceholderRock);
+            System.Array.Sort(art, (a, b) => b.bounds.size.y.CompareTo(a.bounds.size.y));
+            return art;
+        }
+
+        // Your rock art in formations around the rim: a large rock with smaller ones overlapping it on each
+        // side. Every rock is scaled alike, so the pixels stay one size and small art stays small.
+        private void BuildPaintedEdgeRocks(MapSkin skin, float[] rim)
+        {
+            int count = skin.EdgeRockCount;
+            _edgeRockSprites = new SpriteRenderer[count];
+            _edgeRockBase = new Vector3[count];
+            _edgeRockLift = new float[count];
+            if (count == 0)
+                return;
+
+            Sprite[] art = EdgeRockArtTallestFirst(skin);
+
+            var random = new System.Random(13); // same layout every match
+            float pixelScale = skin.EdgeRockHeight.y / Mathf.Max(0.0001f, art[0].bounds.size.y);
+            float rimLength = Mathf.PI * (_islandRadiusX + _islandRadiusY);
+            int large = Mathf.Max(1, art.Length / 3); // the tallest third stand in the middle of a formation
+            int small = art.Length - large;
+            int formations = Mathf.CeilToInt((float)count / skin.EdgeRockFormationSize);
+            int placed = 0;
+            int flankers = 0;
+
+            for (int f = 0; f < formations; f++)
+            {
+                int members = count * (f + 1) / formations - count * f / formations;
+                float middle = (f + (float)random.NextDouble() * 0.6f) / formations;
+                float left = 0f, right = 0f; // how far the formation reaches each way so far
+
+                for (int m = 0; m < members; m++)
                 {
-                    Sprite sprite = Pick(skin.GetEdgeRock(i), PlaceholderRock);
+                    Sprite sprite;
+                    if (m == 0)
+                        sprite = art[f % large];
+                    else
+                        sprite = small > 0 ? art[large + flankers++ % small] : art[flankers++ % large];
+
+                    float scale = pixelScale * Mathf.Lerp(EdgeRockSmallest, 1f, (float)random.NextDouble());
+                    float width = sprite.bounds.size.x * scale;
+                    float along = 0f;
+                    if (m == 0)
+                    {
+                        left = right = width / 2f;
+                    }
+                    else if (m % 2 == 1)
+                    {
+                        along = right + width * (0.5f - EdgeRockOverlap);
+                        right = along + width / 2f;
+                    }
+                    else
+                    {
+                        along = -left - width * (0.5f - EdgeRockOverlap);
+                        left = width / 2f - along;
+                    }
+
                     SpriteRenderer rock = CreateRenderer("EdgeRock", sprite, EdgeRockOrder);
-                    float scale = height / Mathf.Max(0.0001f, sprite.bounds.size.y);
                     rock.transform.localScale = Vector3.one * scale;
                     rock.flipX = random.Next(2) == 0;
-                    _edgeRockSprites[i] = rock;
-                    _edgeRockBase[i] = spot;
-                    _edgeRockLift[i] = -sprite.bounds.min.y * scale;
-                }
-                else
-                {
-                    // Placeholder rocks get their own plain stone, not the island's painted pattern.
-                    Mesh mesh = IslandMesh.BuildRock(100 + i, FullTexture, skin.CliffShade);
-                    Transform rock = CreateMesh("EdgeRock", mesh, StoneMaterial(material), EdgeRockOrder, spot);
-                    float width = height * (0.7f + (float)random.NextDouble() * 0.5f);
-                    rock.localScale = new Vector3(width, width, height);
-                    rock.localRotation = Quaternion.AngleAxis((float)random.NextDouble() * 360f, Vector3.forward);
+                    rock.color = skin.EdgeRockTint;
+                    _edgeRockSprites[placed] = rock;
+                    _edgeRockBase[placed] = RimSpot(skin, rim, Mathf.Repeat(middle + along / rimLength, 1f));
+                    _edgeRockLift[placed] = -sprite.bounds.min.y * scale;
+                    placed++;
                 }
             }
+        }
+
+        // A point just inside the rim, turn (0 to 1) of the way around it.
+        private Vector3 RimSpot(MapSkin skin, float[] rim, float turn)
+        {
+            int segment = Mathf.Clamp((int)(turn * RimSegments), 0, RimSegments - 1);
+            float angle = turn * Mathf.PI * 2f;
+            float reach = rim[segment] * (1f - skin.EdgeRockInset);
+            return new Vector3(Mathf.Cos(angle) * _islandRadiusX * reach, Mathf.Sin(angle) * _islandRadiusY * reach, 0f);
         }
 
         private static readonly Rect FullTexture = new Rect(0f, 0f, 1f, 1f);
@@ -334,10 +474,11 @@ namespace SoulBind.UI
 
         private void Update()
         {
-            if (_skin == null)
-                return;
-            float time = Time.time;
+            if (_skin == null || TimeStopEffect.IsFrozen)
+                return; // The World: the map holds still until time runs again
             float delta = Time.deltaTime;
+            _mapTime += delta;
+            float time = _mapTime;
 
             // Sea: slide by less than one tile, then jump back; tiling hides the jump.
             float tile = _skin.SeaTileSize;

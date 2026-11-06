@@ -69,6 +69,13 @@ namespace SoulBind.Core
         public bool StrengthAwaitingPartner;
         public bool EmperorArmed;
         public bool SkipRestOfRound;
+        public int PhaseOpenerId;
+        public int TimeStopOwnerId;
+        public int LegendaryPlayCount;
+        public ArcanaId LastLegendaryCard;
+        public int LastLegendaryPlayerId;
+        public int EffectCount;
+        public readonly List<MatchEffect> RecentEffects = new List<MatchEffect>();
         public readonly int[] ElementsPlayedThisTurn = new int[ElementCombo.ElementCount];
         public readonly List<ArcanaId> AttackCards = new List<ArcanaId>();
         public readonly List<StrikeHit> LastStrikeHits = new List<StrikeHit>();
@@ -144,6 +151,18 @@ namespace SoulBind.Core
                 w.Write(StrengthAwaitingPartner);
                 w.Write(EmperorArmed);
                 w.Write(SkipRestOfRound);
+                w.Write((byte)PhaseOpenerId);
+                w.Write((byte)TimeStopOwnerId);
+                w.Write((short)LegendaryPlayCount);
+                w.Write((byte)LastLegendaryCard);
+                w.Write((byte)LastLegendaryPlayerId);
+                w.Write(EffectCount);
+                w.Write((byte)RecentEffects.Count);
+                foreach (MatchEffect effect in RecentEffects)
+                {
+                    w.Write((byte)effect.Kind);
+                    w.Write((byte)effect.ApostleId);
+                }
                 for (int i = 0; i < ElementsPlayedThisTurn.Length; i++)
                     w.Write((byte)ElementsPlayedThisTurn[i]);
                 WriteCards(w, AttackCards);
@@ -246,6 +265,18 @@ namespace SoulBind.Core
                     s.StrengthAwaitingPartner = r.ReadBoolean();
                     s.EmperorArmed = r.ReadBoolean();
                     s.SkipRestOfRound = r.ReadBoolean();
+                    s.PhaseOpenerId = r.ReadByte();
+                    s.TimeStopOwnerId = r.ReadByte();
+                    s.LegendaryPlayCount = r.ReadInt16();
+                    s.LastLegendaryCard = (ArcanaId)r.ReadByte();
+                    s.LastLegendaryPlayerId = r.ReadByte();
+                    s.EffectCount = r.ReadInt32();
+                    int effectCount = r.ReadByte();
+                    for (int e = 0; e < effectCount; e++)
+                    {
+                        var kind = (MatchEffectKind)r.ReadByte();
+                        s.RecentEffects.Add(new MatchEffect(kind, r.ReadByte()));
+                    }
                     for (int i = 0; i < s.ElementsPlayedThisTurn.Length; i++)
                         s.ElementsPlayedThisTurn[i] = r.ReadByte();
                     ReadCards(r, s.AttackCards);

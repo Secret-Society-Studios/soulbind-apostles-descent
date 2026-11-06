@@ -26,6 +26,10 @@ MonoBehaviour:
   island: {fileID: -6058928264790137376, guid: 781524bd8e7d39a4893c50d968a6a5c6, type: 3}
   islandSize: {x: 1.35, y: 2.15}
   islandTopShift: 0
+  island3D: 1
+  islandTopSize: {x: 1.3, y: 1.25}
+  islandDepth: 1.1
+  islandRoughness: 0.06
   islandTopArea:
     serializedVersion: 2
     x: 0.091
@@ -38,6 +42,20 @@ MonoBehaviour:
     y: 0.18
     width: 0.7
     height: 0.25
+  cliffShade: 0.45
+  edgeRocks:
+  - {fileID: -3918447094164067238, guid: e69205e2e7acb4149b6a10443a2bdb5f, type: 3}
+  - {fileID: -8565748372969800258, guid: e69205e2e7acb4149b6a10443a2bdb5f, type: 3}
+  - {fileID: -150976507350560685, guid: e69205e2e7acb4149b6a10443a2bdb5f, type: 3}
+  - {fileID: 6845924093340620358, guid: e69205e2e7acb4149b6a10443a2bdb5f, type: 3}
+  - {fileID: 3239485356624758850, guid: e69205e2e7acb4149b6a10443a2bdb5f, type: 3}
+  - {fileID: -4990954275208225007, guid: e69205e2e7acb4149b6a10443a2bdb5f, type: 3}
+  - {fileID: -9005693095895796457, guid: e69205e2e7acb4149b6a10443a2bdb5f, type: 3}
+  - {fileID: -4793072613589390648, guid: e69205e2e7acb4149b6a10443a2bdb5f, type: 3}
+  - {fileID: 3572588585573795707, guid: e69205e2e7acb4149b6a10443a2bdb5f, type: 3}
+  edgeRockCount: 14
+  edgeRockHeight: {x: 0.7, y: 1.6}
+  edgeRockInset: 0.05
   lavaGlow: {fileID: 0}
   glowColor: {r: 1, g: 0.45, b: 0.1, a: 1}
   glowPulseSpeed: 1.6

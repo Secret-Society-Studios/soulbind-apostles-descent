@@ -13,7 +13,7 @@ namespace SoulBind.Utility
         /// Raise this by one whenever anything players send each other changes: commands, snapshots,
         /// card rules or numbers, chat ids. A patch that only changes art or menus can keep it.
         /// </summary>
-        public const int ProtocolVersion = 1;
+        public const int ProtocolVersion = 3;
 
         /// <summary>The version typed in Player Settings, as shown on the menus ("1.0.3").</summary>
         public static string GameVersion => Application.version;

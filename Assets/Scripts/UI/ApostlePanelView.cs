@@ -47,12 +47,17 @@ namespace SoulBind.UI
         private const float SoulsBarHeight = 16f;
         private const float SoulsBarRight = 78f;   // room for "DEF 12" on the right
 
+        private const float BuffListGap = 6f;      // between the buff list and the panel
+        private static readonly Color BuffListBackground = new Color(0.07f, 0.05f, 0.09f, 0.85f);
+
         private bool _hasPortrait;
         private RectTransform _soulsFill;
         private TMP_Text _soulsText;
         private Image _vesselImage;
         private Image _corruptionImage;
         private Image _soulsImage;
+        private GameObject _buffList;
+        private TMP_Text _buffText;
         public int ApostleId { get; private set; }
 
         /// <summary>Raised with the Apostle's id when the portrait is left-clicked.</summary>
@@ -74,6 +79,7 @@ namespace SoulBind.UI
                 background.raycastTarget = true;
 
             CreateSoulsBar();
+            CreateBuffList();
             _vesselImage = FillImage(vesselFill);
             _corruptionImage = FillImage(corruptionFill);
             _soulsImage = FillImage(_soulsFill);
@@ -103,6 +109,48 @@ namespace SoulBind.UI
             // DEF moves to the right end of the same row.
             if (statsText != null)
                 statsText.alignment = TextAlignmentOptions.Right;
+        }
+
+        // Buffs in force or starting next round, one a line, left of the panel (the action buttons fill
+        // the space above it). Made at runtime so the HUD needs no rebuild, and it never catches clicks.
+        private void CreateBuffList()
+        {
+            if (_buffList != null)
+                return;
+            _buffList = new GameObject("BuffList", typeof(RectTransform));
+            _buffList.layer = gameObject.layer;
+            var rect = (RectTransform)_buffList.transform;
+            rect.SetParent(transform, false);
+            rect.anchorMin = rect.anchorMax = Vector2.zero;
+            rect.pivot = new Vector2(1f, 0f);
+            rect.anchoredPosition = new Vector2(-BuffListGap, 0f);
+
+            var back = (Image)_buffList.AddComponent(typeof(Image));
+            back.color = BuffListBackground;
+            back.raycastTarget = false;
+
+            var column = _buffList.AddComponent<VerticalLayoutGroup>();
+            column.padding = new RectOffset(10, 10, 6, 6);
+            column.childControlWidth = true;
+            column.childControlHeight = true;
+            column.childForceExpandWidth = false;
+            column.childForceExpandHeight = false;
+
+            var fitter = _buffList.AddComponent<ContentSizeFitter>();
+            fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            var label = new GameObject("Text", typeof(RectTransform));
+            label.layer = gameObject.layer;
+            label.transform.SetParent(rect, false);
+            var text = label.AddComponent<TextMeshProUGUI>();
+            text.fontSize = 18f;
+            text.alignment = TextAlignmentOptions.Right;
+            text.textWrappingMode = TextWrappingModes.NoWrap;
+            text.raycastTarget = false;
+            _buffText = text;
+
+            _buffList.SetActive(false);
         }
 
         // The Image on a bar fill, or null when the bar is missing.
@@ -176,6 +224,20 @@ namespace SoulBind.UI
                 else
                     statsText.text = $"Souls {apostle.Souls}/{GameConstants.SoulsToAwaken}   DEF {apostle.Defense}";
             }
+
+            ShowBuffs(apostle);
+        }
+
+        // Lists the buffs, and hides the list when there are none.
+        private void ShowBuffs(ApostleState apostle)
+        {
+            if (_buffList == null)
+                return;
+            string buffs = BuffText.Format(apostle, "\n");
+            _buffText.text = buffs;
+            bool show = buffs.Length > 0;
+            if (_buffList.activeSelf != show)
+                _buffList.SetActive(show);
         }
 
         // A fill drawn from real art keeps its own colours unless the skin says to tint it.

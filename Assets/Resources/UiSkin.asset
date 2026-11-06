@@ -12,16 +12,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4425292584484afcbad252b95b427094, type: 3}
   m_Name: UiSkin
   m_EditorClassIdentifier: 
-  capacityPipLit: {fileID: 0}
-  capacityPipSpent: {fileID: 0}
-  capacityFrame: {fileID: 0}
-  vesselBack: {fileID: 0}
+  capacityPipLit: {fileID: 21300000, guid: f1ac2b8d841f4439a4d5eb3bbb810442, type: 3}
+  capacityPipSpent: {fileID: 21300000, guid: 0c836fc334e54511910b6418c7bd1b0a, type: 3}
+  capacityFrame: {fileID: 21300000, guid: b94cb322c614491aa28aa08c20d0037f, type: 3}
+  vesselBack: {fileID: 21300000, guid: 9fa1c16047cc432881d6f6dafd7bd5f3, type: 3}
   vesselFill: {fileID: 0}
-  vesselFrame: {fileID: 0}
-  corruptionBack: {fileID: 0}
+  vesselFrame: {fileID: 21300000, guid: ef152b47fc4c41b294f9758509e2c058, type: 3}
+  corruptionBack: {fileID: 21300000, guid: 9fa1c16047cc432881d6f6dafd7bd5f3, type: 3}
   corruptionFill: {fileID: 0}
-  corruptionFrame: {fileID: 0}
-  soulsBack: {fileID: 0}
+  corruptionFrame: {fileID: 21300000, guid: ef152b47fc4c41b294f9758509e2c058, type: 3}
+  soulsBack: {fileID: 21300000, guid: 9fa1c16047cc432881d6f6dafd7bd5f3, type: 3}
   soulsFill: {fileID: 0}
-  soulsFrame: {fileID: 0}
+  soulsFrame: {fileID: 21300000, guid: ef152b47fc4c41b294f9758509e2c058, type: 3}
   tintFills: 0
+  gamePanel: {fileID: 21300000, guid: b8bfe43c870e4592b9e31895f0469907, type: 3}
+  gameButton: {fileID: 21300000, guid: fd14421fb9e64ccea23fa4a1989af7a6, type: 3}
+  gameFrame: {fileID: 21300000, guid: 461f099b83184c449929734a48d723dd, type: 3}
+  menuPanel: {fileID: 21300000, guid: f4b751379172437ca224bfef6c39d532, type: 3}
+  menuButton: {fileID: 21300000, guid: 9935ae5e47854fc19ea259407dbc7c8c, type: 3}

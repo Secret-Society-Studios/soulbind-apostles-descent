@@ -1487,7 +1487,7 @@ MonoBehaviour:
   previewRaise: 40
   handsOnScreen: 1
   pcCardScale: 0.8
-  phoneCardScale: 0.6
+  phoneCardScale: 0.75
   handPhoneInEditor: 0
   pcHandWidth: 1300
   screenLeftClear: 280
@@ -1985,7 +1985,7 @@ MonoBehaviour:
   specialFloatHeight: 0.45
   specialBobHeight: 0.08
   specialBobSpeed: 0.8
-  specialIconSize: 0.8
+  specialIconSize: 0.55
   cameraMargin: -0.3
   cameraTilt: 41
   fieldOfView: 61

@@ -141,8 +141,10 @@ namespace SoulBind.UI
         /// that lie turned along the sides of the mat.
         /// </summary>
         /// isPlay: a card being played (lift, hang, drop, glow) rather than drawn.
+        /// hangScale: how large it hangs; 0 = a little larger than it starts or ends.
         public void Fly(ArcanaId card, Vector3 from, float fromAngle, float fromScale, Vector3 to, float toAngle,
-            float toScale, bool startFaceDown, bool endFaceDown, float duration, Action landed, bool isPlay = false)
+            float toScale, bool startFaceDown, bool endFaceDown, float duration, Action landed, bool isPlay = false,
+            float hangScale = 0f)
         {
             if ((startFaceDown || endFaceDown) && _backTemplate == null)
             {
@@ -160,7 +162,7 @@ namespace SoulBind.UI
             {
                 // It rises a little toward the pile, and is shown larger while it hangs there.
                 flight.Hang = Vector3.Lerp(from, to, 0.2f) + Vector3.up * (LiftPixels * transform.lossyScale.y);
-                flight.HangScale = Mathf.Max(fromScale, toScale) * 1.25f;
+                flight.HangScale = hangScale > 0f ? hangScale : Mathf.Max(fromScale, toScale) * 1.25f;
                 flight.Element = CardView.GetElementColor(CardCatalog.Get(card).Element);
             }
             Begin(flight, from, Quaternion.Euler(0f, 0f, fromAngle), fromScale, duration, landed);
