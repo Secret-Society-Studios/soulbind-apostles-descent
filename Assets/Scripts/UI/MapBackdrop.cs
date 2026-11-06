@@ -181,13 +181,26 @@ namespace SoulBind.UI
                 }
                 else
                 {
-                    Mesh mesh = IslandMesh.BuildRock(100 + i, cliff, skin.CliffShade);
-                    Transform rock = CreateMesh("EdgeRock", mesh, material, EdgeRockOrder, spot);
+                    // Placeholder rocks get their own plain stone, not the island's painted pattern.
+                    Mesh mesh = IslandMesh.BuildRock(100 + i, FullTexture, skin.CliffShade);
+                    Transform rock = CreateMesh("EdgeRock", mesh, StoneMaterial(material), EdgeRockOrder, spot);
                     float width = height * (0.7f + (float)random.NextDouble() * 0.5f);
                     rock.localScale = new Vector3(width, width, height);
                     rock.localRotation = Quaternion.AngleAxis((float)random.NextDouble() * 360f, Vector3.forward);
                 }
             }
+        }
+
+        private static readonly Rect FullTexture = new Rect(0f, 0f, 1f, 1f);
+
+        private Material _stoneMaterial; // shared by every placeholder edge rock
+
+        // A copy of the island material that shows the plain stone texture instead of the island art.
+        private Material StoneMaterial(Material island)
+        {
+            if (_stoneMaterial == null)
+                _stoneMaterial = new Material(island) { mainTexture = PlaceholderStone() };
+            return _stoneMaterial;
         }
 
         // Creates a mesh object, such as the 3D island, with its material and sort order.
@@ -381,6 +394,7 @@ namespace SoulBind.UI
         private static Sprite _placeholderGlow;
         private static Sprite _placeholderRock;
         private static Sprite _placeholderEmber;
+        private static Texture2D _placeholderStone;
 
         // Clears cached placeholders when Play starts, since Unity may keep statics between runs.
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -392,6 +406,7 @@ namespace SoulBind.UI
             _placeholderGlow = null;
             _placeholderRock = null;
             _placeholderEmber = null;
+            _placeholderStone = null;
         }
 
         // Dark sky with a few stars; tiles seamlessly.
@@ -547,6 +562,34 @@ namespace SoulBind.UI
             }
             _placeholderRock = MakeSprite("MapRock", n, n, pixels);
             return _placeholderRock;
+        }
+
+        // Grey-purple pixel stone for the placeholder edge rocks: random speckles, no lava.
+        private static Texture2D PlaceholderStone()
+        {
+            if (_placeholderStone != null)
+                return _placeholderStone;
+            const int Size = 16; // pixels per side
+            var random = new System.Random(31);
+            var shades = new[]
+            {
+                new Color32(74, 64, 74, 255),
+                new Color32(62, 53, 63, 255),
+                new Color32(88, 77, 87, 255),
+                new Color32(50, 42, 51, 255)
+            };
+            var pixels = new Color32[Size * Size];
+            for (int i = 0; i < pixels.Length; i++)
+                pixels[i] = shades[random.Next(shades.Length)];
+            _placeholderStone = new Texture2D(Size, Size, TextureFormat.RGBA32, false)
+            {
+                name = "MapStone",
+                filterMode = FilterMode.Point,
+                wrapMode = TextureWrapMode.Repeat
+            };
+            _placeholderStone.SetPixels32(pixels);
+            _placeholderStone.Apply(false, true);
+            return _placeholderStone;
         }
 
         // A 2x2 white square; MapSkin tints it.
