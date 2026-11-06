@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Video;
 
 namespace SoulBind.UI
 {
@@ -58,6 +59,15 @@ namespace SoulBind.UI
         [SerializeField] private Sprite gameHelpIcon;
         [SerializeField] private Sprite gameBanner;
 
+        [Header("Studio opening (Art/UI/StudioIntro)")]
+        [Tooltip("Shown after Made with Unity, before the main menu. A video wins over the logo.")]
+        [SerializeField] private VideoClip studioVideo;
+        [Tooltip("Still logo that fades in and out when there is no video.")]
+        [SerializeField] private Sprite studioLogo;
+        [SerializeField] private Color studioBackground = Color.black;
+        [Tooltip("How long the logo stays up, in seconds (fades included). Videos play to the end.")]
+        [SerializeField] private float studioSeconds = 3f;
+
         [Header("Colours")]
         [Tooltip("Off: fill sprites show their own colours. On: the game still tints them " +
                  "(Corruption turns red when Corrupted, for example). Draw fills white to tint them.")]
@@ -67,6 +77,10 @@ namespace SoulBind.UI
         public Sprite CapacityPipSpent => capacityPipSpent;
         public Sprite CapacityFrame => capacityFrame;
         public bool TintFills => tintFills;
+        public VideoClip StudioVideo => studioVideo;
+        public Sprite StudioLogo => studioLogo;
+        public Color StudioBackground => studioBackground;
+        public float StudioSeconds => studioSeconds;
         public Sprite MenuBackground => menuBackground;
         public Sprite MenuLogo => menuLogo;
         public Sprite MenuPanel => menuPanel;

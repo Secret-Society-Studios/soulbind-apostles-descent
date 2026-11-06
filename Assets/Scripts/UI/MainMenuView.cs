@@ -55,6 +55,7 @@ namespace SoulBind.UI
             }
             ShowPlayers();
             ShowScreen(Screen.Main);
+            StudioIntro.PlayOnce();
         }
 
         private void Update()

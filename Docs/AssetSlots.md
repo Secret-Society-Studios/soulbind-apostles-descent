@@ -27,7 +27,7 @@ Set **Fps** and **Loop** per slot.
 | Menu design assets (in-game) | `Assets/Art/UI/InGame` | In-game menu design (panel, buttons, icons, banner) |
 | Apply assets to new in-game UI | n/a | Done in code once the sprites are in the slots above |
 | Credits | `Assets/Art/Credits` | Text in `Assets/Resources/Credits.txt` |
-| OBB | n/a | Build setting, see below |
+| OBB (studio opening billboard) | `Assets/Art/UI/StudioIntro` | Studio opening: Studio Video or Studio Logo, Background, Seconds |
 
 ## Sound: `Assets/Resources/SoundLibrary.asset`
 
@@ -42,7 +42,13 @@ The three music tracks already play: main menu, match, and the result screen.
 The other sounds and animations are slots only; they get wired to the game as the files arrive.
 Code: `GameAudio.PlaySfx(clip)` and `GameAudio.PlayMusic(clip)`; a null clip does nothing.
 
-## OBB (Android)
+## Studio opening billboard
+
+Plays once per launch, after Unity's own splash, over the main menu (UI/StudioIntro.cs).
+A video (.mp4, H.264) wins over the logo; the logo fades in and out over Studio Seconds.
+A tap, click or key skips it. With both slots empty nothing shows.
+
+## Android expansion files (not the billboard)
 
 An OBB lets the Android build go over the store's size limit by moving assets out of the APK.
 Turn it on in **Player Settings > Android > Publishing Settings > Split Application Binary**.
