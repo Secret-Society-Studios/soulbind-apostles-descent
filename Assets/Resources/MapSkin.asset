@@ -26,6 +26,18 @@ MonoBehaviour:
   island: {fileID: -6058928264790137376, guid: 781524bd8e7d39a4893c50d968a6a5c6, type: 3}
   islandSize: {x: 1.35, y: 2.15}
   islandTopShift: 0
+  islandTopArea:
+    serializedVersion: 2
+    x: 0.091
+    y: 0.08
+    width: 0.84
+    height: 0.76
+  islandCliffArea:
+    serializedVersion: 2
+    x: 0.161
+    y: 0.18
+    width: 0.7
+    height: 0.25
   lavaGlow: {fileID: 0}
   glowColor: {r: 1, g: 0.45, b: 0.1, a: 1}
   glowPulseSpeed: 1.6
