@@ -16,7 +16,10 @@ namespace SoulBind.Core
         HealTile,
 
         /// <summary>This Apostle picked up a Soul tile.</summary>
-        SoulTile
+        SoulTile,
+
+        /// <summary>This Apostle picked up a Purify tile.</summary>
+        PurifyTile
     }
 
     /// <summary>One thing that happened to one Apostle, for the screen to show. Rules never read these.</summary>

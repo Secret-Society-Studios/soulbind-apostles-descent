@@ -12,3 +12,47 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3371339e70f84c28aa57d670291779f8, type: 3}
   m_Name: SoundLibrary
   m_EditorClassIdentifier: 
+  mainMenuMusic: {fileID: 8300000, guid: 88923c397d0048e0b83b5be64a7eb9a8, type: 3}
+  matchMusic: {fileID: 8300000, guid: 6fb8f8d48f4944dcb908585c764edc5b, type: 3}
+  resultMusic: {fileID: 8300000, guid: 13294fe2f9994cadbc2b6205df2e894c, type: 3}
+  extraMusic: []
+  move: {fileID: 8300000, guid: 1906ec1c6eb64f25965bd2a0cf975bb4, type: 3}
+  spawnLand: {fileID: 8300000, guid: f8bbf7b7610e4984a8e87f9654a168ca, type: 3}
+  attackHit: {fileID: 8300000, guid: d935a5a172de4c18bc425915c8f7afff, type: 3}
+  shieldBreak: {fileID: 8300000, guid: c0abccfe84d54a8db817b37aff0f4f73, type: 3}
+  heal: {fileID: 8300000, guid: d706e0ef17974b15b0ddbb58884afc8b, type: 3}
+  purify: {fileID: 8300000, guid: 3dd4f5143f5a4cf695ae287b2d99b86e, type: 3}
+  soulGained: {fileID: 8300000, guid: 06b46427ca664215b1032316d1f20c93, type: 3}
+  awaken: {fileID: 8300000, guid: 6d6acb9252b74c7ca7219e5580a65228, type: 3}
+  death: {fileID: 8300000, guid: 115f059149e649a8b5f97c5146789bae, type: 3}
+  cardDraw: {fileID: 8300000, guid: 491e18262b144f53b014c26d4bc3d588, type: 3}
+  cardPlay: {fileID: 8300000, guid: 9281a4a7bdb1406c8ffe264e482f09c6, type: 3}
+  buff: {fileID: 8300000, guid: 41418af9d89845bc80b308826f11ce30, type: 3}
+  debuff: {fileID: 8300000, guid: bb9002e090f9452da95268d3200d730b, type: 3}
+  corrupt: {fileID: 8300000, guid: 3e30e0ab8c774e8a97e1e48974a0b9cc, type: 3}
+  turnStart: {fileID: 8300000, guid: 5d78986f6ac944b4b7b0587cc578e028, type: 3}
+  victory: {fileID: 8300000, guid: 53cf7252a8574b26861f528c2d4720f4, type: 3}
+  defeat: {fileID: 8300000, guid: 85ff62689a3d48faa7b3bf3e7b95f99c, type: 3}
+  cards:
+  - {fileID: 8300000, guid: 2f1da8a759ad467d91eb111150770438, type: 3}
+  - {fileID: 8300000, guid: 412e8e09481a492eaff7e3dffcb98cdd, type: 3}
+  - {fileID: 8300000, guid: 1960bd59bee74339a118b95c7562fb35, type: 3}
+  - {fileID: 8300000, guid: dd30121777364793b8fa1aab4498c249, type: 3}
+  - {fileID: 0}
+  - {fileID: 8300000, guid: e59357e850cf4ec8a5e90bcb9a0f61f4, type: 3}
+  - {fileID: 8300000, guid: 836d6813dfa74b479cea493cdbbcd530, type: 3}
+  - {fileID: 8300000, guid: f28cad783679439ea44a288997aeeaed, type: 3}
+  - {fileID: 8300000, guid: f8335276d6b34501afb65c5b2f492674, type: 3}
+  - {fileID: 8300000, guid: 69d7866cdc7d4182ae767592ea15ee5c, type: 3}
+  - {fileID: 8300000, guid: 4f1aecf31e0b419aaebea99acce38d59, type: 3}
+  - {fileID: 8300000, guid: a87a32ef35e94845b7eac6c86211c054, type: 3}
+  - {fileID: 8300000, guid: 914811e788ac4e7ea837260afd9a5d15, type: 3}
+  - {fileID: 8300000, guid: 3cbd594943424ed9889c9696b1b5bc87, type: 3}
+  - {fileID: 8300000, guid: d12a41cb2b3a4fc8bd6ddb105df37f68, type: 3}
+  - {fileID: 8300000, guid: 9540b7995e644409a7b23b7676ddfb81, type: 3}
+  - {fileID: 8300000, guid: 8b7e652b941e4849b06f813fc3894175, type: 3}
+  - {fileID: 8300000, guid: d5b7b6b7af834a9f9eaedc0225cf5746, type: 3}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 8300000, guid: 3967e655d3834ef3b1ee8864600ba720, type: 3}
+  - {fileID: 0}

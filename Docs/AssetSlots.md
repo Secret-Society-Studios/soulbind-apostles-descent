@@ -34,12 +34,13 @@ Set **Fps** and **Loop** per slot.
 | OKR | Folder (`Assets/Audio/...`) | Slots |
 | --- | --- | --- |
 | At least 3 soundtracks | `Music` | Main Menu Music, Match Music, Result Music (+ Extra Music) |
-| In-game SFX | `SFX/Game` | Move, Spawn Land, Attack Hit, Shield Break, Heal, Purify, Soul Gained, Awaken, Death, Card Draw, Turn Start, Victory, Defeat |
+| In-game SFX | `SFX/Game` | Move, Spawn Land, Attack Hit, Shield Break, Heal, Purify, Soul Gained, Awaken, Death, Card Draw, Card Play, Buff, Debuff, Corrupt, Turn Start, Victory, Defeat |
 | UI interaction SFX | `SFX/UI` | Button Click, Button Hover, Popup Open, Popup Close, Not Allowed |
 | Card SFX (per card) | `SFX/Cards` | Cards 0-21 (0 Fool ... 21 World) |
 
-The three music tracks already play: main menu, match, and the result screen.
-The other sounds and animations are slots only; they get wired to the game as the files arrive.
+The music and every in-game and card sound play in the game. Files named `placeholder_*` are stand-ins:
+drag a real file over the slot, or overwrite the placeholder file to keep the slot as it is.
+The Emperor, Moon, Sun and World moment sounds are in FxLibrary (`SFX/Cards`). UI sounds are slots only.
 Code: `GameAudio.PlaySfx(clip)` and `GameAudio.PlayMusic(clip)`; a null clip does nothing.
 
 ## Studio opening billboard

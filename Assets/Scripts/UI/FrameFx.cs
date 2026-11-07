@@ -42,6 +42,13 @@ namespace SoulBind.UI
         public void Play(FrameClip clip, Vector3 position, float height, int sortingOrder = OverPieces,
             Transform follow = null)
         {
+            Play(clip, position, height, Color.white, sortingOrder, follow);
+        }
+
+        /// <summary>The same, tinted: for grey art that takes an Apostle's colour.</summary>
+        public void Play(FrameClip clip, Vector3 position, float height, Color tint,
+            int sortingOrder = OverPieces, Transform follow = null)
+        {
             if (!clip.HasFrames || clip.Fps <= 0f)
                 return;
 
@@ -53,6 +60,7 @@ namespace SoulBind.UI
 
             SpriteRenderer spriteRenderer = effect.Renderer;
             spriteRenderer.sprite = clip.Frames[0];
+            spriteRenderer.color = tint;
             spriteRenderer.sortingOrder = sortingOrder;
             spriteRenderer.transform.position = position;
             spriteRenderer.transform.localScale =

@@ -315,6 +315,16 @@ namespace SoulBind.UI
 
         // ---------- Rounded sprites (drawn once per size, white, 9-sliced) ----------
 
+        /// <summary>Gives an image round corners. Null is ignored.</summary>
+        public static void Round(Image image, float radius)
+        {
+            if (image == null)
+                return;
+            image.sprite = RoundedFill(radius);
+            image.type = Image.Type.Sliced;
+            image.pixelsPerUnitMultiplier = Detail;
+        }
+
         // Drawn at twice the design size (Image.pixelsPerUnitMultiplier = 2) so edges stay smooth.
         private const float Detail = 2f;
 

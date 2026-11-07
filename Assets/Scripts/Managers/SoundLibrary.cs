@@ -30,12 +30,24 @@ namespace SoulBind.Managers
         [SerializeField] private AudioClip spawnLand;
         [SerializeField] private AudioClip attackHit;
         [SerializeField] private AudioClip shieldBreak;
+        [Tooltip("A Heal tile is picked up.")]
         [SerializeField] private AudioClip heal;
+        [Tooltip("A Purify tile is picked up.")]
         [SerializeField] private AudioClip purify;
+        [Tooltip("A Soul tile is picked up.")]
         [SerializeField] private AudioClip soulGained;
         [SerializeField] private AudioClip awaken;
         [SerializeField] private AudioClip death;
         [SerializeField] private AudioClip cardDraw;
+        [Tooltip("A card is played and has no sound of its own in Cards below.")]
+        [SerializeField] private AudioClip cardPlay;
+        [Tooltip("A card strengthens the Apostle who played it.")]
+        [SerializeField] private AudioClip buff;
+        [Tooltip("An opponent's card puts a lasting penalty on an Apostle.")]
+        [SerializeField] private AudioClip debuff;
+        [Tooltip("An opponent's card gives an Apostle Corruption.")]
+        [SerializeField] private AudioClip corrupt;
+        [Tooltip("Your turn starts.")]
         [SerializeField] private AudioClip turnStart;
         [SerializeField] private AudioClip victory;
         [SerializeField] private AudioClip defeat;
@@ -52,7 +64,8 @@ namespace SoulBind.Managers
         // ---------- Card SFX ----------
 
         [Header("Card SFX (one per card in the Arcana)")]
-        [Tooltip("Index = card id: 0 Fool, 1 Magician ... 21 World. Plays when that card is played.")]
+        [Tooltip("Index = card id: 0 Fool, 1 Magician ... 21 World. Plays when that card is played, instead " +
+                 "of Card Play. The Emperor, Moon, Sun and World also have their moment's sound in FxLibrary.")]
         [SerializeField] private AudioClip[] cards = new AudioClip[ArcanaCount];
 
         private const int ArcanaCount = 22; // The Fool to The World
@@ -70,6 +83,10 @@ namespace SoulBind.Managers
         public AudioClip Awaken => awaken;
         public AudioClip Death => death;
         public AudioClip CardDraw => cardDraw;
+        public AudioClip CardPlay => cardPlay;
+        public AudioClip Buff => buff;
+        public AudioClip Debuff => debuff;
+        public AudioClip Corrupt => corrupt;
         public AudioClip TurnStart => turnStart;
         public AudioClip Victory => victory;
         public AudioClip Defeat => defeat;

@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using SoulBind.Core;
 using SoulBind.Entities;
@@ -264,6 +265,8 @@ namespace SoulBind.Managers
         private const int MaxEffectBacklog = 8; // more than this behind (joining late): skip them
         private const float AvatarFramePixels = 64f; // one avatar frame's height, the scale of the effect art
         private int _auraIndex = -1;
+        private int _lastTurnId;
+        private bool _wasAwakened;
         private readonly bool[] _defended = new bool[GameConstants.MaxPlayers];
 
         // A Strike, as shares of its time: wind-up (pull back), strike (impact at the end), recovery.
@@ -1392,8 +1395,17 @@ namespace SoulBind.Managers
             FxLibrary fx = FxLibrary.Current;
             if (fx != null && _frameFx != null)
                 _frameFx.Play(fx.SpawnFall, position, fx.SpawnFallHeight);
+            FrameClip fall = fx != null ? fx.SpawnFall : default;
+            StartCoroutine(PlaySpawnLand(fall.HasFrames && fall.Fps > 0f ? fall.Frames.Length / fall.Fps : 0f));
 
             Debug.Log($"MatchController: Apostle {picker} starts at ({tile.Q}, {tile.R}).");
+        }
+
+        // The sound of landing, once the fall has played.
+        private static IEnumerator PlaySpawnLand(float delay)
+        {
+            yield return new WaitForSeconds(delay);
+            GameAudio.PlaySfx(Sounds != null ? Sounds.SpawnLand : null);
         }
 
         // Highlights the tiles the person picking may choose, and says whose pick it is.
@@ -1614,6 +1626,8 @@ namespace SoulBind.Managers
                     float distance = Vector3.Distance(_moveFrom[i], _moveTo[i]);
                     _moveDuration[i] = distance < 0.001f ? 0f
                         : MotionStyle.Seconds(Mathf.Clamp(distance / Mathf.Max(0.1f, discMoveSpeed) * 1.6f, 0.35f, 1.1f));
+                    if (distance >= 0.001f)
+                        GameAudio.PlaySfx(Sounds != null ? Sounds.Move : null);
                     _smokeTimer[i] = 0f;
                 }
 
@@ -1679,6 +1693,7 @@ namespace SoulBind.Managers
             for (int i = 0; i < _impactViews.Count; i++)
                 _views[_impactViews[i]].PlayDamaged(-_lungeDirection);
 
+            GameAudio.PlaySfx(Sounds != null ? Sounds.AttackHit : null);
             if (_effects == null)
                 return;
             for (int i = 0; i < _impactTargets.Count; i++)
@@ -1867,7 +1882,11 @@ namespace SoulBind.Managers
                 // Discs slide to their tile (see AnimateDiscs); one coming back into view just appears there.
                 bool wasShown = view.gameObject.activeSelf;
                 if (wasShown && apostle.IsEliminated)
-                    PlayOnBoard(FxLibrary.Current != null ? FxLibrary.Current.Death : default, view.transform.position, null);
+                {
+                    PlayOnBoard(FxLibrary.Current != null ? FxLibrary.Current.Death : default, view.transform.position, null,
+                        AvatarTint(apostle.Id));
+                    GameAudio.PlaySfx(Sounds != null ? Sounds.Death : null);
+                }
                 view.gameObject.SetActive(!apostle.IsEliminated);
                 _discTargets[i] = boardView.GetWorldPosition(apostle.Position);
                 if (!wasShown)
@@ -1876,7 +1895,12 @@ namespace SoulBind.Managers
                     view.transform.position = _discTargets[i];
                 }
                 if (i < _defended.Length)
-                    _defended[i] = !apostle.IsEliminated && !CurrentMatch.IsOver && apostle.Defense > 0;
+                {
+                    bool defended = !apostle.IsEliminated && !CurrentMatch.IsOver && apostle.Defense > 0;
+                    if (_defended[i] && !defended && !apostle.IsEliminated && !CurrentMatch.IsOver)
+                        GameAudio.PlaySfx(Sounds != null ? Sounds.ShieldBreak : null);
+                    _defended[i] = defended;
+                }
 
                 // No size pop for the Apostle whose turn it is: a slow aura under its piece instead.
                 view.SetActiveTurn(false);
@@ -1892,6 +1916,22 @@ namespace SoulBind.Managers
             if (_timeStop != null)
                 _timeStop.Set(timeStopper != 0, timeStopCenter);
             PlayNewLegendary(apostles);
+            PlayTurnSounds(ascension);
+        }
+
+        private static SoundLibrary Sounds => SoundLibrary.Current;
+
+        // The moments only noticed by comparing with the last look: someone Awakens, your turn starts.
+        private void PlayTurnSounds(AscensionTracker ascension)
+        {
+            if (ascension.HasAwakened && !_wasAwakened)
+                GameAudio.PlaySfx(Sounds != null ? Sounds.Awaken : null);
+            _wasAwakened = ascension.HasAwakened;
+
+            int turnId = CanAct ? CurrentMatch.CurrentApostle.Id : 0;
+            if (turnId != _lastTurnId && IsLocalTurn)
+                GameAudio.PlaySfx(Sounds != null ? Sounds.TurnStart : null);
+            _lastTurnId = turnId;
         }
 
         // Plays what has happened to the Apostles since the last look, on each of them.
@@ -1909,7 +1949,8 @@ namespace SoulBind.Managers
                 MatchEffect effect = recent[i];
                 int index = IndexOfApostle(effect.ApostleId);
                 if (index >= 0 && index < _views.Count)
-                    PlayOnBoard(ClipFor(effect.Kind), _views[index].transform.position, _views[index].transform);
+                    PlayOnBoard(ClipFor(effect.Kind), _views[index].transform.position, _views[index].transform, Color.white);
+                GameAudio.PlaySfx(SoundFor(effect.Kind));
             }
             _seenEffects = count;
         }
@@ -1925,19 +1966,43 @@ namespace SoulBind.Managers
                 case MatchEffectKind.Debuff: return fx.DebuffEffect;
                 case MatchEffectKind.Corrupt: return fx.CorruptionAura;
                 case MatchEffectKind.HealTile: return fx.HealAura;
+                case MatchEffectKind.PurifyTile: return fx.PurifyAura;
                 default: return fx.SoulPick;
             }
         }
 
+        private static AudioClip SoundFor(MatchEffectKind kind)
+        {
+            SoundLibrary sounds = Sounds;
+            if (sounds == null)
+                return null;
+            switch (kind)
+            {
+                case MatchEffectKind.Buff: return sounds.Buff;
+                case MatchEffectKind.Debuff: return sounds.Debuff;
+                case MatchEffectKind.Corrupt: return sounds.Corrupt;
+                case MatchEffectKind.HealTile: return sounds.Heal;
+                case MatchEffectKind.PurifyTile: return sounds.Purify;
+                default: return sounds.SoulGained;
+            }
+        }
+
         // Effect art is drawn at the avatar's pixel size, so a frame scales with the avatar.
-        private void PlayOnBoard(FrameClip clip, Vector3 position, Transform follow)
+        private void PlayOnBoard(FrameClip clip, Vector3 position, Transform follow, Color tint)
         {
             if (_frameFx == null || !clip.HasFrames)
                 return;
             AvatarSkin skin = AvatarSkin.Current;
             float avatarHeight = skin != null ? skin.Height : 1.1f;
             float height = clip.Frames[0].rect.height / AvatarFramePixels * avatarHeight;
-            _frameFx.Play(clip, position, height, FrameFx.OverPieces, follow);
+            _frameFx.Play(clip, position, height, tint, FrameFx.OverPieces, follow);
+        }
+
+        // Grey avatar art tinted the way this Apostle's piece is.
+        private static Color AvatarTint(int apostleId)
+        {
+            AvatarSkin skin = AvatarSkin.Current;
+            return skin != null ? skin.Tinted(ApostleColors.Get(apostleId)) : Color.white;
         }
 
         // A legendary card has resolved since the last look: its moment plays from whoever played it.

@@ -211,16 +211,24 @@ namespace SoulBind.UI
                 return;
             if (!match.Battlefield.Specials.Active.TryGetValue(position, out SpecialTileType type))
                 return;
-            if (type != SpecialTileType.Soul)
-                return;
 
             bool you = apostle.Id == viewer;
-            if (apostle.IsSoullocked)
+            if (type == SpecialTileType.Heal)
+            {
+                if (apostle.HasFullVessel)
+                    QueueBanner(you ? "Your Vessel is full" : $"{Name(apostle.Id)}'s Vessel is full");
+            }
+            else if (type == SpecialTileType.Purify)
+            {
+                if (apostle.Corruption <= 0)
+                    QueueBanner(you ? "You have no Corruption" : $"{Name(apostle.Id)} has no Corruption");
+            }
+            else if (apostle.IsSoullocked)
                 QueueBanner(you
                     ? $"Soullocked! No Souls until your Corruption is below {GameConstants.CorruptionThreshold}"
                     : $"{Name(apostle.Id)} is Soullocked and can't take the Soul tile");
             else if (apostle.HasMaxSouls)
-                QueueBanner(you ? "Your Souls are full: the Soul tile stays" : $"{Name(apostle.Id)}'s Souls are full");
+                QueueBanner(you ? "Your Souls are full" : $"{Name(apostle.Id)}'s Souls are full");
         }
 
         // ---------- Quit ----------
@@ -389,6 +397,9 @@ namespace SoulBind.UI
             int viewer = _controller.ViewerId;
             int winner = match.WinnerId;
             bool youWon = winner != 0 && winner == viewer && _controller.BotsPlayOthers;
+            SoundLibrary sounds = SoundLibrary.Current;
+            if (sounds != null)
+                GameAudio.PlaySfx(winner != 0 && winner == viewer ? sounds.Victory : sounds.Defeat);
 
             switch (match.EndReason)
             {

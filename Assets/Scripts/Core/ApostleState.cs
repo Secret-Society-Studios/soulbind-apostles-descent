@@ -36,6 +36,9 @@ namespace SoulBind.Core
         public bool IsEliminated => Vessel <= 0;
         public bool IsCorrupted => Corruption >= GameConstants.CorruptionThreshold;
 
+        /// <summary>At full Vessel, so healing would do nothing.</summary>
+        public bool HasFullVessel => Vessel >= GameConstants.MaxVessel;
+
         /// <summary>Corrupted Apostles cannot gain Souls until Corruption drops below the threshold.</summary>
         public bool IsSoullocked => IsCorrupted;
 

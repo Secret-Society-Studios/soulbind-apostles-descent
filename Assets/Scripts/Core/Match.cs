@@ -473,6 +473,8 @@ namespace SoulBind.Core
                 RecordEffect(MatchEffectKind.HealTile, apostle.Id);
             else if (type == SpecialTileType.Soul)
                 RecordEffect(MatchEffectKind.SoulTile, apostle.Id);
+            else if (type == SpecialTileType.Purify)
+                RecordEffect(MatchEffectKind.PurifyTile, apostle.Id);
         }
 
         private void RecordEffect(MatchEffectKind kind, int apostleId)

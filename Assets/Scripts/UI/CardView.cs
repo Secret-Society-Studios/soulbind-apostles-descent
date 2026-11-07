@@ -13,6 +13,7 @@ namespace SoulBind.UI
     /// Everything shown comes from CardCatalog, so a card can never show a stat the rules don't use.
     /// With a CardArtLibrary, the card's flat front (character art and border) fills the card and the
     /// numbers, element, name and effect are layered on top; cards without art keep the placeholder look.
+    /// The front is drawn by a CardBody, so it looks like the Collections' 3D card.
     /// </summary>
     public sealed class CardView : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler,
         IBeginDragHandler, IDragHandler, IEndDragHandler
@@ -45,10 +46,13 @@ namespace SoulBind.UI
         [Tooltip("The small ATK / DEF / CAP words, hidden when the stat icons are used.")]
         [SerializeField] private Graphic[] statLabels;
 
+        private const float GlowWidth = 6f; // how far the selected glow reaches past the card
+
         private Color _frameColor;
         private Color _nameColor;
         private Color _effectColor;
         private bool _colorsSaved;
+        private CardBody _body;
 
         public ArcanaId CardId { get; private set; }
 
@@ -71,10 +75,11 @@ namespace SoulBind.UI
             // The flat front, if the team's art for this card is in the library.
             Sprite front = artLibrary != null ? artLibrary.GetFront(card.Id) : null;
             bool hasArt = front != null;
-            if (fullArt != null)
+            BuildBody();
+            if (_body != null)
             {
-                fullArt.enabled = hasArt;
-                fullArt.sprite = front;
+                _body.enabled = hasArt;
+                _body.Show(front);
             }
 
             // A complete front already shows everything: draw nothing over it.
@@ -138,6 +143,19 @@ namespace SoulBind.UI
                 defenseText.text = card.Defense.ToString();
             if (capText != null)
                 capText.text = card.Cap.ToString();
+        }
+
+        // The card body takes the flat art's place, and the glow and dimming follow its round corners.
+        private void BuildBody()
+        {
+            if (_body != null || fullArt == null)
+                return;
+            fullArt.enabled = false;
+            _body = CardBody.Create(fullArt.transform.parent, fullArt.transform.GetSiblingIndex() + 1);
+
+            float corner = Rect.rect.width * CardBody.CornerShare;
+            UiKit.Round(dimOverlay, corner);
+            UiKit.Round(highlight, corner + GlowWidth);
         }
 
         // Remembers the prefab's colours once so dimming can restore them.

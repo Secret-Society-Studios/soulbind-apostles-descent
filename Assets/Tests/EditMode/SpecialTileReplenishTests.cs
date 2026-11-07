@@ -25,6 +25,7 @@ namespace SoulBind.Tests.EditMode
             SpecialTileType type = tiles.Active[used];
             var apostle = new ApostleState(1, used, 5);
             apostle.TakeDamage(10); // so a Heal tile has something to heal
+            apostle.AddCorruption(1); // and a Purify tile
 
             Assert.IsTrue(tiles.TryTrigger(apostle));
             Assert.AreEqual(total - 1, tiles.Active.Count);

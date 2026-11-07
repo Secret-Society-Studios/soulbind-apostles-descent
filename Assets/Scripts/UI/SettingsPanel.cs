@@ -148,6 +148,11 @@ namespace SoulBind.UI
             box.anchorMin = box.anchorMax = box.pivot = new Vector2(0.5f, 0.5f);
             box.sizeDelta = new Vector2(600f, 394f);
 
+            // Takes the taps inside the box, or they would pass up to the dim layer and close it.
+            Button inside = box.gameObject.AddComponent<Button>();
+            inside.transition = Selectable.Transition.None;
+            inside.navigation = new Navigation { mode = Navigation.Mode.None };
+
             TMP_Text title = Kit.Label(box, "Title", "Settings", 32f, Kit.Display, Kit.Title);
             Kit.At(title.rectTransform, 0f, 22f, 600f, 44f);
 

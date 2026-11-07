@@ -93,13 +93,17 @@ namespace SoulBind.Tests.EditMode
         }
 
         [Test]
-        public void Heal_AtFullVessel_IsStillUsedUp()
+        public void Heal_AtFullVessel_StaysOnTheBoard()
         {
             SpecialTiles specials = OneTile(SpecialTileType.Heal);
             ApostleState apostle = ApostleOnSpot();
 
-            Assert.IsTrue(specials.TryTrigger(apostle));
+            Assert.IsFalse(specials.TryTrigger(apostle));
             Assert.AreEqual(50, apostle.Vessel);
+            Assert.IsTrue(specials.Active.ContainsKey(Spot));
+
+            apostle.TakeDamage(1);
+            Assert.IsTrue(specials.TryTrigger(apostle), "Usable as soon as it would heal");
             Assert.IsFalse(specials.Active.ContainsKey(Spot));
         }
 
@@ -116,13 +120,17 @@ namespace SoulBind.Tests.EditMode
         }
 
         [Test]
-        public void Purify_AtZeroCorruption_IsStillUsedUp()
+        public void Purify_AtZeroCorruption_StaysOnTheBoard()
         {
             SpecialTiles specials = OneTile(SpecialTileType.Purify);
             ApostleState apostle = ApostleOnSpot();
 
-            Assert.IsTrue(specials.TryTrigger(apostle));
+            Assert.IsFalse(specials.TryTrigger(apostle));
             Assert.AreEqual(0, apostle.Corruption);
+            Assert.IsTrue(specials.Active.ContainsKey(Spot));
+
+            apostle.AddCorruption(1);
+            Assert.IsTrue(specials.TryTrigger(apostle), "Usable as soon as there is Corruption");
             Assert.IsFalse(specials.Active.ContainsKey(Spot));
         }
 

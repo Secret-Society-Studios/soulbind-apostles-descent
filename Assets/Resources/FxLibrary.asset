@@ -29,7 +29,11 @@ MonoBehaviour:
     - {fileID: 6980080760192195986, guid: d25e1679f51d467faea4b91d77bb2a9b, type: 3}
     - {fileID: 1772250041918618107, guid: d25e1679f51d467faea4b91d77bb2a9b, type: 3}
     - {fileID: -2056498844744873902, guid: d25e1679f51d467faea4b91d77bb2a9b, type: 3}
-    Fps: 12
+    - {fileID: -4256767712361535691, guid: d25e1679f51d467faea4b91d77bb2a9b, type: 3}
+    - {fileID: 2406168499103703497, guid: d25e1679f51d467faea4b91d77bb2a9b, type: 3}
+    - {fileID: 2333885303101685693, guid: d25e1679f51d467faea4b91d77bb2a9b, type: 3}
+    - {fileID: 1157026731460007559, guid: d25e1679f51d467faea4b91d77bb2a9b, type: 3}
+    Fps: 13.333333
     Loop: 0
   spawnFall:
     Frames:
@@ -107,7 +111,11 @@ MonoBehaviour:
     - {fileID: 750841898309735015, guid: 05f2e7e98bd74047a898abf55e4d49a6, type: 3}
     - {fileID: -3083582852392860336, guid: 05f2e7e98bd74047a898abf55e4d49a6, type: 3}
     - {fileID: -3491303096031154702, guid: 05f2e7e98bd74047a898abf55e4d49a6, type: 3}
-    Fps: 8
+    - {fileID: -1151858468408064806, guid: 05f2e7e98bd74047a898abf55e4d49a6, type: 3}
+    - {fileID: 1819865584028378120, guid: 05f2e7e98bd74047a898abf55e4d49a6, type: 3}
+    - {fileID: -3856973291174300699, guid: 05f2e7e98bd74047a898abf55e4d49a6, type: 3}
+    - {fileID: 3693953467145698221, guid: 05f2e7e98bd74047a898abf55e4d49a6, type: 3}
+    Fps: 20
     Loop: 0
   worldClock:
     Frames:
@@ -128,4 +136,21 @@ MonoBehaviour:
     - {fileID: 1002520261714640169, guid: d990f757cc16b924ebeb55ab5ce63087, type: 3}
     - {fileID: 8709226390251538413, guid: d990f757cc16b924ebeb55ab5ce63087, type: 3}
     Fps: 12
+    Loop: 0
+  sunSound: {fileID: 8300000, guid: 33f60ace15d24c3f8d283144c56d84b1, type: 3}
+  moonSound: {fileID: 8300000, guid: e87f63be9b5544f8b1eb7d80fb5ec353, type: 3}
+  emperorSound: {fileID: 8300000, guid: 1de89560121b42e7a6809a45f7826399, type: 3}
+  timeStopSound: {fileID: 8300000, guid: 846d407621bf49028cc2166b6fde3495, type: 3}
+  timeResumeSound: {fileID: 8300000, guid: 08a989f3040f43bca3ec6a1d726f9ed8, type: 3}
+  purifyAura:
+    Frames:
+    - {fileID: 3554420524492010295, guid: f218025ac2ce43608fa9616a937b4480, type: 3}
+    - {fileID: 100335189538011579, guid: f218025ac2ce43608fa9616a937b4480, type: 3}
+    - {fileID: 2621487080325483220, guid: f218025ac2ce43608fa9616a937b4480, type: 3}
+    - {fileID: 1006749912366953171, guid: f218025ac2ce43608fa9616a937b4480, type: 3}
+    - {fileID: 2482116843032549294, guid: f218025ac2ce43608fa9616a937b4480, type: 3}
+    - {fileID: 3022690473493873127, guid: f218025ac2ce43608fa9616a937b4480, type: 3}
+    - {fileID: -12950128627244038, guid: f218025ac2ce43608fa9616a937b4480, type: 3}
+    - {fileID: 1421495437235730905, guid: f218025ac2ce43608fa9616a937b4480, type: 3}
+    Fps: 20
     Loop: 0

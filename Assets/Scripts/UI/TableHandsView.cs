@@ -575,6 +575,7 @@ namespace SoulBind.UI
                 : deck.DrawCount > _lastDrawCount ? int.MaxValue : 0;
 
             int toPile = 0;
+            bool anyDrawn = false;
             for (int s = 0; s < _seats.Count; s++)
             {
                 Seat seat = _seats[s];
@@ -630,12 +631,17 @@ namespace SoulBind.UI
                 for (int i = 0; i < hand.Count; i++)
                     seat.Shown.Add(hand[i]);
                 seat.Arriving += flying;
+                anyDrawn |= flying > 0;
                 Layout(seat, match, false);
 
                 int slots = seat.SlotCount(maxCardsShown);
                 for (int j = 0; j < flying; j++)
                     FlyToSeat(seat, match, Mathf.Clamp(slots - flying + j, 0, Mathf.Max(0, slots - 1)), hand.Count - flying + j);
             }
+
+            // Once, however many cards were drawn together.
+            if (anyDrawn && SoundLibrary.Current != null)
+                GameAudio.PlaySfx(SoundLibrary.Current.CardDraw);
 
             // What no hand claimed came out of the play queue: those play one at a time, in order.
             int queued = _playOrder.Count;
@@ -936,7 +942,10 @@ namespace SoulBind.UI
             Stand(back, OthersStand, CardHeight);
 
             // Edged in the owner's colour, so each card shows whose hand it belongs to.
-            if (back.GetComponent<Image>() != null)
+            CardBody body = back.GetComponentInChildren<CardBody>(true);
+            if (body != null)
+                body.SetEdge(ApostleColors.Get(seat.ApostleId));
+            else if (back.GetComponent<Image>() != null)
             {
                 Outline ring = back.gameObject.AddComponent<Outline>();
                 ring.effectColor = ApostleColors.Get(seat.ApostleId);
@@ -1467,6 +1476,7 @@ namespace SoulBind.UI
                 if (discardPile.TryGetScreenSpot(out Vector2 to, out float toPixels))
                 {
                     _playingCard = true;
+                    PlayCardSound(card);
                     var from = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
                     _flights.Fly(card, from, 0f, _flights.ScaleForPixels(Screen.height * 0.1f), to, 0f,
                         _flights.ScaleForPixels(toPixels), false, false, playFlightTime, OnCardPlayed, true,
@@ -1476,6 +1486,16 @@ namespace SoulBind.UI
                 discardPile.ReleaseOne();
             }
             _playingCard = false;
+        }
+
+        // The card's own sound, or the general one.
+        private static void PlayCardSound(ArcanaId card)
+        {
+            SoundLibrary sounds = SoundLibrary.Current;
+            if (sounds == null)
+                return;
+            AudioClip own = sounds.GetCard(card);
+            GameAudio.PlaySfx(own != null ? own : sounds.CardPlay);
         }
 
         // A queued card reached the pile: on to the next one.
@@ -1525,6 +1545,7 @@ namespace SoulBind.UI
                     out float startAngle))
                 return false;
 
+            PlayCardSound(card);
             _flights.Fly(card, start, startAngle, _flights.ScaleForPixels(startPixels), to, 0f,
                 _flights.ScaleForPixels(toPixels), !seat.IsYours, false, playFlightTime, discardPile.ReleaseOne, true);
             return true;

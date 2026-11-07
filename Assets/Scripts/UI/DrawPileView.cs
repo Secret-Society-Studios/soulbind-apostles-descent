@@ -113,6 +113,11 @@ namespace SoulBind.UI
             }
             for (int i = 0; i < cardBackTemplate.childCount; i++)
                 cardBackTemplate.GetChild(i).gameObject.SetActive(false);
+
+            // The back is a CardBody like the fronts; the image stays, clear, in case it catches taps.
+            if (back != null)
+                back.color = Color.clear;
+            CardBody.Create(cardBackTemplate, cardBackTemplate.childCount).Show(cardBackSprite);
         }
 
         // Lies flat on the mat, in its left corner beside the board.

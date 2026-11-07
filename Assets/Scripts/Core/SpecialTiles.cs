@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace SoulBind.Core
 {
     /// <summary>
-    /// The special tiles still waiting to be used. Each works once: when an Apostle steps
+    /// The special tiles still waiting to be used. Each works once: when an Apostle who can use it steps
     /// onto it, its effect applies and the tile becomes an ordinary tile. At the start of every
     /// Phase, every used tile comes back on a random free interior tile (Replenish).
     /// Pure rules data: no Unity types.
@@ -131,7 +131,8 @@ namespace SoulBind.Core
 
         /// <summary>
         /// Applies the tile under the Apostle, if there is one, and uses it up.
-        /// Returns true if a tile was used. A Soul tile does nothing for a Soullocked Apostle and stays.
+        /// Returns true if a tile was used. A tile that would do nothing stays on the board: Heal at full
+        /// Vessel, Purify with no Corruption, Soul for a Soullocked Apostle or one with the most Souls.
         /// </summary>
         public bool TryTrigger(ApostleState apostle)
         {
@@ -143,14 +144,18 @@ namespace SoulBind.Core
             switch (type)
             {
                 case SpecialTileType.Heal:
+                    if (apostle.HasFullVessel)
+                        return false;
                     apostle.Heal(GameConstants.HealTileAmount);
                     break;
                 case SpecialTileType.Purify:
+                    if (apostle.Corruption <= 0)
+                        return false;
                     apostle.ReduceCorruption(GameConstants.PurifyTileAmount);
                     break;
                 case SpecialTileType.Soul:
-                    // Stays on the board for someone who can use it: a Soullocked Apostle gains nothing,
-                    // and one already at the Souls needed to Awaken can't hold more.
+                    // A Soullocked Apostle gains nothing, and one already at the Souls needed to Awaken
+                    // can't hold more.
                     if (apostle.IsSoullocked || apostle.HasMaxSouls)
                         return false;
                     apostle.AddSouls(GameConstants.SoulTileAmount);
