@@ -40,6 +40,17 @@ namespace SoulBind.UI
         private Image _profileAvatar;
 
         private GameObject _quitPopup;
+        private GameObject _tutorialPopup;
+        private const float GreetDelay = 0.6f;
+
+        // The narrator's welcome waits for the studio opening.
+        private static System.Collections.IEnumerator GreetAfterIntro()
+        {
+            while (StudioIntro.Showing)
+                yield return null;
+            yield return new WaitForSecondsRealtime(GreetDelay);
+            Narrator.Welcome();
+        }
 
         private void Start()
         {
@@ -59,15 +70,16 @@ namespace SoulBind.UI
             ShowPlayers();
             ShowScreen(Screen.Main);
             StudioIntro.PlayOnce();
+            StartCoroutine(GreetAfterIntro());
         }
 
         private void Update()
         {
             OnlineSession session = OnlineSession.Instance;
             bool inRoom = session != null && session.InSession;
-            if (inRoom && _screen != Screen.Lobby)
+            if (inRoom && _screen != Screen.Lobby && _screen != Screen.Avatar)
                 ShowScreen(Screen.Lobby);
-            else if (!inRoom && _screen == Screen.Lobby)
+            else if (!inRoom && (_screen == Screen.Lobby || (_screen == Screen.Avatar && _avatarFromLobby)))
             {
                 // The room ended: the host left, or the connection dropped.
                 if (OnlineSession.LastMessage != null)
@@ -89,6 +101,12 @@ namespace SoulBind.UI
         // Shows one menu screen and hides the rest.
         private void ShowScreen(Screen screen)
         {
+            if (screen == Screen.Avatar)
+            {
+                _avatarFromLobby = _screen == Screen.Lobby;
+                _avatarSaveStatus.text = string.Empty;
+                ShowAvatarColor();
+            }
             _screen = screen;
             _mainScreen.SetActive(screen == Screen.Main);
             _singleScreen.SetActive(screen == Screen.Singleplayer);
@@ -126,7 +144,16 @@ namespace SoulBind.UI
         }
 
         // Starts a local match where bots play the other seats.
-        private void PlayBots() => Play(true);
+        private void PlayBots()
+        {
+            if (TutorialProgress.IsDone)
+            {
+                Play(true);
+                return;
+            }
+            _tutorialPopup.transform.SetAsLastSibling();
+            _tutorialPopup.SetActive(true);
+        }
 
         // Pass & Play: everyone takes turns on this device; the view follows whoever's turn it is.
         private void PassAndPlay() => Play(false);
@@ -144,6 +171,16 @@ namespace SoulBind.UI
             MatchSettings.SetTutorial();
             SceneManager.LoadScene(gameSceneName);
         }
+
+        // Skipping the tutorial counts as done, so the offer doesn't come back.
+        private void SkipTutorial()
+        {
+            TutorialProgress.MarkDone();
+            Play(true);
+        }
+
+        // Closes the offer. Nothing is decided, so the next Play vs Bots asks again.
+        private void CancelTutorial() => _tutorialPopup.SetActive(false);
 
         // Asks "Quit the game?" before closing anything.
         private void AskToQuit()
@@ -168,11 +205,22 @@ namespace SoulBind.UI
         // ---------- Building ----------
 
         // Builds the background and every menu screen once.
+        private void OnDestroy() => Kit.MenuFrames = false;
+
         private void Build()
         {
-            RectTransform background = Kit.Stretch(Kit.CreateRect("Background", _root));
-            Image fill = background.gameObject.AddComponent<Image>();
-            fill.color = Kit.Background;
+            Kit.MenuFrames = true;
+            Sprite picture = UiSkin.Current != null ? UiSkin.Current.MenuBackground : null;
+            if (picture != null)
+            {
+                MenuBackdrop.Create(_root, picture, Kit.Background);
+            }
+            else
+            {
+                RectTransform background = Kit.Stretch(Kit.CreateRect("Background", _root));
+                Image fill = background.gameObject.AddComponent<Image>();
+                fill.color = Kit.Background;
+            }
 
             BuildMain();
             BuildSingleplayer();
@@ -183,17 +231,7 @@ namespace SoulBind.UI
             BuildLobby();
             BuildProfilePopup();
             BuildQuitPopup();
-        }
-
-        // The two thin frame lines just inside the edge of every screen.
-        private static void AddFrameLines(RectTransform frame, bool inner)
-        {
-            RectTransform outer = Kit.Box(frame, "FrameLine", Color.clear, Kit.BronzeLine, 6f);
-            Kit.Stretch(outer, 18f);
-            if (!inner)
-                return;
-            RectTransform line = Kit.Box(frame, "FrameLineInner", Color.clear, Kit.Hex(0x2C2236), 4f);
-            Kit.Stretch(line, 24f);
+            BuildTutorialPopup();
         }
 
         // Builds the main screen: profile card, play buttons and the rest.
@@ -201,21 +239,9 @@ namespace SoulBind.UI
         {
             RectTransform frame = Kit.CreateFrame(_root, "MainScreen");
             _mainScreen = frame.gameObject;
-            AddFrameLines(frame, true);
             BuildProfileCard(frame);
 
-            // Emblem: two rings, then the title and subtitle.
-            RectTransform ring = Kit.Circle(frame, "Emblem", 56f, Color.clear, Kit.Gold, 2f);
-            Kit.At(ring, 612f, 52f, 56f, 56f);
-            RectTransform inner = Kit.Circle(ring, "Inner", 32f, Color.clear, Kit.GoldLine, 2f);
-            Kit.At(inner, 12f, 12f, 32f, 32f);
-
-            TMP_Text title = Kit.Label(frame, "Title", "SoulBind", 84f, Kit.DisplayHeavy, Kit.Title);
-            Kit.At(title.rectTransform, 0f, 112f, 1280f, 92f);
-            title.characterSpacing = 4f;
-            TMP_Text subtitle = Kit.Label(frame, "Subtitle", "APOSTLE'S DESCENT", 22f, Kit.Display, Kit.Soft);
-            Kit.At(subtitle.rectTransform, 0f, 206f, 1280f, 32f);
-            subtitle.characterSpacing = 33f;
+            BuildTitle(frame);
 
             // The column, top to bottom. Each opens its own screen, except Tutorial and Quit.
             RectTransform column = Kit.At(Kit.CreateRect("Column", frame), 430f, 268f, 420f, 350f);
@@ -236,6 +262,34 @@ namespace SoulBind.UI
             Kit.At(version.rectTransform, 724f, 662f, 500f, 20f);
         }
 
+        // The logo art above the column, or the drawn emblem and text when UiSkin has none.
+        private static void BuildTitle(RectTransform frame)
+        {
+            Sprite logo = UiSkin.Current != null ? UiSkin.Current.MenuLogo : null;
+            if (logo != null)
+            {
+                RectTransform area = Kit.At(Kit.CreateRect("Logo", frame), 340f, 56f, 600f, 176f);
+                Image image = area.gameObject.AddComponent<Image>();
+                image.sprite = logo;
+                image.preserveAspect = true;
+                image.raycastTarget = false;
+                return;
+            }
+
+            // Emblem: two rings, then the title and subtitle.
+            RectTransform ring = Kit.Circle(frame, "Emblem", 56f, Color.clear, Kit.Gold, 2f);
+            Kit.At(ring, 612f, 52f, 56f, 56f);
+            RectTransform inner = Kit.Circle(ring, "Inner", 32f, Color.clear, Kit.GoldLine, 2f);
+            Kit.At(inner, 12f, 12f, 32f, 32f);
+
+            TMP_Text title = Kit.Label(frame, "Title", "SoulBind", 84f, Kit.DisplayHeavy, Kit.Title);
+            Kit.At(title.rectTransform, 0f, 112f, 1280f, 92f);
+            title.characterSpacing = 4f;
+            TMP_Text subtitle = Kit.Label(frame, "Subtitle", "APOSTLE'S DESCENT", 22f, Kit.Display, Kit.Soft);
+            Kit.At(subtitle.rectTransform, 0f, 206f, 1280f, 32f);
+            subtitle.characterSpacing = 33f;
+        }
+
         /// <summary>‹ count ›, the left button at x, y. Returns the count's text.</summary>
         private static TMP_Text BuildStepper(RectTransform parent, float x, float y, System.Action<int> change)
         {
@@ -254,7 +308,13 @@ namespace SoulBind.UI
             TMP_Text back = Kit.Button(frame, "Back", "‹", Kit.ButtonStyle.Secondary, onClick, 34f, 26f);
             var rect = (RectTransform)back.transform.parent;
             Kit.At(rect, 56f, 44f, 52f, 52f);
-            rect.GetComponent<Image>().color = Kit.Panel;
+            // The shared menu button sprite is rectangular; keep Back circular instead.
+            Image background = rect.GetComponent<Image>();
+            Kit.Round(background, 26f);
+            background.color = Kit.Panel;
+            Image border = rect.Find("Border").GetComponent<Image>();
+            border.enabled = false;
+            Kit.AddBorder(rect, Kit.GoldLine, 26f, 1f);
             back.color = Kit.Gold;
         }
 
@@ -388,6 +448,37 @@ namespace SoulBind.UI
             Kit.At((RectTransform)quit.transform.parent, 280f, 152f, 220f, 56f);
 
             _quitPopup.SetActive(false);
+        }
+
+        // The first Play vs Bots: offers the tutorial, or goes straight to the match.
+        private void BuildTutorialPopup()
+        {
+            RectTransform cover = Kit.Stretch(Kit.CreateRect("TutorialPopup", _root));
+            Image dim = cover.gameObject.AddComponent<Image>();
+            dim.color = new Color(0f, 0f, 0f, 0.7f);
+            Button outside = cover.gameObject.AddComponent<Button>();
+            outside.transition = Selectable.Transition.None;
+            outside.onClick.AddListener(CancelTutorial);
+            _tutorialPopup = cover.gameObject;
+
+            RectTransform frame = Kit.CreateFrame(cover, "Frame");
+            RectTransform panel = Kit.Box(frame, "Panel", Kit.Panel, Kit.GoldLine, 14f);
+            Kit.At(panel, 370f, 240f, 540f, 240f);
+            // Takes its own clicks, so a click on the box does not count as outside it.
+            panel.gameObject.AddComponent<Button>().transition = Selectable.Transition.None;
+
+            TMP_Text title = Kit.Label(panel, "Title", "New to SoulBind?", 30f, Kit.Display, Kit.Title);
+            Kit.At(title.rectTransform, 0f, 28f, 540f, 40f);
+            TMP_Text text = Kit.Label(panel, "Text", "The tutorial teaches the game in one short guided match.",
+                16f, Kit.Inter, Kit.Soft);
+            Kit.At(text.rectTransform, 40f, 84f, 460f, 40f);
+
+            TMP_Text skip = Kit.Button(panel, "Skip", "Skip", Kit.ButtonStyle.Ghost, SkipTutorial, 16f);
+            Kit.At((RectTransform)skip.transform.parent, 40f, 152f, 220f, 56f);
+            TMP_Text play = Kit.Button(panel, "PlayTutorial", "Play Tutorial", Kit.ButtonStyle.Primary, PlayTutorial, 20f);
+            Kit.At((RectTransform)play.transform.parent, 280f, 152f, 220f, 56f);
+
+            _tutorialPopup.SetActive(false);
         }
 
         // ---------- Shared pieces ----------

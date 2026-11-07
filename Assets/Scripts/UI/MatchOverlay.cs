@@ -34,10 +34,10 @@ namespace SoulBind.UI
         private const float RestSpacing = 6f;
         private const float EndScreenDelay = 1.2f;   // lets the last animations finish first
 
-        private static readonly Color PanelColor = new Color(0.07f, 0.06f, 0.10f, 0.92f);
+        private static readonly Color PanelColor = UiKit.Panel;
         private static readonly Color DimColor = new Color(0f, 0f, 0f, 0.65f);
-        private static readonly Color GoldColor = new Color(1f, 0.85f, 0.4f);
-        private static readonly Color ButtonColor = new Color(0.22f, 0.18f, 0.30f);
+        private static readonly Color GoldColor = UiKit.Soft;
+        private static readonly Color ButtonColor = UiKit.Inset;
 
         private MatchController _controller;
 
@@ -54,6 +54,8 @@ namespace SoulBind.UI
         private float _guideTime;
         private bool _guideWanted;
         private readonly Queue<string> _bannerQueue = new Queue<string>();
+        private readonly Queue<string> _deathBannerQueue = new Queue<string>();
+        private bool _bannerIsDeath;
         private float _bannerTimer;
 
         // End screen
@@ -128,6 +130,8 @@ namespace SoulBind.UI
             {
                 // A new match: remember its starting state without announcing anything.
                 _seenMatch = match;
+                _deathBannerQueue.Clear();
+                _bannerIsDeath = false;
                 for (int i = 0; i < apostles.Count; i++)
                 {
                     _wasEliminated[apostles[i].Id] = apostles[i].IsEliminated;
@@ -147,12 +151,24 @@ namespace SoulBind.UI
                 return;
             }
 
+            // Eliminations, banners and the end screen wait for the last card of a Strike.
+            if (StrikeDisplay.Active)
+                return;
+
+            int deaths = 0;
             for (int i = 0; i < apostles.Count; i++)
             {
                 ApostleState apostle = apostles[i];
                 if (apostle.IsEliminated && !_wasEliminated[apostle.Id])
                 {
-                    QueueBanner(apostle.Id == viewer ? "You have been eliminated" : $"{Name(apostle.Id)} has been eliminated");
+                    if (deaths++ == 0)
+                    {
+                        // Elimination news must not wait behind old turn and tile announcements.
+                        _bannerQueue.Clear();
+                        if (!_bannerIsDeath)
+                            _bannerTimer = 0f;
+                    }
+                    _deathBannerQueue.Enqueue(apostle.Id == viewer ? "You have been eliminated" : $"{Name(apostle.Id)} has been eliminated");
                     if (apostle.Id == viewer && !match.IsOver)
                         ShowOutPanel();
                 }
@@ -191,11 +207,13 @@ namespace SoulBind.UI
 
             // A new turn: say whose it is.
             int turnId = match.CurrentApostle != null ? match.CurrentApostle.Id : 0;
-            if (turnId != 0 && turnId != _lastTurnId && !match.IsOver)
+            if (turnId != 0 && turnId != _lastTurnId && !match.IsOver && deaths == 0)
                 QueueBanner(turnId == viewer ? "Your turn" : $"{Name(turnId)}'s turn");
             _lastTurnId = turnId;
             if (match.IsOver && !_endShown && _endScreenTimer < 0f)
-                _endScreenTimer = EndScreenDelay;
+                _endScreenTimer = Mathf.Max(EndScreenDelay,
+                    (_bannerIsDeath ? Mathf.Max(0f, _bannerTimer) : 0f)
+                    + MotionStyle.Seconds(BannerTime * _deathBannerQueue.Count) + 0.2f);
 
             RefreshQuit(match);
         }
@@ -224,9 +242,13 @@ namespace SoulBind.UI
                     QueueBanner(you ? "You have no Corruption" : $"{Name(apostle.Id)} has no Corruption");
             }
             else if (apostle.IsSoullocked)
+            {
+                if (you)
+                    Narrator.Say(NarratorLine.SoulsHeld);
                 QueueBanner(you
                     ? $"Soullocked! No Souls until your Corruption is below {GameConstants.CorruptionThreshold}"
                     : $"{Name(apostle.Id)} is Soullocked and can't take the Soul tile");
+            }
             else if (apostle.HasMaxSouls)
                 QueueBanner(you ? "Your Souls are full" : $"{Name(apostle.Id)}'s Souls are full");
         }
@@ -357,12 +379,14 @@ namespace SoulBind.UI
         {
             if (_bannerTimer <= 0f)
             {
-                if (_bannerQueue.Count == 0)
+                if (_bannerQueue.Count == 0 && _deathBannerQueue.Count == 0)
                 {
+                    _bannerIsDeath = false;
                     _bannerGroup.alpha = 0f;
                     return;
                 }
-                _bannerText.text = _bannerQueue.Dequeue();
+                _bannerIsDeath = _deathBannerQueue.Count > 0;
+                _bannerText.text = _bannerIsDeath ? _deathBannerQueue.Dequeue() : _bannerQueue.Dequeue();
                 _bannerLength = MotionStyle.Seconds(BannerTime);
                 _bannerTimer = _bannerLength;
             }
@@ -600,9 +624,7 @@ namespace SoulBind.UI
             panel.anchorMin = panel.anchorMax = new Vector2(0.5f, 0.5f);
             panel.sizeDelta = new Vector2(760f, 560f);
             AddImage(panel, PanelColor, true);
-            Outline edge = panel.gameObject.AddComponent<Outline>();
-            edge.effectColor = GoldColor;
-            edge.effectDistance = new Vector2(3f, -3f);
+            GothicTheme.AddThemeFrame(panel, UiKit.Line);
 
             _titleText = CreateText("Title", panel, 60f, FontStyles.Bold);
             Row(_titleText.rectTransform, 30f, 80f);
@@ -686,9 +708,7 @@ namespace SoulBind.UI
             box.anchorMin = box.anchorMax = new Vector2(0.5f, 0.5f);
             box.sizeDelta = new Vector2(640f, 300f);
             AddImage(box, PanelColor, true); // catches taps, so they don't reach the dim behind it
-            Outline edge = box.gameObject.AddComponent<Outline>();
-            edge.effectColor = GoldColor;
-            edge.effectDistance = new Vector2(3f, -3f);
+            GothicTheme.AddThemeFrame(box, UiKit.Line);
 
             TMP_Text title = CreateText("Title", box, 40f, FontStyles.Bold);
             Row(title.rectTransform, 24f, 56f);
@@ -729,9 +749,7 @@ namespace SoulBind.UI
             box.anchorMin = box.anchorMax = new Vector2(0.5f, 0.5f);
             box.sizeDelta = new Vector2(640f, 300f);
             AddImage(box, PanelColor, true);
-            Outline edge = box.gameObject.AddComponent<Outline>();
-            edge.effectColor = GoldColor;
-            edge.effectDistance = new Vector2(3f, -3f);
+            GothicTheme.AddThemeFrame(box, UiKit.Line);
 
             TMP_Text title = CreateText("Title", box, 40f, FontStyles.Bold);
             Row(title.rectTransform, 24f, 56f);
@@ -762,9 +780,7 @@ namespace SoulBind.UI
             box.anchorMin = box.anchorMax = new Vector2(0.5f, 0.5f);
             box.sizeDelta = new Vector2(480f, 420f);
             AddImage(box, PanelColor, true);
-            Outline edge = box.gameObject.AddComponent<Outline>();
-            edge.effectColor = GoldColor;
-            edge.effectDistance = new Vector2(3f, -3f);
+            GothicTheme.AddThemeFrame(box, UiKit.Line);
 
             TMP_Text title = CreateText("Title", box, 40f, FontStyles.Bold);
             Row(title.rectTransform, 24f, 56f);

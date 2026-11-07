@@ -113,7 +113,7 @@ namespace SoulBind.UI
             for (int i = 0; i < apostles.Count; i++)
             {
                 if (apostles[i].Id == viewer)
-                    return apostles[i].IsEliminated ? 0 : apostles[i].Vessel;
+                    return apostles[i].IsEliminated ? 0 : SoulBind.Managers.StrikeDisplay.ShownVessel(apostles[i]);
             }
             return 0;
         }

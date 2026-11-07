@@ -51,6 +51,8 @@ namespace SoulBind.UI
         private static readonly Color BuffListBackground = new Color(0.07f, 0.05f, 0.09f, 0.85f);
 
         private bool _hasPortrait;
+        private bool _readableLayout;
+        public static readonly Vector2 ReadableSize = new Vector2(380f, 148f);
         private RectTransform _soulsFill;
         private TMP_Text _soulsText;
         private Image _vesselImage;
@@ -153,6 +155,58 @@ namespace SoulBind.UI
             _buffList.SetActive(false);
         }
 
+        /// <summary>A larger layout for the local player's bottom-right panel.</summary>
+        public void UseReadableLayout()
+        {
+            if (_readableLayout)
+                return;
+            _readableLayout = true;
+            RectTransform rect = (RectTransform)transform;
+            rect.sizeDelta = ReadableSize;
+            LayoutElement layout = GetComponent<LayoutElement>();
+            if (layout != null)
+            {
+                layout.minWidth = layout.preferredWidth = ReadableSize.x;
+                layout.minHeight = layout.preferredHeight = ReadableSize.y;
+            }
+            if (colorStripe != null)
+                UiKit.At(colorStripe.rectTransform, 12f, 60f, 56f, 64f);
+            PlaceReadableText(nameText, 12f, 10f, 220f, 26f, 20f, TextAlignmentOptions.Left);
+            PlaceReadableText(statusText, 240f, 12f, 128f, 22f, 14f, TextAlignmentOptions.Right);
+            PlaceReadableBar(vesselFill, vesselText, 42f, 286f);
+            PlaceReadableBar(corruptionFill, corruptionText, 76f, 286f);
+            PlaceReadableBar(_soulsFill, _soulsText, 110f, 190f);
+            PlaceReadableText(statsText, 278f, 110f, 90f, 28f, 20f, TextAlignmentOptions.Right);
+        }
+
+        private static void PlaceReadableBar(RectTransform fill, TMP_Text label, float top, float width)
+        {
+            if (fill != null)
+                UiKit.At((RectTransform)fill.parent, 82f, top, width, 28f);
+            if (label == null)
+                return;
+            UiKit.Stretch(label.rectTransform, 4f);
+            label.enableAutoSizing = false;
+            label.fontSize = 20f;
+            label.textWrappingMode = TextWrappingModes.NoWrap;
+            label.alignment = TextAlignmentOptions.Center;
+            label.color = UiKit.Text;
+        }
+
+        private static void PlaceReadableText(TMP_Text label, float x, float y, float width, float height,
+            float size, TextAlignmentOptions alignment)
+        {
+            if (label == null)
+                return;
+            UiKit.At(label.rectTransform, x, y, width, height);
+            label.enableAutoSizing = false;
+            label.fontSize = size;
+            label.textWrappingMode = TextWrappingModes.NoWrap;
+            label.overflowMode = TextOverflowModes.Ellipsis;
+            label.alignment = alignment;
+            label.color = UiKit.Text;
+        }
+
         // The Image on a bar fill, or null when the bar is missing.
         private static Image FillImage(RectTransform fill) =>
             fill != null ? (Image)fill.GetComponent(typeof(Image)) : null;
@@ -198,9 +252,10 @@ namespace SoulBind.UI
                     : string.Empty;
             }
 
-            SetFill(vesselFill, _vesselImage, (float)apostle.Vessel / GameConstants.MaxVessel);
+            int vessel = SoulBind.Managers.StrikeDisplay.ShownVessel(apostle);
+            SetFill(vesselFill, _vesselImage, (float)vessel / GameConstants.MaxVessel);
             if (vesselText != null)
-                vesselText.text = $"Vessel {apostle.Vessel}/{GameConstants.MaxVessel}";
+                vesselText.text = $"Vessel {vessel}/{GameConstants.MaxVessel}";
 
             SetFill(corruptionFill, _corruptionImage, (float)apostle.Corruption / CorruptionBarMax);
             if (corruptionFillImage != null && KeepsGameColours(corruptionFillImage))

@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace SoulBind.Core
 {
     /// <summary>
@@ -9,6 +11,18 @@ namespace SoulBind.Core
     {
         public const int Count = GameConstants.MaxPlayers;
         public const int None = -1; // a seat with no wish, like a bot
+
+        /// <summary>Changes one player's reservation only if nobody else owns the colour.</summary>
+        public static bool TryReserve(IDictionary<string, int> reservations, string owner, int color)
+        {
+            if (color < 0 || color >= Count)
+                return false;
+            foreach (KeyValuePair<string, int> reservation in reservations)
+                if (reservation.Key != owner && reservation.Value == color)
+                    return false;
+            reservations[owner] = color;
+            return true;
+        }
 
         /// <summary>Fills colors (index = seat - 1) from wanted. Both arrays hold Count entries.</summary>
         public static void Resolve(int[] wanted, int[] colors)

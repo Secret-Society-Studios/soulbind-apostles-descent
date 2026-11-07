@@ -37,7 +37,10 @@ namespace SoulBind.Utility
         }
 
         /// <summary>The color of the Apostle with this id in this match (ids start at 1).</summary>
-        public static Color Get(int apostleId) => Colors[Seats[(apostleId - 1 + Seats.Length) % Seats.Length]];
+        public static Color Get(int apostleId) => Colors[GetPaletteIndex(apostleId)];
+
+        /// <summary>The assigned palette index, for colour-specific UI art.</summary>
+        public static int GetPaletteIndex(int apostleId) => Seats[(apostleId - 1 + Seats.Length) % Seats.Length];
 
         /// <summary>One colour of the palette.</summary>
         public static Color Palette(int index) => Colors[index];

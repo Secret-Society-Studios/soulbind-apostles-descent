@@ -162,6 +162,19 @@ namespace SoulBind.Core
             return bestId;
         }
 
+        /// <summary>Living Apostles still due to act this round, current turn first. Never predicts a new Phase.</summary>
+        public void GetRemainingTurns(IReadOnlyList<ApostleState> apostles, List<int> result)
+        {
+            result.Clear();
+            if (IsAwaitingPhaseStart)
+                return;
+            for (int i = _sequenceIndex; i < _sequenceCount; i++)
+            {
+                if (IsAlive(apostles, _sequence[i]))
+                    result.Add(_sequence[i]);
+            }
+        }
+
         // ---------- Snapshots (online play) ----------
 
         internal IReadOnlyList<int> Seats => _seats;

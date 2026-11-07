@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using SoulBind.Core;
 using SoulBind.Managers;
@@ -30,6 +31,10 @@ namespace SoulBind.UI
         private const float CardHeight = 252f;
         private const float LabelHeight = 56f;
         private const int ArcanaSlots = 32;
+        private Match _openingDealMatch;
+        private Coroutine _openingDeal;
+        private MatchHud _matchHud;
+        public bool IsDealingOpeningHand { get; private set; }
 
         [SerializeField] private MatchController matchController;
         [SerializeField] private CardView cardPrefab;
@@ -136,7 +141,7 @@ namespace SoulBind.UI
             public RectTransform Tray;
             public Image TurnGlow;
             public Image DefenseGlow;
-            public Outline Edge;
+            public Image Edge;
             public bool IsTurn;
             public bool HasDefense;
             public TMP_Text Label;
@@ -324,10 +329,21 @@ namespace SoulBind.UI
         {
             if (matchController != null)
                 matchController.StateChanged -= Refresh;
+            if (_openingDeal != null)
+                StopCoroutine(_openingDeal);
+            _openingDeal = null;
+            IsDealingOpeningHand = false;
+            foreach (Seat seat in _seats)
+            {
+                seat.Arriving = 0;
+                if (seat.Root != null && _builtFor != null)
+                    Layout(seat, _builtFor, true);
+            }
         }
 
         private void Start()
         {
+            _matchHud = FindAnyObjectByType<MatchHud>();
             if (matchController == null || cardPrefab == null || drawPile == null || drawPile.CardBackTemplate == null)
             {
                 Debug.LogError("TableHandsView: assign the Match Controller, Card Prefab and Draw Pile in the Inspector.", this);
@@ -396,6 +412,8 @@ namespace SoulBind.UI
                 return;
             }
 
+            if (IsDealingOpeningHand)
+                return; // Reconcile any newer online state after the opening cards land.
             ApplyChanges(match);
             UpdateGlows(match);
             if (_yours != null)
@@ -426,6 +444,10 @@ namespace SoulBind.UI
         // Builds one seat per Apostle, with the viewer's at the bottom.
         private void BuildSeats(Match match, int viewer)
         {
+            bool dealOpening = _openingDealMatch != match && _flights != null && !match.IsOver
+                && match.Turns.RoundNumber == 1;
+            _openingDealMatch = match;
+            IsDealingOpeningHand = dealOpening;
             _pendingRebuild = false;
             Unpin();
             EndHover();
@@ -483,10 +505,7 @@ namespace SoulBind.UI
                 Color seatColor = ApostleColors.Get(apostle.Id);
                 tray.color = Color.Lerp(trayColor, seatColor, 0.22f);
                 tray.raycastTarget = false;
-                Outline edge = seat.Tray.gameObject.AddComponent<Outline>();
-                edge.effectColor = ApostleColors.Get(apostle.Id);
-                edge.effectDistance = new Vector2(6f, -6f);
-                seat.Edge = edge;
+                seat.Edge = GothicTheme.AddThemeFrame(seat.Tray, ApostleColors.Get(apostle.Id));
                 if (seat.IsYours && handsOnScreen)
                     HideTray(seat);
 
@@ -514,10 +533,7 @@ namespace SoulBind.UI
                     Image plate = tagRect.gameObject.AddComponent<Image>();
                     plate.color = new Color(0.05f, 0.04f, 0.08f, 0.85f);
                     plate.raycastTarget = false;
-                    Outline plateEdge =
-                        tagRect.gameObject.AddComponent<Outline>();
-                    plateEdge.effectColor = seatColor;
-                    plateEdge.effectDistance = new Vector2(3f, -3f);
+                    GothicTheme.AddThemeFrame(tagRect, seatColor, 2f);
 
                     RectTransform labelRect = CreateRect("Label", tagRect);
                     labelRect.anchorMin = Vector2.zero;
@@ -541,6 +557,7 @@ namespace SoulBind.UI
                 IReadOnlyList<ArcanaId> hand = match.GetHand(apostle.Id);
                 for (int c = 0; c < hand.Count; c++)
                     seat.Shown.Add(hand[c]);
+                seat.Arriving = dealOpening ? hand.Count : 0;
                 _seats.Add(seat);
                 if (seat.IsYours)
                 {
@@ -556,6 +573,45 @@ namespace SoulBind.UI
             UpdateGlows(match);
             _lastDiscardCount = match.Deck.DiscardCount;
             _lastDrawCount = match.Deck.DrawCount;
+            if (dealOpening)
+                _openingDeal = StartCoroutine(DealOpeningHands(match));
+        }
+
+        // Deal around the table, one card per Apostle per pass. The rules already own the full hands.
+        private IEnumerator DealOpeningHands(Match match)
+        {
+            // Let the canvas settle and the opening camera sweep finish before measuring card targets.
+            yield return null;
+            while (MatchCamera.IsIntroPlaying)
+                yield return null;
+            Canvas.ForceUpdateCanvases();
+            int largestHand = 0;
+            foreach (Seat seat in _seats)
+                largestHand = Mathf.Max(largestHand, seat.Shown.Count);
+            float gap = Mathf.Clamp(MotionStyle.Seconds(0.1f), 0.04f, 0.2f);
+            for (int card = 0; card < largestHand; card++)
+            {
+                foreach (Seat seat in _seats)
+                {
+                    if (card >= seat.Shown.Count)
+                        continue;
+                    FlyToSeat(seat, match, Mathf.Min(card, seat.SlotCount(maxCardsShown) - 1), card);
+                    if (SoundLibrary.Current != null)
+                        GameAudio.PlaySfx(SoundLibrary.Current.CardDraw);
+                    yield return new WaitForSecondsRealtime(gap);
+                }
+            }
+            float deadline = Time.unscaledTime + Mathf.Max(2f, MotionStyle.Seconds(drawFlightTime * 1.15f) + 0.5f);
+            while (_flights != null && _flights.ActiveCount > 0 && Time.unscaledTime < deadline)
+                yield return null;
+            foreach (Seat seat in _seats)
+            {
+                seat.Arriving = 0;
+                Layout(seat, match, true);
+            }
+            IsDealingOpeningHand = false;
+            _openingDeal = null;
+            Refresh();
         }
 
         // Works out which cards left each hand and which arrived, and launches the flights.
@@ -793,7 +849,8 @@ namespace SoulBind.UI
         {
             float wanted = pcHandWidth * scale / Mathf.Max(0.01f, pcCardScale);
             float half = _rect.sizeDelta.x / 2f;
-            float right = 2f * (half - screenRightClear - screenHandOffset);
+            float rightClearance = Mathf.Max(screenRightClear, _matchHud != null ? _matchHud.PlayerInfoRightClearance : 0f);
+            float right = 2f * (half - rightClearance - screenHandOffset);
             float left = 2f * (half - screenLeftClear + screenHandOffset);
             return Mathf.Max(CardWidth * scale, Mathf.Min(wanted, Mathf.Min(left, right)));
         }
@@ -1502,6 +1559,7 @@ namespace SoulBind.UI
         private void OnCardPlayed()
         {
             discardPile.ReleaseOne();
+            matchController.NoteCardLanded();
             PlayNextCard();
         }
 
@@ -1764,8 +1822,8 @@ namespace SoulBind.UI
                 // While it has DEF, the tray's edge also turns the defense colour, and thicker.
                 if (seat.Edge != null)
                 {
-                    seat.Edge.effectColor = seat.HasDefense ? defenseGlowColor : ApostleColors.Get(seat.ApostleId);
-                    seat.Edge.effectDistance = seat.HasDefense ? new Vector2(6f, -6f) : new Vector2(3f, -3f);
+                    seat.Edge.color = seat.HasDefense ? defenseGlowColor : ApostleColors.Get(seat.ApostleId);
+                    seat.Edge.pixelsPerUnitMultiplier = seat.HasDefense ? 1f : 2f;
                 }
             }
         }

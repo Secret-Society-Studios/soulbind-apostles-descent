@@ -48,8 +48,12 @@ namespace SoulBind.UI
         private RectTransform BuildSubScreen(string name, string title)
         {
             RectTransform frame = Kit.CreateFrame(_root, name);
-            AddFrameLines(frame, false);
-            BuildBackButton(frame, () => ShowScreen(Screen.Main));
+            BuildBackButton(frame, () =>
+            {
+                if (name == "AvatarScreen" && _savingLobbyColor)
+                    return;
+                ShowScreen(name == "AvatarScreen" && _avatarFromLobby ? Screen.Lobby : Screen.Main);
+            });
             TMP_Text heading = Kit.Label(frame, "Title", title, 44f, Kit.Display, Kit.Title);
             Kit.At(heading.rectTransform, 0f, 50f, 1280f, 56f);
             frame.gameObject.SetActive(false);
@@ -194,6 +198,7 @@ namespace SoulBind.UI
         private void BuildPreview(RectTransform frame)
         {
             RectTransform box = Kit.Box(frame, "Preview", Kit.Inset, Kit.GoldLine, 12f);
+            Kit.UseFrame(box);
             Kit.At(box, PreviewLeft, FilterTop, PreviewWidth, PreviewHeight);
             _previewCard = CardViewer360.Create(box, 6f, new Vector2(PreviewWidth, PreviewHeight));
             _previewMissing = Kit.Label(box, "NoArt", "No art yet", 18f, Kit.Inter, Kit.Muted);
@@ -244,13 +249,16 @@ namespace SoulBind.UI
 
         // ---------- Settings ----------
 
-        // Builds the Settings screen: graphics, music and sound volume, and chat.
+        // Keeps all settings inside one framed panel, with room for the voice row at the bottom.
         private void BuildSettings()
         {
             RectTransform frame = BuildSubScreen("SettingsScreen", "Settings");
             _settingsScreen = frame.gameObject;
 
-            RectTransform column = Kit.At(Kit.CreateRect("Column", frame), 390f, 170f, 500f, 400f);
+            RectTransform container = Kit.At(
+                Kit.Box(frame, "SettingsContainer", Kit.Panel, Kit.GoldLine, 14f, 2f),
+                330f, 146f, 620f, 526f);
+            RectTransform column = Kit.At(Kit.CreateRect("Column", container), 60f, 36f, 500f, 454f);
 
             // How to Play lives here now that the main screen has no ? button.
             TMP_Text help = Kit.Button(column, "HowToPlay", "How to Play", Kit.ButtonStyle.Secondary,
@@ -261,7 +269,7 @@ namespace SoulBind.UI
             Kit.At((RectTransform)_chatMuteLabel.transform.parent, 0f, 70f, 500f, 56f);
             ShowChatMute();
 
-            // Graphics, Music and Sounds (the same rows as the in-game Menu's Settings).
+            // The shared graphics, volume and narrator voice controls.
             SettingsPanel.Build(column, 0f, 150f, 500f);
         }
 

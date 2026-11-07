@@ -13,13 +13,13 @@ namespace SoulBind.UI
     /// </summary>
     public static class GothicTheme
     {
-        public static readonly Color Gold = new Color(0.86f, 0.70f, 0.38f);
-        public static readonly Color GoldBright = new Color(1f, 0.86f, 0.50f);
-        public static readonly Color GoldDim = new Color(0.55f, 0.44f, 0.24f, 0.85f);
-        public static readonly Color PanelColor = new Color(0.09f, 0.07f, 0.12f, 0.94f);
-        public static readonly Color ButtonColor = new Color(0.17f, 0.12f, 0.22f, 1f);
-        public static readonly Color StrikeButtonColor = new Color(0.42f, 0.07f, 0.10f, 1f);
-        public static readonly Color TextColor = new Color(0.92f, 0.88f, 0.80f);
+        public static readonly Color Gold = UiKit.Soft;
+        public static readonly Color GoldBright = UiKit.Text;
+        public static readonly Color GoldDim = UiKit.Line;
+        public static readonly Color PanelColor = UiKit.Panel;
+        public static readonly Color ButtonColor = UiKit.Inset;
+        public static readonly Color StrikeButtonColor = UiKit.Inset;
+        public static readonly Color TextColor = UiKit.Text;
         public static readonly Color TableEdge = new Color(0.025f, 0.018f, 0.035f);
         public static readonly Color TableLight = new Color(0.16f, 0.12f, 0.17f);
 
@@ -204,16 +204,16 @@ namespace SoulBind.UI
             image.color = strike ? StrikeButtonColor : ButtonColor;
 
             ColorBlock colors = button.colors;
-            colors.normalColor = new Color(0.85f, 0.85f, 0.85f, 1f);
-            colors.highlightedColor = Color.white;
-            colors.selectedColor = new Color(0.85f, 0.85f, 0.85f, 1f);
-            colors.pressedColor = new Color(0.65f, 0.6f, 0.6f, 1f);
-            colors.disabledColor = new Color(0.45f, 0.45f, 0.45f, 0.6f);
-            colors.colorMultiplier = 1.5f; // lets hovering brighten the dark button
+            colors.normalColor = Color.white;
+            colors.highlightedColor = new Color(1.12f, 1.12f, 1.12f, 1f);
+            colors.selectedColor = Color.white;
+            colors.pressedColor = new Color(0.8f, 0.8f, 0.8f, 1f);
+            colors.disabledColor = new Color(0.6f, 0.6f, 0.6f, 0.5f);
+            colors.colorMultiplier = 1f;
             colors.fadeDuration = 0.15f;
             button.colors = colors;
 
-            AddFrame(button.transform, "ThemeFrame", Gold, 0f);
+            AddFrame(button.transform, "ThemeFrame", UiKit.Line, 0f);
             foreach (TMP_Text label in button.GetComponentsInChildren<TMP_Text>(true))
                 Title(label, GoldBright);
         }
@@ -235,10 +235,13 @@ namespace SoulBind.UI
         public static void StyleRuntimeBar(Transform bar) => StyleBar(bar);
 
         /// <summary>A thin gold double frame over this rect, named "ThemeFrame". Returns its Image.</summary>
-        public static Image AddThemeFrame(Transform parent, Color color)
+        public static Image AddThemeFrame(Transform parent, Color color, float borderScale = 1f)
         {
             AddFrame(parent, "ThemeFrame", color, 0f);
-            return (Image)parent.Find("ThemeFrame").GetComponent(typeof(Image));
+            Image frame = (Image)parent.Find("ThemeFrame").GetComponent(typeof(Image));
+            frame.color = color;
+            frame.pixelsPerUnitMultiplier = borderScale;
+            return frame;
         }
 
         // Styles a bar's background and fill.
@@ -262,6 +265,8 @@ namespace SoulBind.UI
                 fillImage.type = Image.Type.Sliced;
             }
             AddFrame(bar, "ThemeFrame", new Color(Gold.r, Gold.g, Gold.b, 0.5f), 0f);
+            // A full-size panel rim would consume the middle of these 16-pixel stat bars.
+            bar.Find("ThemeFrame").GetComponent<Image>().pixelsPerUnitMultiplier = 6f;
             Transform label = bar.Find("Label");
             if (label != null)
                 AddShadow(label.gameObject);
@@ -302,6 +307,7 @@ namespace SoulBind.UI
             Image image = rect.gameObject.AddComponent<Image>();
             image.sprite = FrameSprite;
             image.type = Image.Type.Sliced;
+            image.fillCenter = false; // border art sits above labels and bars, so draw only its edges
             image.color = color;
             image.raycastTarget = false;
         }

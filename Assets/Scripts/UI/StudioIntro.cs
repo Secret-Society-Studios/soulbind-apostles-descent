@@ -26,7 +26,14 @@ namespace SoulBind.UI
 
         // Runs again on every Play, even with domain reload turned off.
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetOnPlay() => _played = false;
+        private static void ResetOnPlay()
+        {
+            _played = false;
+            Showing = false;
+        }
+
+        /// <summary>True while the opening is on screen.</summary>
+        public static bool Showing { get; private set; }
 
         /// <summary>Shows the opening the first time the main menu loads; later visits skip it.</summary>
         public static void PlayOnce()
@@ -40,6 +47,7 @@ namespace SoulBind.UI
                 return;
 
             var go = new GameObject("StudioIntro", typeof(RectTransform));
+            Showing = true;
             go.AddComponent<StudioIntro>().Build(skin);
         }
 
@@ -146,6 +154,7 @@ namespace SoulBind.UI
                 Destroy(_texture);
                 _texture = null;
             }
+            Showing = false;
             Destroy(gameObject);
         }
 

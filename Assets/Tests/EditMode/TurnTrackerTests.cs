@@ -7,6 +7,32 @@ namespace SoulBind.Tests.EditMode
 {
     public class TurnTrackerTests
     {
+        [Test]
+        public void RemainingTurns_StartsWithCurrentAndSkipsEliminatedApostles()
+        {
+            var apostles = Apostles(1, 2, 3, 4);
+            var tracker = new TurnTracker(new[] { 3, 1, 4, 2 });
+            tracker.EndTurn(apostles);
+            ById(apostles, 4).TakeDamage(50);
+            var result = new List<int> { 99 };
+            tracker.GetRemainingTurns(apostles, result);
+            CollectionAssert.AreEqual(new[] { 1, 2 }, result);
+        }
+
+        [Test]
+        public void RemainingTurns_PhaseBoundaryHasNoPredictedTurns_ReversePhaseUsesItsActualOrder()
+        {
+            var apostles = Apostles(1, 2, 3);
+            var tracker = new TurnTracker(new[] { 1, 2, 3 });
+            var result = new List<int>();
+            RunToPhaseEnd(tracker, apostles);
+            tracker.GetRemainingTurns(apostles, result);
+            Assert.IsEmpty(result);
+            tracker.BeginNextPhase(apostles, TurnDirection.Backward, 2);
+            tracker.GetRemainingTurns(apostles, result);
+            CollectionAssert.AreEqual(new[] { 2, 1, 3 }, result);
+        }
+
         private static List<ApostleState> Apostles(params int[] ids)
         {
             var list = new List<ApostleState>();

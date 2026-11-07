@@ -9,7 +9,7 @@ namespace SoulBind.UI
 {
     /// <summary>
     /// The play queue, top-left (the match layout mockup). While an attack builds, the cards played
-    /// into it line up in order: a number, a small card in its element's colour, the name and stats.
+    /// into it line up in order: a number, the real card, its name and stats.
     /// Cards whose element combo is active glow and carry a COMBO tag. Under the list sit the four
     /// element counters (they replace the old combo panel), the total ATK and its target, and the
     /// ATTACK button, which Strikes. MatchHud creates it at runtime, so it needs no setup.
@@ -24,8 +24,8 @@ namespace SoulBind.UI
         private const float HeaderHeight = 26f;
         private const float RowHeight = 64f;
         private const float RowGap = 8f;
-        private const float ThumbWidth = 40f;
-        private const float ThumbHeight = 56f;
+        private const float ThumbWidth = 44f;
+        private const float ThumbHeight = 62f;        // the card art's 5:7
         private const float ChipHeight = 26f;
         private const float TotalHeight = 30f;
         private const float ButtonHeight = 62f;
@@ -44,9 +44,10 @@ namespace SoulBind.UI
         {
             public RectTransform Rect;
             public Image Background;
-            public Outline Edge;
+            public Image Edge;
             public Image ThumbFrame;
             public Image ThumbBand;
+            public CardBody ThumbCard;
             public TMP_Text Number;
             public TMP_Text Name;
             public TMP_Text Stats;
@@ -59,7 +60,7 @@ namespace SoulBind.UI
         {
             public RectTransform Rect;
             public Image Background;
-            public Outline Ring;
+            public Image Ring;
             public TMP_Text Label;
             public Color Color;
         }
@@ -172,8 +173,7 @@ namespace SoulBind.UI
             var row = new Row { Rect = NewRect("Row" + (index + 1), root) };
             row.Rect.sizeDelta = new Vector2(inner, RowHeight);
             row.Background = AddImage(row.Rect.gameObject);
-            row.Edge = row.Rect.gameObject.AddComponent<Outline>();
-            row.Edge.effectDistance = new Vector2(2f, -2f);
+            row.Edge = GothicTheme.AddThemeFrame(row.Rect, RowEdge, 2f);
 
             // Tapping a row takes that card back into the hand.
             row.Background.raycastTarget = true;
@@ -188,9 +188,7 @@ namespace SoulBind.UI
             Place(badge, 10f, (RowHeight - 28f) / 2f, 28f, 28f);
             Image badgeImage = AddImage(badge.gameObject);
             badgeImage.color = new Color(0.07f, 0.05f, 0.09f, 1f);
-            Outline badgeRing = badge.gameObject.AddComponent<Outline>();
-            badgeRing.effectColor = GothicTheme.Gold;
-            badgeRing.effectDistance = new Vector2(1.5f, -1.5f);
+            GothicTheme.AddThemeFrame(badge, GothicTheme.Gold, 4f);
             row.Number = NewText("Number", badge, "", 15f, FontStyles.Bold);
             Stretch(row.Number.rectTransform);
             row.Number.alignment = TextAlignmentOptions.Center;
@@ -210,6 +208,7 @@ namespace SoulBind.UI
             band.anchorMax = Vector2.one;
             band.offsetMin = band.offsetMax = Vector2.zero;
             row.ThumbBand = AddImage(band.gameObject);
+            row.ThumbCard = CardBody.Create(thumb, thumb.childCount); // over the placeholder, when there is art
 
             float textX = 48f + ThumbWidth + 12f;
             row.Name = NewText("Name", row.Rect, "", 17f, FontStyles.Bold);
@@ -244,9 +243,7 @@ namespace SoulBind.UI
                 Color = CardView.GetElementColor((SoulBind.Core.Element)element),
             };
             chip.Background = AddImage(chip.Rect.gameObject);
-            chip.Ring = chip.Rect.gameObject.AddComponent<Outline>();
-            chip.Ring.effectColor = Color.white;
-            chip.Ring.effectDistance = new Vector2(2f, -2f);
+            chip.Ring = GothicTheme.AddThemeFrame(chip.Rect, Color.white, 4f);
             chip.Label = NewText("Label", chip.Rect, "", 11f, FontStyles.Bold);
             Stretch(chip.Label.rectTransform);
             chip.Label.alignment = TextAlignmentOptions.Center;
@@ -339,10 +336,14 @@ namespace SoulBind.UI
             row.Stats.text = $"{card.Element} · A{attack} D{card.Defense} C{card.Cap}";
             row.ThumbFrame.color = element;
             row.ThumbBand.color = element;
+            CardArtLibrary art = CardArtLibrary.Current;
+            Sprite front = art != null ? art.GetFront(card.Id) : null;
+            row.ThumbCard.Show(front);
+            row.ThumbCard.enabled = front != null;
 
             // A card whose combo is active glows in its element's colour.
             row.Background.color = combo ? Color.Lerp(RowColor, element, 0.35f) : RowColor;
-            row.Edge.effectColor = combo ? element : RowEdge;
+            row.Edge.color = combo ? element : RowEdge;
             row.ComboTag.SetActive(combo);
             row.ComboTagImage.color = element;
         }

@@ -63,7 +63,7 @@ namespace SoulBind.Online
                 controller.ChatSubmitted += SendChat;
                 // A separate message, so ClientReadyRpc stays the same between versions: it carries the
                 // protocol check, and a changed signature would never reach a host on another version.
-                ClientColorRpc(ApostleColors.LocalChoice);
+                ClientColorRpc(OnlineSession.Instance != null ? OnlineSession.Instance.LocalAvatarColor : ApostleColors.LocalChoice);
                 ClientReadyRpc(PlayerNames.LocalName, BuildInfo.ProtocolVersion);
             }
         }
@@ -148,7 +148,7 @@ namespace SoulBind.Online
             var wanted = new int[SeatColors.Count];
             for (int i = 0; i < wanted.Length; i++)
                 wanted[i] = SeatColors.None;
-            wanted[0] = ApostleColors.LocalChoice;
+            wanted[0] = OnlineSession.Instance != null ? OnlineSession.Instance.LocalAvatarColor : ApostleColors.LocalChoice;
             foreach (KeyValuePair<ulong, int> seat in _seatByClient)
             {
                 if (_colorByClient.TryGetValue(seat.Key, out int color))

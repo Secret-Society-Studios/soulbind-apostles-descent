@@ -81,7 +81,7 @@ namespace SoulBind.UI
         {
             public RectTransform Rect;
             public Image Background;
-            public Outline Ring;
+            public Image Ring;
             public TMP_Text Label;
         }
 
@@ -438,7 +438,7 @@ namespace SoulBind.UI
             chip.Rect.gameObject.SetActive(true);
             chip.Rect.anchoredPosition = new Vector2(x, y);
             chip.Background.color = color;
-            chip.Ring.effectColor = lit ? GothicTheme.GoldBright : GothicTheme.GoldDim;
+            chip.Ring.color = lit ? GothicTheme.GoldBright : GothicTheme.GoldDim;
             chip.Label.text = label;
         }
 
@@ -582,8 +582,7 @@ namespace SoulBind.UI
             chip.Rect.sizeDelta = new Vector2(ChipWidth, ChipHeight);
             chip.Background = AddImage(chip.Rect.gameObject, ChipColor);
             chip.Background.raycastTarget = true;
-            chip.Ring = chip.Rect.gameObject.AddComponent<Outline>();
-            chip.Ring.effectDistance = new Vector2(2.5f, -2.5f);
+            chip.Ring = GothicTheme.AddThemeFrame(chip.Rect, GothicTheme.GoldDim, 3f);
             Button button = chip.Rect.gameObject.AddComponent<Button>();
             button.targetGraphic = chip.Background;
             button.transition = Selectable.Transition.None;

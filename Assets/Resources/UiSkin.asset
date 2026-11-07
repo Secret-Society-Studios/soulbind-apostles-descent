@@ -27,6 +27,9 @@ MonoBehaviour:
   tintFills: 0
   gamePanel: {fileID: 21300000, guid: b8bfe43c870e4592b9e31895f0469907, type: 3}
   gameButton: {fileID: 21300000, guid: fd14421fb9e64ccea23fa4a1989af7a6, type: 3}
-  gameFrame: {fileID: 21300000, guid: 461f099b83184c449929734a48d723dd, type: 3}
+  gameFrame: {fileID: 21300000, guid: db19cc93217abdd408a869c6fa043a17, type: 3}
   menuPanel: {fileID: 21300000, guid: f4b751379172437ca224bfef6c39d532, type: 3}
   menuButton: {fileID: 21300000, guid: 9935ae5e47854fc19ea259407dbc7c8c, type: 3}
+  menuBackground: {fileID: 21300000, guid: d303da3b69b62a645837b4a3add633c7, type: 3}
+  menuLogo: {fileID: 21300000, guid: 31254baffd95f784998f30501de79ffe, type: 3}
+  menuFrame: {fileID: 21300000, guid: db19cc93217abdd408a869c6fa043a17, type: 3}

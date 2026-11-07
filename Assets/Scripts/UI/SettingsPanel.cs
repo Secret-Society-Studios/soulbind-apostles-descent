@@ -7,7 +7,7 @@ using Kit = SoulBind.UI.UiKit;
 namespace SoulBind.UI
 {
     /// <summary>
-    /// The settings rows: Graphics (Auto, Low, Medium, High), Music and Sounds. The main menu's Settings screen
+    /// The settings rows: Graphics (Auto, Low, Medium, High), Music, Sounds, Narrator and Voice. The main menu's Settings screen
     /// shows them in place; during a match, SettingsPopup shows them over the game.
     /// </summary>
     public sealed class SettingsPanel : MonoBehaviour
@@ -17,17 +17,18 @@ namespace SoulBind.UI
         private const float LabelWidth = 160f;
 
         private TMP_Text _graphics;
+        private TMP_Text _narrator;
 
         /// <summary>Builds the rows at x, y (design pixels from the parent's top-left), width wide.</summary>
         public static SettingsPanel Build(RectTransform parent, float x, float y, float width)
         {
-            RectTransform root = Kit.At(Kit.CreateRect("Settings", parent), x, y, width, 2f * RowGap + RowHeight);
+            RectTransform root = Kit.At(Kit.CreateRect("Settings", parent), x, y, width, 4f * RowGap + RowHeight);
             SettingsPanel panel = root.gameObject.AddComponent<SettingsPanel>();
             panel.BuildRows(root, width);
             return panel;
         }
 
-        // Builds the Graphics, Music and Sounds rows.
+        // Builds the Graphics, Music, Sounds, Narrator and Voice rows.
         private void BuildRows(RectTransform root, float width)
         {
             float control = width - LabelWidth - 20f;
@@ -41,6 +42,14 @@ namespace SoulBind.UI
             // ---------- Volume ----------
             VolumeRow(root, "Music", RowGap, width, GameAudio.MusicVolume, v => GameAudio.MusicVolume = v);
             VolumeRow(root, "Sounds", 2f * RowGap, width, GameAudio.SoundVolume, v => GameAudio.SoundVolume = v);
+
+            VolumeRow(root, "Narrator", 3f * RowGap, width, GameAudio.NarratorVolume, v => GameAudio.NarratorVolume = v);
+
+            // ---------- Narrator's voice ----------
+            RowLabel(root, "VoiceLabel", "Voice", 4f * RowGap);
+            _narrator = Kit.Button(root, "Voice", Narrator.Voice.ToString(), Kit.ButtonStyle.Secondary,
+                CycleNarrator, 18f);
+            Kit.At((RectTransform)_narrator.transform.parent, LabelWidth + 20f, 4f * RowGap, control, RowHeight);
         }
 
         // One volume row: a label, a slider and its percentage. set stores the new volume.
@@ -67,6 +76,8 @@ namespace SoulBind.UI
             // The tier may have changed elsewhere (the other menu) since this was built.
             if (_graphics != null)
                 _graphics.text = GraphicsQuality.ShortLabel;
+            if (_narrator != null)
+                _narrator.text = Narrator.Voice.ToString();
         }
 
         // The volumes are saved to disk when the rows close, not on every slider step.
@@ -77,6 +88,15 @@ namespace SoulBind.UI
         {
             GraphicsQuality.Cycle();
             _graphics.text = GraphicsQuality.ShortLabel;
+        }
+
+        // Moves to the next narrator voice and says a line, so the player hears what they picked.
+        private void CycleNarrator()
+        {
+            Narrator.CycleVoice();
+            _narrator.text = Narrator.Voice.ToString();
+            GameAudio.StopVoice();
+            Narrator.Preview();
         }
 
         // Shows the volume as a percentage, without allocating a string.
@@ -144,9 +164,9 @@ namespace SoulBind.UI
             outside.transition = Selectable.Transition.None;
             outside.onClick.AddListener(popup.Close);
 
-            RectTransform box = Kit.Box(dim, "Box", Kit.Panel, Kit.GoldLine, 14f, 2f);
+            RectTransform box = Kit.Box(dim, "Box", Kit.Panel, Kit.Line, 14f, 2f);
             box.anchorMin = box.anchorMax = box.pivot = new Vector2(0.5f, 0.5f);
-            box.sizeDelta = new Vector2(600f, 394f);
+            box.sizeDelta = new Vector2(600f, 522f);
 
             // Takes the taps inside the box, or they would pass up to the dim layer and close it.
             Button inside = box.gameObject.AddComponent<Button>();
@@ -159,7 +179,7 @@ namespace SoulBind.UI
             SettingsPanel.Build(box, 40f, 92f, 520f);
 
             TMP_Text close = Kit.Button(box, "Close", "Close", Kit.ButtonStyle.Primary, popup.Close, 20f);
-            Kit.At((RectTransform)close.transform.parent, 200f, 318f, 200f, 52f);
+            Kit.At((RectTransform)close.transform.parent, 200f, 446f, 200f, 52f);
             return dim.gameObject;
         }
 

@@ -200,8 +200,42 @@ namespace SoulBind.UI
             if (fill == Panel)
                 UseMenuArt(image, UiSkin.Current != null ? UiSkin.Current.MenuPanel : null);
             if (border.a > 0f && borderWidth > 0f)
-                AddBorder(rect, border, radius, borderWidth);
+            {
+                Image ring = AddBorder(rect, border, radius, borderWidth);
+                if (fill == Panel)
+                    UseFrameArt(ring);
+            }
             return rect;
+        }
+
+        /// <summary>
+        /// True while the main menu is up. Selects the menu button palette and frame skin.
+        /// </summary>
+        public static bool MenuFrames { get; set; }
+
+        // Off on every Play, even with domain reload turned off.
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetFrames() => MenuFrames = false;
+
+        /// <summary>Puts UiSkin's frame art on a box made by Box, in place of its thin drawn line.</summary>
+        public static void UseFrame(RectTransform box)
+        {
+            Transform border = box.Find("Border");
+            if (border != null)
+                UseFrameArt(border.GetComponent<Image>());
+        }
+
+        // The frame is tinted by the border's colour. No art keeps the thin rounded line.
+        private static void UseFrameArt(Image ring)
+        {
+            UiSkin skin = UiSkin.Current;
+            Sprite art = skin != null ? (MenuFrames ? skin.MenuFrame : skin.GameFrame) : null;
+            if (art == null || ring == null)
+                return;
+            ring.sprite = art;
+            // Frame art may include an opaque centre; it must never cover the panel's content.
+            ring.fillCenter = false;
+            ring.pixelsPerUnitMultiplier = 1f;
         }
 
         // UiSkin's art, tinted by the box's colour. Null keeps the drawn rounded box.
@@ -276,10 +310,17 @@ namespace SoulBind.UI
                     break;
             }
 
+            // Both menus and the match use the same muted control palette.
+            fill = Inset;
+            border = Line;
+            ink = Text;
+            borderWidth = 1f;
+
             RectTransform rect = Box(parent, name, fill, border, radius, borderWidth);
             Image image = rect.GetComponent<Image>();
             image.raycastTarget = true; // a ghost button is clear but still clickable
             UseMenuArt(image, UiSkin.Current != null ? UiSkin.Current.MenuButton : null);
+            UseFrame(rect);
             UnityEngine.UI.Button button = rect.gameObject.AddComponent<UnityEngine.UI.Button>();
             button.targetGraphic = image;
             ColorBlock colors = button.colors;

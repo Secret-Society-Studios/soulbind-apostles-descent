@@ -78,6 +78,7 @@ namespace SoulBind.UI
                 bool phone = IsPhone;
                 if (phone)
                     EnlargePortraits(mobilePortraitScale);
+                EnlargePlayerInfo();
                 KeepClearOfScreenEdges(phone);
                 // Banners and the end-of-match screen.
                 MatchOverlay overlay = MatchOverlay.Create(_canvas.rootCanvas, matchController);
@@ -147,6 +148,8 @@ namespace SoulBind.UI
                 ApostlePanelView panel = _panels[i];
                 bool isCurrent = apostle == match.CurrentApostle;
                 bool isViewer = apostle.Id == viewerId;
+                if (isViewer)
+                    panel.UseReadableLayout();
 
                 // This screen's player sits bottom-right; everyone else along the top, in Id order.
                 // Whoever's turn it is gets the TURN highlight, wherever they sit.
@@ -159,6 +162,36 @@ namespace SoulBind.UI
                 bool isPickable = matchController.IsChoosingComboTarget && !isCurrent && !apostle.IsEliminated;
                 panel.Show(apostle, isCurrent, ascension.HasAwakened && ascension.AwakenedId == apostle.Id, isPickable);
                 GothicTheme.SetPortraitHighlight(panel, isCurrent);
+            }
+        }
+
+        private void EnlargePlayerInfo()
+        {
+            if (playerSlot == null)
+                return;
+            playerSlot.sizeDelta = ApostlePanelView.ReadableSize;
+            // The larger text no longer needs the old 1.25x scale on top of the panel layout.
+            ScaleFromCorner(playerSlot, new Vector2(1f, 0f), IsPhone ? 1.1f : 1f);
+            ActionBar actions = GetComponentInChildren<ActionBar>(true);
+            if (actions != null)
+            {
+                RectTransform area = (RectTransform)actions.transform;
+                area.anchoredPosition = new Vector2(area.anchoredPosition.x,
+                    playerSlot.anchoredPosition.y + playerSlot.sizeDelta.y * playerSlot.localScale.y + 14f);
+            }
+        }
+
+        /// <summary>Space occupied by the player panel, in the hand's 1080-high design coordinates.</summary>
+        public float PlayerInfoRightClearance
+        {
+            get
+            {
+                if (playerSlot == null || _canvas == null || Screen.height <= 0)
+                    return 0f;
+                playerSlot.GetWorldCorners(_corners);
+                Camera camera = _canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : _canvas.worldCamera;
+                float left = RectTransformUtility.WorldToScreenPoint(camera, _corners[0]).x;
+                return (Screen.width - left) * 1080f / Screen.height + 24f;
             }
         }
 
@@ -221,9 +254,7 @@ namespace SoulBind.UI
                 Transform portrait = panel.transform.Find("Portrait");
                 if (portrait != null && portrait.GetComponent<Graphic>() != null)
                 {
-                    Outline ring = portrait.gameObject.AddComponent<Outline>();
-                    ring.effectColor = ApostleColors.Get(apostle.Id);
-                    ring.effectDistance = new Vector2(4f, -4f);
+                    GothicTheme.AddThemeFrame(portrait, ApostleColors.Get(apostle.Id));
                 }
                 panel.Clicked += OnPortraitClicked;
                 _panels.Add(panel);

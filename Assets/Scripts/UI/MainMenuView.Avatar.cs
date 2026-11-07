@@ -15,6 +15,11 @@ namespace SoulBind.UI
         private const int SwatchesPerRow = 3;
 
         private GameObject _avatarScreen;
+        private bool _avatarFromLobby;
+        private TMP_Text _avatarSaveStatus;
+        private readonly Button[] _avatarColorButtons = new Button[SeatColors.Count];
+        private readonly TMP_Text[] _avatarColorLabels = new TMP_Text[SeatColors.Count];
+        private float _nextAvatarRefresh;
         private Image _avatarPreview;
         private TMP_Text _avatarColorName;
         private readonly GameObject[] _swatchMarks = new GameObject[SeatColors.Count];
@@ -26,6 +31,7 @@ namespace SoulBind.UI
             _avatarScreen = frame.gameObject;
 
             RectTransform stage = Kit.Box(frame, "Preview", Kit.Inset, Kit.Line, 14f);
+            Kit.UseFrame(stage);
             Kit.At(stage, 240f, 170f, 330f, 400f);
             RectTransform art = Kit.CreateRect("Art", stage);
             Kit.At(art, 25f, 20f, 280f, 300f);
@@ -39,9 +45,12 @@ namespace SoulBind.UI
                 BuildSwatch(frame, i);
 
             TMP_Text note = Kit.Label(frame, "Note",
-                "Online, if an earlier seat has your colour, you get the next free one.", 14f, Kit.Inter, Kit.Muted,
+                "Online, colours held by other players are unavailable.", 14f, Kit.Inter, Kit.Muted,
                 TextAlignmentOptions.TopLeft);
             Kit.At(note.rectTransform, SwatchLeft, 516f, 3f * SwatchWidth + 2f * SwatchGap, 50f);
+
+            _avatarSaveStatus = Kit.Label(frame, "SaveStatus", "", 14f, Kit.Inter, Kit.Gold);
+            Kit.At(_avatarSaveStatus.rectTransform, SwatchLeft, 574f, 422f, 40f);
 
             ShowAvatarColor();
         }
@@ -51,9 +60,11 @@ namespace SoulBind.UI
         {
             float x = SwatchLeft + color % SwatchesPerRow * (SwatchWidth + SwatchGap);
             float y = SwatchTop + color / SwatchesPerRow * (SwatchHeight + SwatchGap);
-            RectTransform card = Kit.Box(frame, "Swatch " + color, Kit.Panel, Kit.Line, 12f);
+            RectTransform card = Kit.Box(frame, "Swatch " + color, Kit.Raised, Kit.Line, 12f);
+            Kit.UseFrame(card);
             Kit.At(card, x, y, SwatchWidth, SwatchHeight);
             Button button = card.gameObject.AddComponent<Button>();
+            _avatarColorButtons[color] = button;
             button.targetGraphic = card.GetComponent<Image>();
             button.onClick.AddListener(() => PickAvatarColor(color));
 
@@ -61,6 +72,7 @@ namespace SoulBind.UI
             Kit.At(disc, (SwatchWidth - 76f) / 2f, 22f, 76f, 76f);
             disc.GetComponent<Image>().raycastTarget = false;
             TMP_Text name = Kit.Label(card, "Name", ApostleColors.PaletteName(color), 16f, Kit.InterSemiBold, Kit.Soft);
+            _avatarColorLabels[color] = name;
             Kit.At(name.rectTransform, 0f, 108f, SwatchWidth, 26f);
 
             RectTransform mark = Kit.Box(card, "Picked", Color.clear, Kit.GoldBright, 12f, 3f);
@@ -71,6 +83,11 @@ namespace SoulBind.UI
         // Saves the colour and shows it.
         private void PickAvatarColor(int color)
         {
+            if (_avatarFromLobby)
+            {
+                PickLobbyColor(color);
+                return;
+            }
             ApostleColors.LocalChoice = color;
             ShowAvatarColor();
         }
@@ -85,13 +102,28 @@ namespace SoulBind.UI
             if (hasFrames)
                 _avatarPreview.color = skin.Tinted(ApostleColors.Palette(picked));
             _avatarColorName.text = ApostleColors.PaletteName(picked);
+            SoulBind.Online.OnlineSession session = SoulBind.Online.OnlineSession.Instance;
             for (int i = 0; i < _swatchMarks.Length; i++)
+            {
                 _swatchMarks[i].SetActive(i == picked);
+                bool available = !_avatarFromLobby || (session != null && session.CanPickAvatarColor(i));
+                _avatarColorButtons[i].interactable = available && !_savingLobbyColor;
+                _avatarColorLabels[i].text = ApostleColors.PaletteName(i) + (available ? "" : " (taken)");
+                _avatarColorLabels[i].fontSize = available ? 16f : 13f;
+            }
         }
 
         // Plays the idle clip on the preview while the screen is open.
         private void AnimateAvatarPreview()
         {
+            if (_avatarFromLobby && Time.unscaledTime >= _nextAvatarRefresh)
+            {
+                _nextAvatarRefresh = Time.unscaledTime + 0.5f;
+                SoulBind.Online.OnlineSession session = SoulBind.Online.OnlineSession.Instance;
+                if (session != null)
+                    session.GetRoomPlayers(_roomPlayers);
+                ShowAvatarColor();
+            }
             AvatarSkin skin = AvatarSkin.Current;
             if (skin == null || !skin.HasFrames)
                 return;

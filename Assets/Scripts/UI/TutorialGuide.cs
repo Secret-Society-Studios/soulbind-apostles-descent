@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using SoulBind.Core;
 using SoulBind.Managers;
+using SoulBind.Utility;
 using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -130,6 +131,7 @@ namespace SoulBind.UI
         {
             RectTransform rect = Kit.Box(hudRoot, "TutorialGuide", new Color(0.03f, 0.02f, 0.05f, 0.92f),
                 Kit.Gold, 14f, 2f);
+            Kit.UseFrame(rect);
             rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0.5f, 1f);
             rect.anchoredPosition = new Vector2(0f, -Top);
             rect.sizeDelta = new Vector2(Width, Height);
@@ -191,7 +193,11 @@ namespace SoulBind.UI
                 return;
 
             if (!IsComplete && IsStepDone(match, Steps[_step].Done))
+            {
                 GoTo(_step + 1);
+                if (IsComplete)
+                    TutorialProgress.MarkDone();
+            }
             if (_shownStep != _step)
                 Show();
             ShowFlash();

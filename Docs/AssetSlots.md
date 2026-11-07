@@ -23,7 +23,7 @@ Set **Fps** and **Loop** per slot.
 
 | OKR | Folder | Slots |
 | --- | --- | --- |
-| Main menu design assets | `Assets/Art/UI/MainMenu` | Main menu design (background, logo, panel, buttons) |
+| Main menu design assets | `Assets/Art/UI/MainMenu` | Main menu design (background, logo, panel, buttons, frame) |
 | Menu design assets (in-game) | `Assets/Art/UI/InGame` | In-game menu design (panel, buttons, icons, banner) |
 | Apply assets to new in-game UI | n/a | Done in code once the sprites are in the slots above |
 | Credits | `Assets/Art/Credits` | Text in `Assets/Resources/Credits.txt` |
@@ -42,6 +42,14 @@ The music and every in-game and card sound play in the game. Files named `placeh
 drag a real file over the slot, or overwrite the placeholder file to keep the slot as it is.
 The Emperor, Moon, Sun and World moment sounds are in FxLibrary (`SFX/Cards`). UI sounds are slots only.
 Code: `GameAudio.PlaySfx(clip)` and `GameAudio.PlayMusic(clip)`; a null clip does nothing.
+
+## Narrator: `Assets/Resources/NarratorLibrary.asset`
+
+One line can hold several takes per voice: one plays at random. With Mixed, the default, it picks from
+both voices. The files are `.ogg` in
+`Assets/Audio/Narrator/Normal` and `Raspy`, cut from the `.m4a` recordings in `Assets/Audio/SFX`, because
+Unity can't import `.m4a`. Lines, priorities and cooldowns: `Docs/08-narrator-lines.csv` and `Narrator.cs`.
+Players choose Mixed, Normal, Raspy or Off in Settings. Moments: `MatchNarration.cs`.
 
 ## Studio opening billboard
 

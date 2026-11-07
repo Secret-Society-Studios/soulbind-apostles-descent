@@ -50,6 +50,8 @@ namespace SoulBind.UI
         [SerializeField] private Sprite menuButton;
         [SerializeField] private Sprite menuButtonPressed;
         [SerializeField] private Sprite menuBackButton;
+        [Tooltip("The decorative border on menu containers, panels and buttons. 9-slice it, with a clear middle.")]
+        [SerializeField] private Sprite menuFrame;
 
         [Header("In-game menu design (Art/UI/InGame)")]
         [Tooltip("The Menu, Settings, Help and result boxes. 9-slice it.")]
@@ -90,10 +92,11 @@ namespace SoulBind.UI
         public Sprite MenuButton => menuButton;
         public Sprite MenuButtonPressed => menuButtonPressed;
         public Sprite MenuBackButton => menuBackButton;
-        public Sprite GamePanel => gamePanel;
-        public Sprite GameButton => gameButton;
+        public Sprite MenuFrame => menuFrame;
+        public Sprite GamePanel => menuPanel != null ? menuPanel : gamePanel;
+        public Sprite GameButton => menuButton != null ? menuButton : gameButton;
         public Sprite GameButtonPressed => gameButtonPressed;
-        public Sprite GameFrame => gameFrame;
+        public Sprite GameFrame => menuFrame != null ? menuFrame : gameFrame;
         public Sprite GameMenuIcon => gameMenuIcon;
         public Sprite GameHelpIcon => gameHelpIcon;
         public Sprite GameBanner => gameBanner;
@@ -171,10 +174,12 @@ namespace SoulBind.UI
 
             Transform frameChild = bar.Find("ThemeFrame");
             var frameImage = frameChild != null ? (Image)frameChild.GetComponent(typeof(Image)) : null;
-            if (frame != null && frameImage != null)
+            Sprite borderArt = GameFrame != null ? GameFrame : frame;
+            if (borderArt != null && frameImage != null)
             {
-                frameImage.sprite = frame;
+                frameImage.sprite = borderArt;
                 frameImage.type = Image.Type.Sliced;
+                frameImage.fillCenter = false;
                 frameImage.color = Color.white;
             }
         }

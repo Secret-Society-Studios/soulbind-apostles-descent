@@ -5,6 +5,41 @@ public class SeatColorsTests
 {
     private const int N = SeatColors.None;
 
+    [Test]
+    public void Reservations_CannotStealEvenWhenTheRequesterIsTheHost()
+    {
+        var reservations = new System.Collections.Generic.Dictionary<string, int>();
+        Assert.IsTrue(SeatColors.TryReserve(reservations, "host", 0));
+        Assert.IsTrue(SeatColors.TryReserve(reservations, "guest", 1));
+        Assert.IsFalse(SeatColors.TryReserve(reservations, "host", 1));
+        Assert.AreEqual(0, reservations["host"]);
+        Assert.AreEqual(1, reservations["guest"]);
+    }
+
+    [Test]
+    public void Reservations_TwoRequestsForOneColour_FirstGrantKeepsIt()
+    {
+        var reservations = new System.Collections.Generic.Dictionary<string, int>();
+        SeatColors.TryReserve(reservations, "first", 0);
+        SeatColors.TryReserve(reservations, "second", 1);
+        Assert.IsTrue(SeatColors.TryReserve(reservations, "second", 4));
+        Assert.IsFalse(SeatColors.TryReserve(reservations, "first", 4));
+        Assert.IsTrue(SeatColors.TryReserve(reservations, "first", 1));
+        Assert.IsFalse(SeatColors.TryReserve(reservations, "first", 99));
+        Assert.AreEqual(1, reservations["first"]);
+        Assert.AreEqual(4, reservations["second"]);
+    }
+
+    [Test]
+    public void Reservations_LeavingFreesColour_KeepingYourOwnColourIsAllowed()
+    {
+        var reservations = new System.Collections.Generic.Dictionary<string, int>();
+        SeatColors.TryReserve(reservations, "guest", 2);
+        Assert.IsTrue(SeatColors.TryReserve(reservations, "guest", 2));
+        reservations.Remove("guest");
+        Assert.IsTrue(SeatColors.TryReserve(reservations, "newcomer", 2));
+    }
+
     private static int[] Resolve(params int[] wanted)
     {
         var colors = new int[SeatColors.Count];

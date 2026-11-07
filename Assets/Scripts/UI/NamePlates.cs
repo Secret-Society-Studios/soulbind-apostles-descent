@@ -186,14 +186,16 @@ namespace SoulBind.UI
                 bool isPickable = _controller.IsChoosingComboTarget && !isCurrent && !apostle.IsEliminated;
 
                 plate.Souls.text = apostle.Souls.ToString();
-                plate.Vessel.text = $"{apostle.Vessel}/{GameConstants.MaxVessel}";
+                int vessel = SoulBind.Managers.StrikeDisplay.ShownVessel(apostle);
+                plate.Vessel.text = $"{vessel}/{GameConstants.MaxVessel}";
                 plate.Defense.text = apostle.Defense > 0 ? $"DEF {apostle.Defense}" : string.Empty;
-                SetFill(plate.VesselFill, plate.VesselFillImage, (float)apostle.Vessel / GameConstants.MaxVessel);
+                SetFill(plate.VesselFill, plate.VesselFillImage, (float)vessel / GameConstants.MaxVessel);
                 SetFill(plate.CorruptionFill, plate.CorruptionFillImage, (float)apostle.Corruption / CorruptionBarMax);
                 if (KeepsGameColours(plate.CorruptionFillImage))
                     plate.CorruptionFillImage.color = apostle.IsCorrupted ? CorruptedColor : CorruptionColor;
 
                 plate.Tag.text = isPickable ? "TAP TO PICK"
+                    : isCurrent ? "TURN"
                     : isAwakened ? "AWAKENED"
                     : apostle.IsSoullocked ? "SOULLOCKED"
                     : string.Empty;
@@ -300,9 +302,7 @@ namespace SoulBind.UI
             RectTransform badge = NewRect("SoulsBadge", plate.Rect);
             Place(badge, 8f, (Height - BadgeSize) / 2f, BadgeSize, BadgeSize);
             AddImage(badge.gameObject).color = new Color(0.07f, 0.05f, 0.09f, 1f);
-            Outline ring = badge.gameObject.AddComponent<Outline>();
-            ring.effectColor = SoulsColor;
-            ring.effectDistance = new Vector2(2f, -2f);
+            GothicTheme.AddThemeFrame(badge, SoulsColor, 3f);
             plate.Souls = NewText("Souls", badge, "0", 20f, FontStyles.Bold);
             Stretch(plate.Souls.rectTransform);
             plate.Souls.alignment = TextAlignmentOptions.Center;

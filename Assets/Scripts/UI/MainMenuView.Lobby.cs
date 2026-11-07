@@ -50,8 +50,31 @@ namespace SoulBind.UI
         private readonly StringBuilder _lobbyKey = new StringBuilder(128);
         private string _shownLobby = string.Empty;
         private float _nextLobbyRead;
+        private bool _savingLobbyColor;
 
         // ---------- Actions ----------
+
+        private async void PickLobbyColor(int color)
+        {
+            OnlineSession session = OnlineSession.Instance;
+            if (_savingLobbyColor || session == null || !session.InSession || session.MatchStarted)
+                return;
+            _savingLobbyColor = true;
+            foreach (Button button in _avatarColorButtons)
+                button.interactable = false;
+            _avatarSaveStatus.text = "Saving colour...";
+            string error = await session.SetAvatarColorAsync(color);
+            if (this == null)
+                return;
+            _savingLobbyColor = false;
+            foreach (Button button in _avatarColorButtons)
+                button.interactable = true;
+            if (OnlineSession.Instance != session || !session.InSession || session.MatchStarted)
+                return;
+            _avatarSaveStatus.text = error ?? string.Empty;
+            ShowAvatarColor();
+            ShowLobby(session, true);
+        }
 
         // Host only: starts the match with the chosen number of seats.
         private void StartOnline()
@@ -96,6 +119,8 @@ namespace SoulBind.UI
         // ---------- Showing the room ----------
 
         // Called every frame in the room. Reads the room twice a second and only redraws on a change.
+        private bool _seatAnnounced;
+
         private void ShowLobby(OnlineSession session, bool force)
         {
             if (session == null || !session.InSession)
@@ -103,6 +128,11 @@ namespace SoulBind.UI
             if (!force && Time.unscaledTime < _nextLobbyRead)
                 return;
             _nextLobbyRead = Time.unscaledTime + LobbyRefreshSeconds;
+            if (!_seatAnnounced)
+            {
+                _seatAnnounced = true;
+                Managers.Narrator.Say(Managers.NarratorLine.ChooseSeat);
+            }
 
             session.GetRoomPlayers(_roomPlayers);
             int joined = Mathf.Max(session.PlayerCount, _roomPlayers.Count);
@@ -184,10 +214,11 @@ namespace SoulBind.UI
 
             Color colour = ApostleColors.Palette(_seatColors[index]);
             bool open = index >= _roomPlayers.Count;
-            card.Fill.color = open ? Color.clear : Kit.Panel;
-            card.Border.color = open ? Kit.Line : Kit.BronzeLine;
-            card.Ring.color = open ? Color.clear : colour;
+            card.Fill.color = open ? Kit.OpenFill : Kit.Panel;
+            card.Border.color = Kit.BronzeLine;
+            card.Ring.color = open ? Kit.Inset : colour;
             card.RingBorder.color = colour;
+            card.Role.color = Kit.Soft;
 
             if (open)
             {
@@ -243,7 +274,6 @@ namespace SoulBind.UI
         {
             RectTransform frame = Kit.CreateFrame(_root, "LobbyScreen");
             _lobbyScreen = frame.gameObject;
-            AddFrameLines(frame, false);
             BuildBackButton(frame, LeaveRoom);
 
             TMP_Text codeLabel = Kit.Label(frame, "CodeLabel", "ROOM CODE", 13f, Kit.Inter, Kit.Muted,
@@ -270,7 +300,16 @@ namespace SoulBind.UI
             }
 
             BuildMatchPanel(frame);
+            BuildLobbyColors(frame);
             _lobbyScreen.SetActive(false);
+        }
+
+        // Every player can change their own preference without leaving the room.
+        private void BuildLobbyColors(RectTransform frame)
+        {
+            TMP_Text avatar = Kit.Button(frame, "Avatar", "Avatar", Kit.ButtonStyle.Secondary,
+                () => ShowScreen(Screen.Avatar), 18f);
+            Kit.At((RectTransform)avatar.transform.parent, 56f, 632f, 205f, 50f);
         }
 
         // Builds one seat card.

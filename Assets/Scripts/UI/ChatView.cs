@@ -93,6 +93,7 @@ namespace SoulBind.UI
             button.localScale = Vector3.one * scale;
 
             RectTransform picker = Kit.Box(_root, "ChatPicker", new Color(0.06f, 0.04f, 0.09f, 0.96f), Kit.GoldLine, 12f, 2f);
+            Kit.UseFrame(picker);
             PinTopRight(picker, 20f, ButtonTop + ButtonHeight * scale + 10f, PickerWidth, PickerHeight);
             picker.localScale = Vector3.one * scale;
             // A click on the panel itself must not fall through to the board.
@@ -154,6 +155,7 @@ namespace SoulBind.UI
         private Bubble BuildBubble(int seat, float scale)
         {
             RectTransform rect = Kit.Box(_root, "Bubble " + seat, new Color(0.96f, 0.92f, 0.85f, 0.97f), Kit.Gold, 18f, 2f);
+            Kit.UseFrame(rect);
             rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
             rect.pivot = new Vector2(0.5f, 0f);
             rect.sizeDelta = new Vector2(BubbleWidth, BubbleHeight);

@@ -1,0 +1,65 @@
+SOULBIND: HOW TO CHANGE OR ADD ASSETS AND SFX
+==============================================
+
+
+1. REPLACING AN EXISTING ASSET (THE EASY WAY)
+---------------------------------------------
+Overwrite the old file with your new one, keeping the EXACT same name and folder
+(in File Explorer, or by dragging it onto the old file in Unity's Project window).
+
+- The new file gets used automatically, so you don't have to set anything up again.
+- DON'T delete the old file and then add the new one. Unity gives a deleted-and-re-added
+  file a new ID, and its slot goes empty. If that happens, drag the file back into
+  its slot (see section 2).
+- Use the same format. If the old file was .wav, a new .ogg with the same name is a
+  DIFFERENT file and you'll have to put it in the slot.
+
+
+2. ADDING A NEW ASSET (OR A DIFFERENT NAME OR FORMAT)
+-----------------------------------------------------
+Step 1. Put the file in its folder:
+
+  WHAT                               FOLDER                                   SLOT ASSET (Assets/Resources/)
+  Music                              Assets/Audio/Music                       SoundLibrary
+  In-game SFX (move, hit, heal...)   Assets/Audio/SFX/Game                    SoundLibrary
+  UI SFX (click, popup...)           Assets/Audio/SFX/UI                      SoundLibrary
+  Card SFX (one per card)            Assets/Audio/SFX/Cards                   SoundLibrary > Cards 0-21
+  Narrator lines                     Assets/Audio/Narrator/Normal or Raspy    NarratorLibrary
+  Menu art (background, logo...)     Assets/Art/UI/MainMenu                   UiSkin
+  In-game UI art                     Assets/Art/UI/InGame                     UiSkin
+  Animations / auras                 Assets/Art/Animations/...                FxLibrary
+
+  The full list is in Docs/AssetSlots.md.
+
+Step 2. In Unity, click the slot asset (for example Assets/Resources/SoundLibrary).
+        The Inspector shows all its slots.
+Step 3. Drag your file from the Project window into the right slot.
+Step 4. Press Ctrl+S to save.
+
+
+3. IMPORT SETTINGS TO CHECK
+---------------------------
+IMAGES (click the file and look at the Inspector):
+- Texture Type: Sprite (2D and UI)
+- Sprite Mode: SINGLE for one picture like a logo, background or button.
+  Unity often picks "Multiple" on its own, which cuts the image into pieces, and then
+  the slot won't take it. Only sprite sheets for animations should be Multiple; slice
+  those in the Sprite Editor.
+- Filter Mode: Point for crisp pixel art.
+- Compression: None, if it looks blurry or blotchy.
+- Click APPLY after changing anything.
+
+SOUNDS:
+- Use .wav, .ogg or .mp3. NOT .m4a, because Unity can't read it. Convert it first.
+- Short SFX: Load Type = Decompress On Load
+- Music:     Load Type = Streaming
+- Click APPLY.
+
+
+4. THEN
+-------
+1. Press Play and check that it looks or sounds right. An empty or broken slot
+   doesn't crash the game. It just goes silent or falls back to the old look.
+2. For a new APK, raise the version in Player Settings (Version and the Android
+   Bundle Version Code). Then build with: SoulBind > Build Android APK...
+   Changing only art or sound doesn't need a protocol version bump.

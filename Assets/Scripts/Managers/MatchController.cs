@@ -243,12 +243,10 @@ namespace SoulBind.Managers
         private float _lungeElapsed;
         private float _lungeDuration;
         private bool _impactDone;
-        private bool _strikeStartedNow;
         private bool _lungeWaiting; // the Strike waits for the queued cards to finish playing
         private TableHandsView _hands;
         private bool _handsSearched;
-        private readonly List<Vector3> _impactTargets = new List<Vector3>(GameConstants.MaxPlayers);
-        private readonly List<int> _impactViews = new List<int>(GameConstants.MaxPlayers); // pieces that flinch
+        private readonly List<int> _impactViews = new List<int>(GameConstants.MaxPlayers); // each hit's piece
 
         // Gliding pieces: each move eases in and out, leaving a little smoke behind.
         private readonly Vector3[] _moveFrom = new Vector3[GameConstants.MaxPlayers];
@@ -304,13 +302,16 @@ namespace SoulBind.Managers
         /// <summary>True while bots play every seat except the local one.</summary>
         public bool BotsPlayOthers => botsPlayOthers;
 
-        /// <summary>True when it is this screen's player's turn, so cards, moves and buttons work.</summary>
-        public bool IsLocalTurn => CanAct && (!botsPlayOthers || CurrentMatch.CurrentApostle.Id == localApostleId);
+        /// <summary>
+        /// True when it is this screen's player's turn, so cards, moves and buttons work. Everything
+        /// waits while a Strike plays out card by card.
+        /// </summary>
+        public bool IsLocalTurn => CanAct && !OpeningHandsDealing && !StrikeDisplay.Active && (!botsPlayOthers || CurrentMatch.CurrentApostle.Id == localApostleId);
 
         /// <summary>True when this screen's player must choose the turn direction for the next Phase.</summary>
         public bool IsLocalPhaseChooser =>
             CurrentMatch != null && !CurrentMatch.IsOver && CurrentMatch.IsAwaitingPhaseStart
-            && (!botsPlayOthers || CurrentMatch.GetNextPhaseChooserId() == localApostleId);
+            && !StrikeDisplay.Active && (!botsPlayOthers || CurrentMatch.GetNextPhaseChooserId() == localApostleId);
 
         // True while someone's turn is active and the match is still running.
         private bool CanAct => CurrentMatch != null && !CurrentMatch.IsOver && CurrentMatch.CurrentApostle != null;
@@ -368,6 +369,8 @@ namespace SoulBind.Managers
             MotionStyle.Speed = animationSpeed;
             MotionStyle.ScreenShake = screenShake;
             _effects = TableEffects.Create(transform);
+            MatchNarration.Create(transform, this);
+            StrikeDisplay.End(); // in case a match was left mid-Strike
             _frameFx = FrameFx.Create(transform);
             _timeStop = TimeStopEffect.Create(transform, _frameFx);
             _cinematic = CardCinematic.Create(transform, _effects);
@@ -551,7 +554,7 @@ namespace SoulBind.Managers
         /// <summary>Host: applies an action sent by the player in this seat (the seat comes from the connection, never from the message).</summary>
         public CommandResult ApplyRemoteCommand(int seat, byte[] bytes)
         {
-            if (_online != OnlineRole.Host || CurrentMatch == null)
+            if (_online != OnlineRole.Host || CurrentMatch == null || OpeningHandsDealing)
                 return CommandResult.Refused;
             if (!MatchCommand.TryDecode(bytes, 0, out MatchCommand command))
                 return CommandResult.Malformed;
@@ -709,9 +712,9 @@ namespace SoulBind.Managers
                 _timeStop.Hold = CardsPlaying; // the card lands first, then time stops
             if (_cinematic != null)
                 _cinematic.Hold = CardsPlaying;
-            if (!CardsPlaying)
+            if (!CardsPlaying && !StrikeDisplay.Active)
                 PlayNewEffects(); // the card lands first, then its effect shows
-            if (MatchCamera.IsIntroPlaying)
+            if (MatchCamera.IsIntroPlaying || OpeningHandsDealing)
                 return; // nobody acts, and no timer runs, until the opening sweep is done
             if (_draft != null)
             {
@@ -1418,6 +1421,7 @@ namespace SoulBind.Managers
 
             if (person)
             {
+                Narrator.Say(NarratorLine.ChooseGround);
                 _draft.GetLegalTiles(_legalDestinations);
                 boardView.SetHighlights(_legalDestinations);
                 Hint = botsPlayOthers
@@ -1439,7 +1443,7 @@ namespace SoulBind.Managers
         // decides, and its next snapshot shows the new turn.
         private void UpdateTurnTimer()
         {
-            if (_turnTimer == null || CurrentMatch == null)
+            if (_turnTimer == null || CurrentMatch == null || StrikeDisplay.Active)
                 return;
 
             int key = TurnTimer.GetTurnKey(CurrentMatch);
@@ -1498,7 +1502,7 @@ namespace SoulBind.Managers
                 return;
 
             // A bot lets its queued cards finish playing before it does anything else.
-            if (CardsPlaying)
+            if (CardsPlaying || StrikeDisplay.Active)
                 return;
 
             _botWait -= Time.deltaTime;
@@ -1590,19 +1594,14 @@ namespace SoulBind.Managers
 
             float delta = Time.deltaTime;
             float lunge = 0f;
-            if (_lungeIndex >= 0 && _lungeWaiting && !CardsPlaying)
-            {
-                _lungeWaiting = false;
-                if (_lungeIndex < _views.Count)
-                    _views[_lungeIndex].PlayAttack(_lungeDirection);
-            }
+            AdvanceStrikeSteps();
             if (_lungeIndex >= 0 && !_lungeWaiting)
             {
                 _lungeElapsed += delta;
                 float t = _lungeElapsed / _lungeDuration;
                 if (t >= 1f)
                 {
-                    _lungeIndex = -1;
+                    EndSwing();
                 }
                 else
                 {
@@ -1686,22 +1685,6 @@ namespace SoulBind.Managers
             return lungeDistance * (1f - MotionStyle.InOut((t - ImpactAt) / (1f - ImpactAt)));
         }
 
-        // The Strike lands: a slash on every Apostle hit, a shudder and a dark pulse at the screen's edges.
-        private void Impact()
-        {
-            // Every Apostle whose DEF broke flinches, facing the attacker.
-            for (int i = 0; i < _impactViews.Count; i++)
-                _views[_impactViews[i]].PlayDamaged(-_lungeDirection);
-
-            GameAudio.PlaySfx(Sounds != null ? Sounds.AttackHit : null);
-            if (_effects == null)
-                return;
-            for (int i = 0; i < _impactTargets.Count; i++)
-                _effects.Strike(_impactTargets[i], _lungeDirection, apostleDiameter * 1.4f);
-            _effects.Shake(0.12f, 0.35f);
-            _effects.DarkPulse(0.6f);
-        }
-
         // A Strike just happened (by a button, a bot, or automatically at End Turn): the attacker lunges.
         private void DetectStrike()
         {
@@ -1717,27 +1700,25 @@ namespace SoulBind.Managers
                     _lungeDirection = direction.sqrMagnitude > 0f ? direction.normalized : Vector3.zero;
                     _lungeIndex = attacker;
                     _lungeElapsed = 0f;
-                    _lungeDuration = MotionStyle.Seconds(StrikeDesignedSeconds);
                     _impactDone = false;
-                    _strikeStartedNow = true; // the damage numbers wait for the impact
-                    _impactTargets.Clear();
                     _impactViews.Clear();
                     for (int h = 0; h < hits.Count; h++)
                     {
                         int hit = IndexOfApostle(hits[h].TargetId);
-                        if (hit < 0)
-                            continue;
-                        _impactTargets.Add(_discTargets[hit]);
-                        if (hits[h].BrokeDefense && hit < _views.Count)
-                            _impactViews.Add(hit);
+                        _impactViews.Add(hit < _views.Count ? hit : -1);
                     }
-                    _lungeWaiting = true; // AnimateDiscs starts it once the cards are done
+                    _lungeWaiting = true; // AdvanceStrikeSteps swings as each card lands
+                    BeginStrikeSteps(hits);
                 }
             }
 
             _wasEngaged = engaged;
             if (engaged)
+            {
                 _engagedAttackerId = CurrentMatch.CurrentApostle.Id;
+                _engagedCards.Clear();
+                _engagedCards.AddRange(CurrentMatch.AttackCards);
+            }
         }
 
         // Position of an Apostle in the battlefield list, or -1.
@@ -1756,10 +1737,9 @@ namespace SoulBind.Managers
         // gold Souls and violet Corruption. After a Strike they wait for its impact.
         private void ShowStatChanges()
         {
-            float delay = _strikeStartedNow ? StrikeDesignedSeconds * ImpactAt : 0f;
-            if (Hands != null)
-                delay += Hands.PlaySecondsLeft;
-            _strikeStartedNow = false;
+            if (StrikeDisplay.Active)
+                return; // FinishStrike shows what is left
+            float delay = Hands != null ? Hands.PlaySecondsLeft : 0f;
             IReadOnlyList<ApostleState> apostles = CurrentMatch.Battlefield.Apostles;
             for (int i = 0; i < apostles.Count && i < _lastVessel.Length; i++)
             {
@@ -1807,12 +1787,12 @@ namespace SoulBind.Managers
         private void AfterStateChange()
         {
             boardView.ClearAttackMarks();
+            DetectStrike(); // first: a Strike holds its eliminations back from SyncViews
             SyncViews();
             boardView.ShowSpecialTiles(CurrentMatch.Battlefield.Specials.Active);
             boardView.ShowAscensionTile(CurrentMatch.Ascension.HasAwakened, CurrentMatch.Ascension.Tile);
             RefreshHighlights();
             RefreshAttackMarks();
-            DetectStrike();
             SaveProfileIfOver();
             Hint = BuildHint();
             StateChanged?.Invoke();
@@ -1832,6 +1812,8 @@ namespace SoulBind.Managers
                 return _hands;
             }
         }
+
+        private bool OpeningHandsDealing => Hands != null && Hands.IsDealingOpeningHand;
 
         // True while queued cards are still being shown one by one.
         private bool CardsPlaying => Hands != null && Hands.IsPlayingCards;
@@ -1881,13 +1863,15 @@ namespace SoulBind.Managers
 
                 // Discs slide to their tile (see AnimateDiscs); one coming back into view just appears there.
                 bool wasShown = view.gameObject.activeSelf;
-                if (wasShown && apostle.IsEliminated)
+                // A Strike can delay a visible Apostle's death, but must never revive an earlier casualty.
+                bool gone = apostle.IsEliminated && (!StrikeDisplay.Active || !wasShown);
+                if (wasShown && gone)
                 {
                     PlayOnBoard(FxLibrary.Current != null ? FxLibrary.Current.Death : default, view.transform.position, null,
                         AvatarTint(apostle.Id));
                     GameAudio.PlaySfx(Sounds != null ? Sounds.Death : null);
                 }
-                view.gameObject.SetActive(!apostle.IsEliminated);
+                view.gameObject.SetActive(!gone);
                 _discTargets[i] = boardView.GetWorldPosition(apostle.Position);
                 if (!wasShown)
                 {
@@ -1924,6 +1908,8 @@ namespace SoulBind.Managers
         // The moments only noticed by comparing with the last look: someone Awakens, your turn starts.
         private void PlayTurnSounds(AscensionTracker ascension)
         {
+            if (StrikeDisplay.Active)
+                return; // FinishStrike looks again once the last card has landed
             if (ascension.HasAwakened && !_wasAwakened)
                 GameAudio.PlaySfx(Sounds != null ? Sounds.Awaken : null);
             _wasAwakened = ascension.HasAwakened;
@@ -1935,7 +1921,7 @@ namespace SoulBind.Managers
         }
 
         // Plays what has happened to the Apostles since the last look, on each of them.
-        private void PlayNewEffects()
+        private void PlayNewEffects(int limit = int.MaxValue)
         {
             if (CurrentMatch == null)
                 return;
@@ -1944,15 +1930,18 @@ namespace SoulBind.Managers
             if (count < _seenEffects || count - _seenEffects > MaxEffectBacklog)
                 _seenEffects = count;
 
-            for (int i = recent.Count - (count - _seenEffects); i < recent.Count; i++)
+            int played = 0;
+            for (int i = recent.Count - (count - _seenEffects); i < recent.Count && played < limit; i++, played++)
             {
                 MatchEffect effect = recent[i];
                 int index = IndexOfApostle(effect.ApostleId);
                 if (index >= 0 && index < _views.Count)
                     PlayOnBoard(ClipFor(effect.Kind), _views[index].transform.position, _views[index].transform, Color.white);
                 GameAudio.PlaySfx(SoundFor(effect.Kind));
+                if (effect.ApostleId == ViewerId)
+                    MatchNarration.TileUsed(effect.Kind);
             }
-            _seenEffects = count;
+            _seenEffects += played;
         }
 
         private static FrameClip ClipFor(MatchEffectKind kind)

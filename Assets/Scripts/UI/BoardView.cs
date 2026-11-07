@@ -29,6 +29,9 @@ namespace SoulBind.UI
         [SerializeField] private Color soulTileColor = new Color(0.68f, 0.45f, 0.90f);
         [SerializeField] private Color ascensionTileColor = new Color(1.00f, 0.80f, 0.20f);
         [SerializeField] private Color ascensionHighlightColor = new Color(1.00f, 0.95f, 0.60f);
+        [Tooltip("The Ascension tile pulses between this and white while The World stops time, " +
+                 "because the gold tile would vanish into the gold map.")]
+        [SerializeField] private Color ascensionFrozenColor = new Color(0.10f, 0.85f, 1.00f);
         [SerializeField] private Color attackTargetColor = new Color(0.45f, 0.08f, 0.10f);
         [Tooltip("The faint tint on every tile the Apostle can still walk to this turn (its furthest reach).")]
         [SerializeField] private Color reachColor = new Color(0.55f, 0.80f, 0.60f);
@@ -115,7 +118,10 @@ namespace SoulBind.UI
         private const int IconSortingOrder = 10; // under the avatars (11)
         private Sprite _placeholderSprite;
         private Sprite _solidHexSprite; // floating icons without art stay a filled hex
+        private const float FrozenPulseSeconds = 1.2f;
+
         private bool _hasAscensionTile;
+        private bool _ascensionPulsing;
         private HexCoord _ascensionTile;
         private bool _gridTapArmed;  // pressed on the map, not on the HUD, and has not swiped since
         private Vector2 _gridTapStart;
@@ -709,6 +715,27 @@ namespace SoulBind.UI
             return flat;
         }
 
+        // Keeps the Ascension tile easy to spot while time is stopped, then gives it its colour back.
+        private void PulseAscensionTile()
+        {
+            bool frozen = _hasAscensionTile && TimeStopEffect.IsFrozen;
+            if (!frozen && !_ascensionPulsing)
+                return;
+            bool wasPulsing = _ascensionPulsing;
+            _ascensionPulsing = frozen;
+            if (!_hasAscensionTile || !_tiles.TryGetValue(_ascensionTile, out SpriteRenderer spriteRenderer))
+                return;
+            if (frozen)
+            {
+                float wave = (Mathf.Sin(Time.unscaledTime * Mathf.PI * 2f / FrozenPulseSeconds) + 1f) / 2f;
+                spriteRenderer.color = Color.Lerp(ascensionFrozenColor, Color.white, wave);
+            }
+            else if (wasPulsing)
+            {
+                spriteRenderer.color = _highlighted.Contains(_ascensionTile) ? ascensionHighlightColor : ascensionTileColor;
+            }
+        }
+
         // True when the tile is the current Ascension tile.
         private bool IsAscensionTile(HexCoord tile) => _hasAscensionTile && _ascensionTile == tile;
 
@@ -860,6 +887,7 @@ namespace SoulBind.UI
         // Swiping or pinching never shows the grid, and takes it away if it is up.
         private void Update()
         {
+            PulseAscensionTile();
             Pointer pointer = Pointer.current;
             if (pointer != null)
             {

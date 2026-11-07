@@ -1,0 +1,255 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1136e5623c6c4c23aa58fb38122db763, type: 3}
+  m_Name: NarratorLibrary
+  m_EditorClassIdentifier: 
+  lines:
+  - line: 0
+    normal:
+    - {fileID: 8300000, guid: 5fbd7c0376d846029e16935720630299, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: e7d7f509e2ac417093beb1cd880a7021, type: 3}
+    - {fileID: 8300000, guid: 66408c9e12a94cac8d0602f939622979, type: 3}
+  - line: 1
+    normal:
+    - {fileID: 8300000, guid: ac61b7a1026645259fdd8ac87e66c449, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: 5d328cd0d16243cbb96318c9d06f2a34, type: 3}
+  - line: 2
+    normal:
+    - {fileID: 8300000, guid: 804c3a3aa9a94b5f87c39b858decf8da, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: fc279aef71364d5e85723edabdf40c84, type: 3}
+  - line: 3
+    normal:
+    - {fileID: 8300000, guid: 5610f438d36a4c1fb3f9c3307a0862a5, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: 2f31ddc8ba4f4d4e9e194bfd74072a5c, type: 3}
+  - line: 4
+    normal:
+    - {fileID: 8300000, guid: f4e432364a57437693bd4a885bc45b26, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: 662f94530f84476cb188760df10b721b, type: 3}
+  - line: 5
+    normal:
+    - {fileID: 8300000, guid: 0d0127f69bce40b4bb50c9b0ee7537ac, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: c7f50d2d9457453b8e9680aba50940b4, type: 3}
+  - line: 6
+    normal:
+    - {fileID: 8300000, guid: 19a4511c7b674119badc50ff94b9b3dd, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: 0d96c17f768b4f0fac522600f655fc0e, type: 3}
+  - line: 7
+    normal:
+    - {fileID: 8300000, guid: dbe777a686a549acb32852463acbfead, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: 625a5b4c92424271894d04cab733ef3c, type: 3}
+  - line: 8
+    normal:
+    - {fileID: 8300000, guid: bbeed4132bfe4efdb05a83120d5b7ddb, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: f4a80ef19e254672be32cde0a1a22994, type: 3}
+  - line: 9
+    normal:
+    - {fileID: 8300000, guid: 6d8cac0f93a3486a893acc13c8e84829, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: b4933f8f0195403a92bfc1881462c64c, type: 3}
+  - line: 10
+    normal:
+    - {fileID: 8300000, guid: e4e1f2f0508a460f9747af579c32261f, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: e545b91228e64b049fa2a840389742f0, type: 3}
+  - line: 11
+    normal:
+    - {fileID: 8300000, guid: 130c2653b84f4350a7bc2cf30f3263c3, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: d0675111c8a348338d040939fcc9f864, type: 3}
+  - line: 12
+    normal:
+    - {fileID: 8300000, guid: 7b6952d85d7e487a878a2c70166fdb71, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: fb57176f1e494f8c8f369a4d947beb87, type: 3}
+  - line: 13
+    normal:
+    - {fileID: 8300000, guid: a76f8567ee2f485ca20f314b5c496871, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: 7e99adf0a59140838ca5ebbb9858e348, type: 3}
+  - line: 14
+    normal:
+    - {fileID: 8300000, guid: 7a46c1cb00eb42b38f16ca2feb598566, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: 7a5f2d3849944c63999aaa27ba482493, type: 3}
+  - line: 15
+    normal:
+    - {fileID: 8300000, guid: ae71620512034b7c8027f744fb346e8b, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: 2a5083ad162040c198695f5d1866aa72, type: 3}
+  - line: 16
+    normal:
+    - {fileID: 8300000, guid: 808b6a83de354b52afd277bfd71c33e1, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: 0501f76b52bd41f389b052f4a91b81b6, type: 3}
+  - line: 17
+    normal:
+    - {fileID: 8300000, guid: fa000818fff746fcbf3d194fc691ae44, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: 2936130c90764acd8bc6f97c3ddafc25, type: 3}
+  - line: 18
+    normal:
+    - {fileID: 8300000, guid: 7d6e43ab91ad4be7a3cb1320e5a053e6, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: 7a1b2dc2a3214cfaa794e70f8dfa6e8d, type: 3}
+  - line: 19
+    normal:
+    - {fileID: 8300000, guid: 7ad06cbda3e8446084f5a30302ea8630, type: 3}
+    raspy: []
+  - line: 20
+    normal:
+    - {fileID: 8300000, guid: 7d17f4cac78e49ecae990b9f3a6906d2, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: 007e5264d0ba4f88a3b8cf09ed9bc065, type: 3}
+  - line: 21
+    normal:
+    - {fileID: 8300000, guid: f4a1c0fbafce4337aec39f909fd7fab3, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: f40980aea024463fb1ac4aeeea9d13c5, type: 3}
+  - line: 22
+    normal:
+    - {fileID: 8300000, guid: a4df1320352b4b16bab2408263d89883, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: 3c6f219e55fe4b93baeadc33dcb008c7, type: 3}
+  - line: 23
+    normal:
+    - {fileID: 8300000, guid: 8e10bdf6809146728ddb9fd6b7cef4b7, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: cbd38c2390204d9d867dc76bb08ba7eb, type: 3}
+  - line: 24
+    normal:
+    - {fileID: 8300000, guid: 41d0ac95f2cd4d909af5cfab08d078c4, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: 5f4b4616be6b4137b6104b5eddd4ed54, type: 3}
+  - line: 25
+    normal:
+    - {fileID: 8300000, guid: 560220d23f324bc2ab447bb2698c7067, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: 8736537439ac4ecd8225c87c2dc3d143, type: 3}
+  - line: 26
+    normal:
+    - {fileID: 8300000, guid: 62de089730fc4d6bb32558eb5220f509, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: d42859b50741491686ba5ad61e4f2ed9, type: 3}
+  - line: 27
+    normal:
+    - {fileID: 8300000, guid: 18c9a907a3ab4b0ba41e46bbb0d64d7c, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: 2261a0c42f5242078f6da53de6b3fa16, type: 3}
+  - line: 28
+    normal:
+    - {fileID: 8300000, guid: a5699230504f42e6bf894757dd3bd4cc, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: 3486c6c6939b4623bca45aecb559e7c1, type: 3}
+  - line: 29
+    normal:
+    - {fileID: 8300000, guid: 3cc274bc6ea94d7cab3b90a65a065766, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: bf44eb4799d247bf8bcdfadfff36575a, type: 3}
+    - {fileID: 8300000, guid: c5981c7ce0fd46939dc32ed74084957b, type: 3}
+    - {fileID: 8300000, guid: 98923ca874384281945928a837ceb78f, type: 3}
+    - {fileID: 8300000, guid: 208004f3fc9b4420be9adea6021e8c07, type: 3}
+  - line: 30
+    normal:
+    - {fileID: 8300000, guid: 229f572f7e864f609bc62b821ca7f3ba, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: 13df78a264194e09922ddc609a4e0097, type: 3}
+    - {fileID: 8300000, guid: c398d532274c4a1f8cdf30906ffb0884, type: 3}
+    - {fileID: 8300000, guid: 03daca0354f24fb1860155333586791b, type: 3}
+  - line: 31
+    normal:
+    - {fileID: 8300000, guid: 7b0ee163ca5d46ed832d1af099570269, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: 89504f5c27174ba48c73cbf8bb177998, type: 3}
+    - {fileID: 8300000, guid: 94cdb03a33514488b69aa78555d949df, type: 3}
+    - {fileID: 8300000, guid: df2bdc8da3734a7595bea195b898dd5b, type: 3}
+  - line: 32
+    normal:
+    - {fileID: 8300000, guid: 7c61be22a88b4150ae28e68416de8a21, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: c0200225788f4c7f9bceab7c453a4f1d, type: 3}
+    - {fileID: 8300000, guid: 00de0c26450740ff9036a9eaffcac246, type: 3}
+    - {fileID: 8300000, guid: b8736790143f4893ae3bdbc0770bcab2, type: 3}
+  - line: 33
+    normal:
+    - {fileID: 8300000, guid: 6c748d7735b648f39cd02e2b64d0f758, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: bea3cda63f5f42f481311b319a0a5471, type: 3}
+  - line: 34
+    normal:
+    - {fileID: 8300000, guid: 4c5e353ff2d04433bed278e79aeca212, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: 19461ddb56494970927e8fb745e7380b, type: 3}
+    - {fileID: 8300000, guid: 1965f4def83f4a01a1c9b8573e54c0bf, type: 3}
+  - line: 35
+    normal:
+    - {fileID: 8300000, guid: 74b31b895a9f4651bdc651c92087140b, type: 3}
+    - {fileID: 8300000, guid: 054c2a0e1b054d5db1d275eec30040ee, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: 6c0cab97d45d420fb3f8d353d8743c03, type: 3}
+    - {fileID: 8300000, guid: 420c2e98a93e4379b9c691801f035039, type: 3}
+    - {fileID: 8300000, guid: 15b8a42299254f6da52e775457a261d5, type: 3}
+  - line: 36
+    normal:
+    - {fileID: 8300000, guid: 4d1492b5304e40089e72a76030f6d231, type: 3}
+    - {fileID: 8300000, guid: 8b67fe1b217049899b46f817aa9917ac, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: 1c88a1f611714f9f9f07bcd772251292, type: 3}
+    - {fileID: 8300000, guid: 7ad119420c66400b832cb7ddb23679c4, type: 3}
+  - line: 37
+    normal:
+    - {fileID: 8300000, guid: 836ffb0e442d4436a3f7d757d2938a6b, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: f829584721284338ad71f1eb4c42aeb1, type: 3}
+    - {fileID: 8300000, guid: 64cf437e8461457a8c8c6825ef0e14f7, type: 3}
+    - {fileID: 8300000, guid: 27cd6815bb194545842ef90aa589566d, type: 3}
+    - {fileID: 8300000, guid: 74d900b8ea0648b8916ca0254d1aad24, type: 3}
+  - line: 38
+    normal:
+    - {fileID: 8300000, guid: 2c0c425ad5a749cc80639faef5d12cb5, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: 3860971b4ec340908a47b0c4c1e63b14, type: 3}
+    - {fileID: 8300000, guid: 8cb57844023d4421ac67d0c9e6a4d087, type: 3}
+  - line: 39
+    normal:
+    - {fileID: 8300000, guid: 2c2be75d47ee4b6caaa1417de5bd3258, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: eb17e3ed150645ebaec7d22a4f7fca71, type: 3}
+    - {fileID: 8300000, guid: 1ea7a8f4e39d413abf209a3d483e3524, type: 3}
+  - line: 40
+    normal:
+    - {fileID: 8300000, guid: 9e2caad26af548a1b8b7669796e8de41, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: 05c193d7947a4537b9e7c28488d721cf, type: 3}
+    - {fileID: 8300000, guid: 78636e22ebbb45fc9ec0981c5354d078, type: 3}
+  - line: 41
+    normal:
+    - {fileID: 8300000, guid: f539b9db9631492d833a2437a19a7dec, type: 3}
+    - {fileID: 8300000, guid: 82884576f4164c2da9d44801c85f0d68, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: 298da6cb9592481fa8ef6ced5cd38aa3, type: 3}
+    - {fileID: 8300000, guid: e129091427894ffd9ef64434e1b0852d, type: 3}
+  - line: 42
+    normal:
+    - {fileID: 8300000, guid: c517ea2b47984fadbf5a41c346df01da, type: 3}
+    - {fileID: 8300000, guid: a75479b539c14a8a9618e821f9ae4b82, type: 3}
+    raspy:
+    - {fileID: 8300000, guid: 316967d092454aa0815726e2adc16a83, type: 3}
+    - {fileID: 8300000, guid: 5d7c3ddfd02340d1b35003b5fed1deaa, type: 3}

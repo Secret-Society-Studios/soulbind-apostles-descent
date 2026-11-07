@@ -180,7 +180,6 @@ namespace SoulBind.UI
         {
             RectTransform frame = Kit.CreateFrame(_root, "OnlineScreen");
             _onlineScreen = frame.gameObject;
-            AddFrameLines(frame, false);
             BuildBackButton(frame, () => ShowScreen(Screen.Main));
 
             TMP_Text title = Kit.Label(frame, "Title", "Play Online", 40f, Kit.Display, Kit.Title,

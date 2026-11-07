@@ -65,6 +65,122 @@ namespace SoulBind.Online
         private const string NameKey = "name";
         // The session player property that holds the picked colour.
         private const string ColorKey = "color";
+        private const string ColorRequestKey = "colorRequest";
+        private const string ColorSeatPrefix = "avatar_";
+        private readonly Dictionary<string, int> _reservedColors = new Dictionary<string, int>();
+        private readonly Dictionary<string, string> _processedColorRequests = new Dictionary<string, string>();
+        private readonly List<string> _departedColorOwners = new List<string>();
+        private bool _savingColors;
+        private bool _colorsDirty;
+        private float _nextColorCheck;
+
+        // Only the host grants colours. Existing assignments are reserved before processing requests.
+        private async void Update()
+        {
+            if (!IsHost || MatchStarted || _savingColors || Time.unscaledTime < _nextColorCheck)
+                return;
+            _nextColorCheck = Time.unscaledTime + 0.5f;
+            ISession session = _session;
+            _savingColors = true;
+            try
+            {
+                _departedColorOwners.Clear();
+                foreach (string owner in _reservedColors.Keys)
+                {
+                    bool present = false;
+                    foreach (IReadOnlyPlayer player in session.Players)
+                        present |= player.Id == owner;
+                    if (!present)
+                        _departedColorOwners.Add(owner);
+                }
+                foreach (string owner in _departedColorOwners)
+                {
+                    _reservedColors.Remove(owner);
+                    _processedColorRequests.Remove(owner);
+                }
+
+                IHostSession host = session.AsHost();
+                foreach (IReadOnlyPlayer player in session.Players)
+                {
+                    bool fresh = !_reservedColors.TryGetValue(player.Id, out int assigned);
+                    int wanted = SeatColors.None;
+                    if (player.Properties.TryGetValue(ColorKey, out PlayerProperty choice))
+                        wanted = int.TryParse(choice.Value, out int parsed) ? parsed : SeatColors.None;
+                    if (fresh)
+                    {
+                        assigned = wanted;
+                        if (!SeatColors.TryReserve(_reservedColors, player.Id, assigned))
+                        {
+                            for (assigned = 0; assigned < SeatColors.Count; assigned++)
+                                if (SeatColors.TryReserve(_reservedColors, player.Id, assigned))
+                                    break;
+                        }
+                        if (assigned >= SeatColors.Count)
+                            continue;
+                        _reservedColors[player.Id] = assigned;
+                    }
+                    string token = player.Properties.TryGetValue(ColorRequestKey, out PlayerProperty request)
+                        ? request.Value ?? string.Empty : string.Empty;
+                    if (token.Length > 64)
+                        continue;
+                    bool changed = !_processedColorRequests.TryGetValue(player.Id, out string seen) || token != seen;
+                    if (!fresh && !changed)
+                        continue;
+                    if (!fresh)
+                        SeatColors.TryReserve(_reservedColors, player.Id, wanted);
+                    _processedColorRequests[player.Id] = token;
+                    host.SetProperty(ColorSeatPrefix + player.Id,
+                        new SessionProperty(token + "|" + _reservedColors[player.Id], VisibilityPropertyOptions.Member));
+                    _colorsDirty = true;
+                }
+                if (_colorsDirty)
+                {
+                    await host.SavePropertiesAsync();
+                    if (_session == session)
+                        _colorsDirty = false;
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("OnlineSession: couldn't reserve avatar colours: " + e.Message);
+            }
+            finally
+            {
+                _savingColors = false;
+            }
+        }
+
+        private static bool TryAssignedColor(ISession session, string playerId, out int color, out string token)
+        {
+            color = SeatColors.None;
+            token = string.Empty;
+            if (session.Properties == null || !session.Properties.TryGetValue(ColorSeatPrefix + playerId, out SessionProperty property))
+                return false;
+            string value = property.Value ?? string.Empty;
+            int split = value.IndexOf('|');
+            if (split < 0 || !int.TryParse(value.Substring(split + 1), out color) || color < 0 || color >= SeatColors.Count)
+                return false;
+            token = value.Substring(0, split);
+            return true;
+        }
+
+        /// <summary>A player can keep their own colour, but cannot request another player's reservation.</summary>
+        public bool CanPickAvatarColor(int color)
+        {
+            if (_session == null || MatchStarted || color < 0 || color >= SeatColors.Count)
+                return false;
+            foreach (IReadOnlyPlayer player in _session.Players)
+            {
+                if (!TryAssignedColor(_session, player.Id, out int assigned, out _))
+                    return false; // Wait for the host to seat newcomers first.
+                if (player.Id != _session.CurrentPlayer.Id && assigned == color)
+                    return false;
+            }
+            return true;
+        }
+
+        public int LocalAvatarColor => _session != null && _session.CurrentPlayer != null
+            && TryAssignedColor(_session, _session.CurrentPlayer.Id, out int color, out _) ? color : ApostleColors.LocalChoice;
 
         // This device's name, packed as a property for the room.
         private static Dictionary<string, PlayerProperty> NameProperty()
@@ -258,7 +374,51 @@ namespace SoulBind.Online
                     && int.TryParse(picked.Value, out int parsed))
                     color = parsed;
                 bool isHost = player.Id == _session.Host;
+                if (TryAssignedColor(_session, player.Id, out int assigned, out _))
+                {
+                    color = assigned;
+                    if (player.Id == me && ApostleColors.LocalChoice != color)
+                        ApostleColors.LocalChoice = color;
+                }
                 players.Add(new RoomPlayer(name, color, isHost, player.Id == me));
+            }
+        }
+
+        /// <summary>Shares this player's chosen colour with the room, for hosts and guests alike.</summary>
+        public async Task<string> SetAvatarColorAsync(int color)
+        {
+            ISession session = _session;
+            if (session == null || session.CurrentPlayer == null || MatchStarted)
+                return "Choose a colour before the match starts.";
+            if (color < 0 || color >= SeatColors.Count)
+                return "Choose a valid colour.";
+            if (!CanPickAvatarColor(color))
+                return "That colour is taken, or the host is still assigning colours.";
+
+            IPlayer player = session.CurrentPlayer;
+            player.Properties.TryGetValue(ColorKey, out PlayerProperty previous);
+            try
+            {
+                string token = Guid.NewGuid().ToString("N");
+                player.SetProperty(ColorKey, new PlayerProperty(color.ToString(), VisibilityPropertyOptions.Member));
+                player.SetProperty(ColorRequestKey, new PlayerProperty(token, VisibilityPropertyOptions.Member));
+                await session.SaveCurrentPlayerDataAsync();
+                for (int attempt = 0; attempt < 50 && _session == session && !MatchStarted; attempt++)
+                {
+                    if (TryAssignedColor(session, player.Id, out int assigned, out string response) && response == token)
+                    {
+                        ApostleColors.LocalChoice = assigned;
+                        return assigned == color ? null : "That colour was just taken. Your colour has been kept.";
+                    }
+                    await Task.Delay(200);
+                }
+                return "Colour confirmation is delayed. Check your seat before starting.";
+            }
+            catch (Exception e)
+            {
+                player.SetProperty(ColorKey, previous);
+                Debug.LogWarning("OnlineSession: couldn't share the avatar colour: " + e.Message);
+                return "Couldn't change your colour. Try again.";
             }
         }
 
@@ -311,6 +471,15 @@ namespace SoulBind.Online
             NetworkManager network = NetworkManager.Singleton;
             if (!IsHost || network == null || !network.IsListening || network.SceneManager == null)
                 return "The connection isn't ready yet. Try again in a moment.";
+            if (_savingColors || _colorsDirty)
+                return "Wait for avatar colours to finish saving.";
+            foreach (IReadOnlyPlayer player in _session.Players)
+            {
+                string requested = player.Properties.TryGetValue(ColorRequestKey, out PlayerProperty request)
+                    ? request.Value ?? string.Empty : string.Empty;
+                if (!TryAssignedColor(_session, player.Id, out _, out string confirmed) || requested != confirmed)
+                    return "Wait for everyone’s avatar colour to be confirmed.";
+            }
 
             MatchSettings.SetOnline(Mathf.Max(seats, PlayerCount));
             LockRoom();
@@ -408,6 +577,10 @@ namespace SoulBind.Online
         // Resets the session state after hosting or joining, ready for the match scene.
         private void AfterEntering()
         {
+            _reservedColors.Clear();
+            _processedColorRequests.Clear();
+            _colorsDirty = false;
+            _nextColorCheck = 0f;
             MatchStarted = false;
             _savedSeats = 0;
             SceneManager.sceneLoaded -= OnSceneLoaded;

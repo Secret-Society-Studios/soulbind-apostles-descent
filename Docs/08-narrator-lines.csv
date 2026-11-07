@@ -1,0 +1,45 @@
+id,event,line,priority,cooldown_s
+N_title_01,Title,"Welcome to SoulBind.",1,0
+N_title_02,Title,"Welcome, Apostle.",1,0
+N_lobby_01,Lobby,"Choose your seat.",1,0
+N_lobby_02,Lobby,"Waiting for Apostles.",1,0
+P7_pick_01,P7,"Choose your ground.",2,0
+G8_set_01,G8,"The board is set.",2,0
+G_start_01,MatchStart,"Let the descent begin.",3,0
+P6_turn_01,P6,"Your turn, Apostle.",1,8
+G7_phase_01,G7,"A new Phase begins.",3,0
+G7_phase_02,G7,"The weakest Apostle leads.",3,0
+P8_dir_01,P8,"Choose your direction.",2,0
+G11_skip_01,G11,"Your turn is lost.",3,0
+P2_world_01,P2_World,"Time stands still.",4,0
+P2_wheel_01,P2_Wheel,"The Wheel turns.",3,0
+P2_hierophant_01,P2_Hierophant,"Blessed by the Hierophant.",3,0
+P2_temperance_01,P2_Temperance,"Rest, and grow stronger.",3,0
+P2_death_01,P2_Death,"Judgement is passed.",4,0
+P3_block_01,P3_Block,"Blocked.",2,4
+P3_steal_01,P3_Steal,"A soul, taken.",2,4
+G10_radiance_01,G10_Radiance,"Radiance. Shielded.",3,0
+G10_celeste_01,G10_Celeste,"Celeste. Cleansed.",3,0
+G10_crimson_01,G10_Crimson,"Crimson. Sharpened.",3,0
+G10_nocturne_01,G10_Nocturne,"Nocturne. Cursed.",3,0
+G3_heal_01,G3_Heal,"Healed.",2,4
+G3_purify_01,G3_Purify,"Purified.",2,4
+G3_soul_01,G3_Soul,"A soul, claimed.",2,4
+G9_respawn_01,G9,"The tiles return.",2,0
+G4_dot_01,G4,"Corruption spreads.",2,10
+G5_hand_01,G5,"Too many cards. Corruption rises.",2,10
+G_corrupt5_01,Corrupt5,"Corrupted.",4,0
+G_corrupt10_01,Corrupt10,"Consumed.",4,0
+G15_fail_01,G15,"No souls. No mercy.",4,0
+G16_held_01,G16,"Souls are held.",2,6
+G12_awaken_01,G12,"An Apostle is Awakened.",5,0
+G12_awaken_02,G12,"The contract is fulfilled. Reach the Ascension Hex.",5,0
+G12_stop_01,G12,"Stop them.",5,0
+P4_ascend_01,P4,"Ascension.",5,0
+G13_fall_01,G13,"An Apostle has fallen.",5,0
+G13_fall_02,G13,"Your vessel is broken.",5,0
+G14_last_01,G14_LastStanding,"The last Apostle stands.",6,0
+G14_ascend_01,G14_Ascension,"{name} ascends.",6,0
+G14_complete_01,G14,"The contract is complete.",6,0
+G17_bot_01,G17,"A bot takes the seat.",2,0
+G17_left_01,G17,"An Apostle has left.",2,0
