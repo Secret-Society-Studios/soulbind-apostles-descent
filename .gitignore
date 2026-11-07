@@ -72,6 +72,10 @@ mono_crash.*
 
 # Builds
 *.apk
+
+# Signing keys: this repo is public
+*.keystore
+*.jks
 *.aab
 *.unitypackage
 *.unitypackage.meta
